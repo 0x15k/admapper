@@ -335,6 +335,7 @@ def _upload_via_evil_winrm_builtin(
 
     copy_script = "\n".join(
         [
+            f"mkdir {parent_q} -Force",
             f"upload {local_q} {filename}",
             f"copy .\\{filename} {remote_bs}",
             f"dir {remote_fwd}",
@@ -362,10 +363,10 @@ def upload_file(
         raise FileNotFoundError(local_path)
     data = local_path.read_bytes()
     expected_size = len(data)
-    _ensure_parent_dir(client, remote_path)
     target = _winrm_target(client)
 
     if client.ticket_method == "nthash" and client.nthash:
+        # Skip nxc mkdir here — gMSA PTH often returns empty stdout; evil-winrm script creates parent.
         print_info(
             f"upload: evil-winrm builtin @ {target} ({expected_size} bytes → {remote_path})"
         )
@@ -374,6 +375,7 @@ def upload_file(
         ):
             print_success(f"upload OK — evil-winrm builtin ({expected_size} bytes)")
             return
+        _ensure_parent_dir(client, remote_path)
         print_info("upload: evil-winrm builtin failed — trying certutil staging")
         if _upload_via_certutil_b64(client, data, remote_path):
             print_success(f"upload OK — certutil staging ({expected_size} bytes)")
@@ -383,6 +385,7 @@ def upload_file(
             print_success(f"upload OK — base64 chunks ({expected_size} bytes)")
             return
     else:
+        _ensure_parent_dir(client, remote_path)
         if _upload_base64_chunks(client, data, remote_path):
             print_success(f"upload OK — WinRM base64 ({expected_size} bytes)")
             return
