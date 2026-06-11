@@ -1,0 +1,1 @@
+"""ADMapper command-line interface."""

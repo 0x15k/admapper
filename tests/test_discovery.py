@@ -1,0 +1,57 @@
+import json
+from pathlib import Path
+
+from admapper.core.config import GlobalConfig
+from admapper.core.discovery import default_workspace_name, ensure_domain, resolve_domain
+from admapper.core.session import Session
+from admapper.core.workspace import WorkspaceManager
+from admapper.recon.dns import dn_to_domain
+
+
+def test_dn_to_domain() -> None:
+    assert dn_to_domain("DC=logging,DC=htb") == "logging.htb"
+
+
+def test_default_workspace_name_from_ip() -> None:
+    assert default_workspace_name("10.129.245.130") == "target-10-129-245-130"
+
+
+def test_resolve_domain_from_findings(tmp_path: Path) -> None:
+    manager = WorkspaceManager(tmp_path / "ws")
+    session = Session(config=GlobalConfig(), workspaces=manager)
+    session.select_workspace("lab")
+
+    ws_path = tmp_path / "ws" / "lab"
+    ws_path.mkdir(parents=True, exist_ok=True)
+    (ws_path / "findings.json").write_text(
+        json.dumps(
+            {
+                "findings": [
+                    {
+                        "key": "ldap_anonymous_10.0.0.1",
+                        "detail": "DC=corp,DC=local",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert resolve_domain(session) == "corp.local"
+
+
+def test_ensure_domain_persists_on_session(tmp_path: Path) -> None:
+    manager = WorkspaceManager(tmp_path / "ws")
+    session = Session(config=GlobalConfig(), workspaces=manager)
+    session.select_workspace("lab")
+
+    ws_path = tmp_path / "ws" / "lab"
+    ws_path.mkdir(parents=True, exist_ok=True)
+    (ws_path / "unauth_scan.json").write_text(
+        json.dumps({"domain": "logging.htb"}),
+        encoding="utf-8",
+    )
+
+    domain = ensure_domain(session, announce=False)
+    assert domain == "logging.htb"
+    assert session.workspace.domain == "logging.htb"

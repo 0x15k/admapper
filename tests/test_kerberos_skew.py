@@ -1,0 +1,77 @@
+from pathlib import Path
+from unittest.mock import patch
+
+from admapper.creds.kerberos_skew import (
+    check_kerberos_with_skew,
+    ensure_workspace_skew,
+    load_workspace_clock_skew,
+    save_workspace_clock_skew,
+    seconds_to_faketime_offset,
+)
+from admapper.core.platform import get_clock_skew, set_clock_skew
+
+
+def test_seconds_to_faketime_offset_hours() -> None:
+    assert seconds_to_faketime_offset(25200) == "+7h"
+    assert seconds_to_faketime_offset(-25200) == "-7h"
+
+
+def test_workspace_clock_skew_roundtrip(tmp_path: Path) -> None:
+    save_workspace_clock_skew(tmp_path, "+7h", dc_ip="10.0.0.1", stepped_seconds=25200.0)
+    assert load_workspace_clock_skew(tmp_path) == "+7h"
+    data = (tmp_path / "kerberos_clock.json").read_text(encoding="utf-8")
+    assert "10.0.0.1" in data
+    assert "25200" in data
+
+
+def test_ensure_workspace_skew_loads_cache(tmp_path: Path) -> None:
+    save_workspace_clock_skew(tmp_path, "+7h")
+    set_clock_skew(None)
+    with patch("admapper.creds.kerberos_skew.resolve_faketime", return_value="/usr/bin/faketime"):
+        applied = ensure_workspace_skew(tmp_path)
+    assert applied == "+7h"
+    assert get_clock_skew() == "+7h"
+    set_clock_skew(None)
+
+
+def test_check_kerberos_with_skew_uses_workspace_cache(tmp_path: Path) -> None:
+    save_workspace_clock_skew(tmp_path, "+7h")
+    set_clock_skew(None)
+    with patch(
+        "admapper.creds.kerberos_skew._kerberos_subprocess",
+        side_effect=lambda *a, **kw: kw.get("clock_skew") == "+7h",
+    ) as mock_krb:
+        ok, applied = check_kerberos_with_skew(
+            "logging.htb",
+            "svc_recovery",
+            "secret",
+            dc_ip="10.129.20.182",
+            ws_path=tmp_path,
+            skip_system_time=True,
+        )
+    assert ok is True
+    assert applied == "+7h"
+    assert get_clock_skew() == "+7h"
+    assert mock_krb.call_count >= 1
+
+
+def test_check_kerberos_with_skew_probes_after_system_failure(tmp_path: Path) -> None:
+    set_clock_skew(None)
+    with (
+        patch("admapper.creds.kerberos_skew.resolve_faketime", return_value="/usr/bin/faketime"),
+        patch(
+            "admapper.creds.kerberos_skew._kerberos_subprocess",
+            side_effect=lambda *a, **kw: kw.get("clock_skew") == "+7h",
+        ) as mock_krb,
+    ):
+        ok, applied = check_kerberos_with_skew(
+            "logging.htb",
+            "svc_recovery",
+            "secret",
+            dc_ip="10.129.20.182",
+            ws_path=tmp_path,
+        )
+    assert ok is True
+    assert applied == "+7h"
+    assert any(call.kwargs.get("clock_skew") is None for call in mock_krb.call_args_list)
+    assert any(call.kwargs.get("clock_skew") == "+7h" for call in mock_krb.call_args_list)

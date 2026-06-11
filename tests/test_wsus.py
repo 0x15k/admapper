@@ -1,0 +1,61 @@
+from admapper.wsus.analyze import build_wsus_opportunities
+from admapper.wsus.prerequisites import check_wsus_prerequisites, owned_groups_for_user
+
+
+def test_owned_groups_for_user() -> None:
+    inventory = {
+        "users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "groups": [
+            {
+                "name": "IT",
+                "members": ["CN=jaylee,DC=logging,DC=htb"],
+            }
+        ],
+    }
+    groups = owned_groups_for_user(inventory, "jaylee.clifton")
+    assert "IT" in groups
+
+
+def test_wsus_prerequisites_require_adcs() -> None:
+    checks = check_wsus_prerequisites(
+        username="jaylee.clifton",
+        groups=["IT"],
+        has_adcs=False,
+        wsus_share=True,
+        enroll_findings=[],
+        acl_findings=[],
+    )
+    adcs_check = next(c for c in checks if c.key == "adcs_present")
+    assert not adcs_check.met
+
+
+def test_build_wsus_cert_chain_when_enrollment_finding() -> None:
+    class FakeSession:
+        workspace = type("W", (), {"owned_users": ["jaylee.clifton"]})()
+
+    session = FakeSession()
+    adcs_findings = {
+        "findings": [
+            {
+                "esc": "template_enrollment",
+                "principal": "jaylee.clifton",
+                "template": "UpdateSrv",
+                "ca_name": "logging-DC01-CA",
+            }
+        ]
+    }
+    inventory = {
+        "users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}],
+        "smb_shares": ["WSUSTemp"],
+    }
+    ops = build_wsus_opportunities(
+        session,  # type: ignore[arg-type]
+        inventory=inventory,
+        adcs_inventory={"enrollment_services": [{"name": "logging-DC01-CA"}]},
+        adcs_findings=adcs_findings,
+        acl_data=None,
+        dc_ip="10.129.245.130",
+    )
+    techniques = {o.technique for o in ops}
+    assert "wsus_cert_chain" in techniques

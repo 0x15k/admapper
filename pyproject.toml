@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "admapper"
+version = "0.1.26"
+description = "ADMapper — cross-platform Active Directory pentesting CLI (Python)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ADMapper Contributors" }]
+keywords = ["active-directory", "pentesting", "enumeration", "kerberoasting"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Environment :: Console",
+    "Topic :: Security",
+    "Operating System :: OS Independent",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    # CORE tier — LDAP/DNS/CLI without Impacket (see docs/COMPATIBILITY.md)
+    "typer>=0.15,<1.0",
+    "rich>=13.0,<14.0",
+    "prompt-toolkit>=3.0,<4.0",
+    "dnspython>=2.7,<3.0",
+    "ldap3>=2.9,<3.0",
+]
+
+[project.optional-dependencies]
+# RECON tier — SMB/Kerberos/SAMR/GPP via Impacket (pip; same API on macOS/Linux/Windows)
+recon = [
+    "impacket>=0.12,<0.13",
+]
+# Recommended install for real engagements (alias of recon today)
+full = [
+    "impacket>=0.12,<0.13",
+    "pypsrp>=0.8,<0.9",
+    "gssapi>=1.8",
+    "krb5>=0.5",
+]
+# Developers: tests, lint, and recon extras together
+dev = [
+    "pytest>=8.0,<9.0",
+    "ruff>=0.9,<1.0",
+    "impacket>=0.12,<0.13",
+]
+
+[project.scripts]
+# Registra el comando global `admapper` (pipx / pip install).
+# Instalación oficial: ./scripts/install.sh  (pipx, sin venv)
+admapper = "admapper.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["admapper"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"admapper/guides/catalog.py" = ["E501"]
+"admapper/recon/dns.py" = ["I001"]
+"admapper/enum_pkg/ldap_users.py" = ["I001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
