@@ -214,7 +214,7 @@ def _findings_from_probes(
 
 
 def run_unauth_scan(session: Session) -> UnauthScanResult:
-    """Execute Phase 1 unauthenticated reconnaissance workflow."""
+    """P02 Unauth discovery — unauthenticated reconnaissance workflow."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -226,9 +226,10 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
     if not session.workspace.hosts and not session.workspace.domain:
         raise ValueError("set domain <fqdn> and/or set hosts <cidr|ip> before start_unauth")
 
+    from admapper.core.phases import phase_banner
     from admapper.core.verbosity import print_phase, quiet_info, quiet_success, quiet_warning
 
-    print_phase("Phase 1 — unauthenticated recon")
+    print_phase(phase_banner("p02", detail="unauthenticated recon"))
     dns_dcs: list[str] = []
     if session.workspace.domain:
         quiet_info(f"DNS SRV lookup: {session.workspace.domain}")

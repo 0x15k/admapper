@@ -46,9 +46,9 @@ def test_run_user_enumeration_merges_ldap_users(tmp_path: Path) -> None:
     ldap_result = LdapUserEnumResult(host="10.0.0.1", base_dn="DC=corp,DC=local", users=ldap_users)
 
     with (
-        patch("admapper.enum_pkg.scan.enumerate_users_ldap", return_value=ldap_result),
-        patch("admapper.enum_pkg.scan.enumerate_users_samr") as samr_mock,
-        patch("admapper.enum_pkg.scan.print_manual_guides_for_keys"),
+        patch("admapper.enumeration.scan.enumerate_users_ldap", return_value=ldap_result),
+        patch("admapper.enumeration.scan.enumerate_users_samr") as samr_mock,
+        patch("admapper.enumeration.scan.print_manual_guides_for_keys"),
     ):
         samr_mock.return_value = SamrEnumResult(host="10.0.0.1", users=[])
         result = run_user_enumeration(session)

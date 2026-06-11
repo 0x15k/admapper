@@ -20,7 +20,7 @@ class CredentialVerifyResult:
 
 
 def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyResult:
-    """Phase 7 — verify a workspace credential against the domain."""
+    """P05 Foothold — verify a workspace credential against the domain."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -47,9 +47,10 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
 
     ws_path = session.workspaces.path_for(session.workspace.name)
     ensure_dc_clock(dc_ip, ws_path=ws_path)
+    from admapper.core.phases import phase_banner
     from admapper.core.verbosity import print_phase
 
-    print_phase(f"Phase 7 — verifying {cred.display_user()} @ {dc_ip}")
+    print_phase(phase_banner("p05", detail=f"verifying {cred.display_user()} @ {dc_ip}"))
     from admapper.creds.auth_checks import load_protected_users
 
     protected = load_protected_users(str(ws_path))

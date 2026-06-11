@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "admapper"
-version = "0.1.31"
+version = "0.1.32"
 description = "ADMapper — cross-platform Active Directory pentesting CLI (Python)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -69,7 +69,7 @@ select = ["E", "F", "I", "UP"]
 [tool.ruff.lint.per-file-ignores]
 "admapper/guides/catalog.py" = ["E501"]
 "admapper/recon/dns.py" = ["I001"]
-"admapper/enum_pkg/ldap_users.py" = ["I001"]
+"admapper/enumeration/ldap_users.py" = ["I001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

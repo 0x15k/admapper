@@ -6,12 +6,7 @@ from admapper.report.engagement import _load_json
 
 
 def methodology_lines(ws_path: Path) -> list[str]:
-    """
-  Kill-chain rollup — one line per phase (done / pending / skip).
-
-  Shown in engagement map so the operator sees enumeration progress without
-  re-reading every module banner.
-  """
+    """Kill-chain rollup — also exported from ``admapper.engagement``."""
     from admapper.methodology.unified import methodology_progress_lines
 
     lines: list[str] = methodology_progress_lines(ws_path)

@@ -352,6 +352,8 @@ def compute_stage_and_actions(
     owned = _owned_lower(owned_users)
 
     has_scan = bool(unauth.get("hosts"))
+    users_data = _load_json(ws_path / "users.json") or {}
+    has_users = bool(users_data.get("users"))
     has_creds = bool(valid_users)
     has_enum = bool(inv)
     has_loot = bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
@@ -376,6 +378,48 @@ def compute_stage_and_actions(
             "game_over": False,
             "actions": actions,
         }
+
+    if has_scan and not has_users:
+        actions.append(
+            {
+                "id": "enum_users",
+                "action": "enum",
+                "button": "▶ ENUMERAR USUARIOS (IDENT)",
+                "enabled": True,
+                "reason": "SAMR · LDAP · AS-REP / Kerberoast surface",
+                "required": True,
+            }
+        )
+
+    if has_scan and has_users and not has_creds:
+        actions.extend(
+            [
+                {
+                    "id": "asreproast",
+                    "action": "asreproast",
+                    "button": "▶ AS-REP ROAST",
+                    "enabled": True,
+                    "reason": "P04 Credential access — cuentas sin pre-auth",
+                    "required": False,
+                },
+                {
+                    "id": "kerberoast",
+                    "action": "kerberoast",
+                    "button": "▶ KERBEROAST",
+                    "enabled": True,
+                    "reason": "P04 — SPNs con TGS roastable",
+                    "required": False,
+                },
+                {
+                    "id": "spray",
+                    "action": "spray",
+                    "button": "▶ PASSWORD SPRAY",
+                    "enabled": True,
+                    "reason": "P04 — prueba una contraseña en el user list",
+                    "required": False,
+                },
+            ]
+        )
 
     if not has_creds:
         actions.append(

@@ -38,14 +38,32 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """Drop orphan LDAP groups — sparse graphs collapse into one blob in vis-network."""
     nodes = payload.get("nodes") or []
     edges = payload.get("edges") or []
-    if len(nodes) <= 14:
-        return {**payload, "hidden_nodes": 0}
 
     connected: set[str] = set()
     for edge in edges:
         connected.add(str(edge.get("from", "")))
         connected.add(str(edge.get("to", "")))
     connected.discard("")
+
+    orphan_group_ids = {
+        str(node.get("id", ""))
+        for node in nodes
+        if str(node.get("group", "")) == "group"
+        and str(node.get("id", "")) not in connected
+    }
+
+    if len(nodes) <= 14:
+        if not orphan_group_ids:
+            return {**payload, "hidden_nodes": 0}
+        filtered_nodes = [n for n in nodes if str(n.get("id", "")) not in orphan_group_ids]
+        filtered_edges = list(edges)
+        hidden = len(nodes) - len(filtered_nodes)
+        return {
+            **payload,
+            "nodes": filtered_nodes,
+            "edges": filtered_edges,
+            "hidden_nodes": hidden,
+        }
 
     keep = set(connected)
     pivot = str(payload.get("pivot") or "").lower()

@@ -36,7 +36,7 @@ def run_export(
     export_navigator: bool = True,
     quiet: bool = False,
 ) -> ExportResult:
-    """Phase 17 — export evidence, technical report, and Navigator layer."""
+    """P12 Reporting — export evidence, technical report, and Navigator layer."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -45,7 +45,9 @@ def run_export(
     ws_path = session.workspaces.path_for(ws_name)
 
     if not quiet:
-        print_info("Phase 17 — reporting export")
+        from admapper.core.phases import phase_banner
+
+        print_info(phase_banner("p12", detail="reporting export"))
     collected = collect_workspace_report(ws_path)
     result = ExportResult(item_count=len(collected.items))
 

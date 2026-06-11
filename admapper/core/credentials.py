@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from admapper.core.workspace import WorkspaceManager
@@ -33,6 +34,7 @@ class CredentialStore:
             json.dumps(payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        os.chmod(self._path, 0o600)
         return self._path
 
     def add(

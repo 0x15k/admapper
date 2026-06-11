@@ -85,13 +85,14 @@ def run_auth_enumeration(
     dc_ip: str,
     domain: str,
 ) -> AuthEnumResult:
-    """Phase 8 — full authenticated LDAP + SMB enumeration."""
+    """P06 Domain enumeration — full authenticated LDAP + SMB enumeration."""
     ws_name = session.workspace.name  # type: ignore[union-attr]
     result = AuthEnumResult()
 
+    from admapper.core.phases import phase_banner
     from admapper.core.verbosity import print_phase
 
-    print_phase(f"Phase 8 — authenticated LDAP enum @ {dc_ip}")
+    print_phase(phase_banner("p06", detail=f"authenticated LDAP enum @ {dc_ip}"))
     ws_path = str(session.workspaces.path_for(ws_name))
     ldap_session, err = open_ldap_session(dc_ip, cred, domain, ws_path=ws_path)
     if ldap_session is None:
@@ -111,7 +112,7 @@ def run_auth_enumeration(
         manual=f"ldapsearch -H ldap://{dc_ip} -D '{cred.display_user()}' -w '<pass>' -b DC=...",
     )
 
-    print_phase(f"Phase 8 — authenticated SMB enum @ {dc_ip}")
+    print_phase(phase_banner("p06", detail=f"authenticated SMB enum @ {dc_ip}"))
     result.smb = enumerate_smb_authenticated(dc_ip, cred, domain)
     if result.smb.shares:
         print_ok(

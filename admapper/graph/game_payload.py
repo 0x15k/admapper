@@ -8,7 +8,16 @@ from typing import Any
 
 from admapper.analysis.engagement_intel import build_engagement_intel
 from admapper.core.operator_setup import build_operator_setup
-from admapper.methodology.unified import ENGAGEMENT_FRAMEWORK, build_study_map
+from admapper.engagement import (
+    ENGAGEMENT_FRAMEWORK,
+    build_study_map,
+    enum_highlights,
+    loot_clue_rows,
+    methodology_lines,
+)
+from admapper.report.engagement import _load_json
+from admapper.report.engagement_map import _acl_exploit_blocker
+from admapper.report.scenario import _best_cred_per_user
 from admapper.guides.pentest_book import build_pentest_book
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 from admapper.graph.game_state import build_objective_game_state
@@ -22,10 +31,6 @@ from admapper.graph.identity_lens import (
 from admapper.graph.topology import build_network_topology
 from admapper.models.escalation import EscalationEdge
 from admapper.graph.web import build_graph_payload
-from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import _acl_exploit_blocker, loot_clue_rows
-from admapper.report.methodology import enum_highlights, methodology_lines
-from admapper.report.scenario import _best_cred_per_user
 
 
 def _esc(text: str) -> str:
@@ -34,7 +39,7 @@ def _esc(text: str) -> str:
 
 def _phase_status(ws_path: Path) -> list[dict[str, Any]]:
     """Unified AD chain (CRTP core) — shortened game bar."""
-    from admapper.methodology.unified import game_phase_status
+    from admapper.engagement import game_phase_status
 
     return game_phase_status(ws_path)
 

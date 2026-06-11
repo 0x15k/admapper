@@ -12,7 +12,7 @@ from admapper.graph.game_state import (
     collect_verified_missions,
 )
 from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import loot_clue_rows
+from admapper.engagement import loot_clue_rows
 from admapper.report.scenario import _access_matrix_rows
 
 
@@ -24,7 +24,9 @@ def _user_node_id(username: str, domain: str) -> str:
     return f"user:{username.lower()}@{domain.lower()}"
 
 
-_GLOBAL_ACTION_IDS = frozenset({"scan", "cred", "enum", "loot", "acls"})
+_GLOBAL_ACTION_IDS = frozenset(
+    {"scan", "cred", "enum", "enum_users", "asreproast", "kerberoast", "spray", "loot", "acls"}
+)
 
 
 def _lookup_inventory_user(ws_path: Path, username: str) -> dict[str, Any] | None:

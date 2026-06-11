@@ -181,6 +181,66 @@ class GameContext:
             cmd.extend(["-d", self.domain])
         self._run_subprocess(cmd)
 
+    def _run_workspace_script(self, script: str, *, label: str) -> None:
+        """Run in-process op with stdout routed through the game terminal filter."""
+        import io
+        from contextlib import redirect_stdout
+
+        from admapper.core.session import Session
+
+        self.emit(label, kind="cmd")
+        session = Session.bootstrap()
+        session.select_workspace(self.workspace, create=False)
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                exec(script, {"session": session, "__name__": "__main__"})  # noqa: S102
+            session.persist_workspace()
+            for line in buf.getvalue().splitlines():
+                filtered = self.terminal_filter.process(line.rstrip())
+                if filtered:
+                    kind = "done" if filtered.startswith("✓") else "log"
+                    self.emit(filtered, kind=kind)
+            self.emit("fin · código 0", kind="done")
+        except Exception as exc:  # noqa: BLE001
+            self.emit(str(exc), kind="error")
+            self.emit("fin · código 1", kind="error")
+
+    def run_enum_users(self) -> None:
+        self._run_workspace_script(
+            "from admapper.enumeration.scan import run_user_enumeration\n"
+            "run_user_enumeration(session)",
+            label="enum users",
+        )
+
+    def run_asreproast(self) -> None:
+        self._run_workspace_script(
+            "from admapper.creds.asreproast import run_asreproast\n"
+            "run_asreproast(session)",
+            label="asreproast",
+        )
+
+    def run_kerberoast(self) -> None:
+        self._run_workspace_script(
+            "from admapper.creds.kerberoast import run_kerberoast\n"
+            "run_kerberoast(session)",
+            label="kerberoast",
+        )
+
+    def run_spray(self, password: str) -> None:
+        if not password:
+            self.emit("contraseña requerida para spray", kind="error")
+            return
+        import base64
+
+        pw_b64 = base64.b64encode(password.encode()).decode()
+        self._run_workspace_script(
+            "import base64\n"
+            "from admapper.creds.spray import run_spray\n"
+            f"run_spray(session, base64.b64decode('{pw_b64}').decode())",
+            label="spray '***'",
+        )
+
     def run_exploit(self) -> None:
         cmd = self._admapper_cmd("exploit", "-w", self.workspace)
         self._run_subprocess(cmd)
@@ -390,6 +450,26 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
                     _json_response(self, 400, {"error": "username required"})
                     return
                 self._start_background(lambda: ctx.set_pivot(user))
+                return
+
+            if path == "/api/enum":
+                self._start_background(ctx.run_enum_users)
+                return
+
+            if path == "/api/asreproast":
+                self._start_background(ctx.run_asreproast)
+                return
+
+            if path == "/api/kerberoast":
+                self._start_background(ctx.run_kerberoast)
+                return
+
+            if path == "/api/spray":
+                password = str(body.get("password", ""))
+                if not password:
+                    _json_response(self, 400, {"error": "password required"})
+                    return
+                self._start_background(lambda: ctx.run_spray(password))
                 return
 
             self.send_error(404)

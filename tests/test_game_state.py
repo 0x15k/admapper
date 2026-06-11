@@ -20,7 +20,10 @@ def test_need_creds_stage(tmp_path: Path) -> None:
     )
     assert state["stage"] == "need_creds"
     assert state["game_over"] is True
-    assert state["actions"][0]["action"] == "run"
+    action_ids = {a["action"] for a in state["actions"]}
+    assert "enum" in action_ids
+    assert "run" in action_ids
+    assert any(a.get("required") for a in state["actions"])
 
 
 def test_only_svc_recovery_verified_for_msa(tmp_path: Path) -> None:

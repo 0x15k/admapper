@@ -864,6 +864,11 @@ def build_game_html(
         <input id="cred-pass" type="password" placeholder="contraseña" autocomplete="off"/>
         <button type="button" class="action-btn" id="cred-submit" style="margin-top:0.5rem">▶ AUTENTICAR COMO ESTE USUARIO</button>
         <p class="sub">Ejecuta admapper run — añade cred al inventario sin borrar las anteriores.</p>
+      </div>
+      <div class="cred-form">
+        <label>Password spray (P04 CREDS)</label>
+        <input id="spray-pass" type="password" placeholder="contraseña para spray" autocomplete="off"/>
+        <p class="sub">Usado por la acción ▶ PASSWORD SPRAY cuando el workspace lo permite.</p>
       </div>`;
 
       if (mission && mission.principal) {{
@@ -1523,6 +1528,13 @@ def build_game_html(
         }}
       }}
       if (action === 'brief') body.auto = !!act.auto;
+      if (action === 'spray') {{
+        body.password = ($('spray-pass') || {{}}).value || '';
+        if (!body.password) {{
+          termLine('Introduce contraseña para spray (campo spray-pass)', 'line-error');
+          return;
+        }}
+      }}
       const m = act.mission || {{}};
       if (m.requires_pivot) termLine('Principal: ' + m.requires_pivot, 'line-phase');
       await postOp('/api/' + action, body, act.button || action);
