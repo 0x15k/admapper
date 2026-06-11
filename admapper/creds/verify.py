@@ -71,12 +71,14 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
     if updated is None:
         raise RuntimeError(f"failed to update credential status: {cred_id}")
 
+    from admapper.core.verbosity import is_compact
+
     rows = [
         ["ldap", _status_label(auth_result.ldap)],
         ["smb", _status_label(auth_result.smb)],
         ["kerberos", _status_label(auth_result.kerberos)],
     ]
-    if kerberos_only:
+    if kerberos_only and not is_compact():
         print_info("Protected Users — only Kerberos is accepted for this account")
     print_table("Auth checks", ["method", "result"], rows)
 
@@ -84,9 +86,12 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
     from admapper.creds.kerberos_skew import faketime_install_hint
 
     if status == CredentialStatus.VALID:
-        print_success(f"credential valid: {updated.display_user()} ({updated.id})")
+        if is_compact():
+            print_success(f"credential valid: {updated.display_user()}")
+        else:
+            print_success(f"credential valid: {updated.display_user()} ({updated.id})")
         skew = get_clock_skew()
-        if skew and auth_result.kerberos is True:
+        if skew and auth_result.kerberos is True and not is_compact():
             print_info(
                 f"Kerberos OK with clock skew {skew} — nxc/impacket calls use libfaketime"
             )
@@ -105,10 +110,16 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
                     f"Sync to DC: {suggest_time_sync(dc_ip)}"
                 )
     else:
-        print_warning(f"credential invalid: {updated.display_user()} ({updated.id})")
+        if is_compact():
+            hint = "kerberos" if auth_result.kerberos is False else "auth"
+            print_warning(f"credential invalid: {updated.display_user()} ({hint})")
+        else:
+            print_warning(f"credential invalid: {updated.display_user()} ({updated.id})")
         for err in auth_result.errors:
+            if is_compact() and "Protected Users" in err:
+                continue
             print_warning(err)
-        if auth_result.kerberos is False:
+        if auth_result.kerberos is False and not is_compact():
             from admapper.creds.time_sync import suggest_time_sync
 
             step_seconds = get_last_ntp_step_seconds()

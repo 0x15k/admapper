@@ -169,8 +169,18 @@ def check_kerberos_with_skew(
     workspace_skew = load_workspace_clock_skew(ws_path)
     effective_preferred = preferred_skew or workspace_skew
 
-    if not skip_system_time and not effective_preferred:
+    # Always try real clock first — sntp may have synced even if user passed --clock-skew.
+    if not skip_system_time:
         if _kerberos_subprocess(domain, username, secret, dc_ip=dc_ip):
+            if effective_preferred:
+                from admapper.core.output import print_info
+
+                set_clock_skew(None)
+                save_workspace_clock_skew(ws_path, None)
+                print_info(
+                    "Kerberos OK at system time — ignoring --clock-skew "
+                    "(clock already synced to DC)"
+                )
             return True, None
 
     faketime = resolve_faketime()

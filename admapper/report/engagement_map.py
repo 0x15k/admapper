@@ -13,6 +13,7 @@ from admapper.creds.kerberos_skew import load_workspace_clock_skew
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
+from admapper.report.methodology import enum_highlights, methodology_lines
 from admapper.report.scenario import _access_matrix_rows, _best_cred_per_user
 
 
@@ -50,42 +51,60 @@ def _edge_technique_detail(edge: EscalationEdge) -> str:
     return edge.summary[:80] if edge.summary else edge.title
 
 
-def _discovered_cred_rows(ws_path: Path) -> list[list[str]]:
+def loot_clue_rows(ws_path: Path) -> list[dict[str, str]]:
+    """Strings extracted from loot files — never substituted with verified secrets."""
     manifest = _load_json(ws_path / "loot_manifest.json") or {}
     cred_data = _load_json(ws_path / "credentials.json") or {}
     best = _best_cred_per_user(cred_data.get("credentials") or [])
-    protected = load_protected_users(str(ws_path))
-    rows: list[list[str]] = []
-
-    pw_data = _load_json(ws_path / "password_candidates.json") or {}
-    verified_pw: dict[str, str] = {}
-    for cand in pw_data.get("candidates") or []:
-        if cand.get("verified") and cand.get("password"):
-            verified_pw[str(cand.get("username", "")).lower()] = str(cand["password"])
+    clues: list[dict[str, str]] = []
 
     for item in manifest.get("parsed_credentials") or []:
         user = str(item.get("username", ""))
-        password = str(item.get("password", ""))
-        source = str(item.get("source_file", ""))[:28]
+        if not user:
+            continue
         match = best.get(user.lower())
-        store_secret = str(match.get("secret") or "") if match else ""
-        if store_secret and match and str(match.get("status")) == "valid":
-            password = store_secret
-        elif user.lower() in verified_pw:
-            password = verified_pw[user.lower()]
         if match and str(match.get("status")) == "valid":
-            verified = "krb ✓" if user.lower() in protected else "sí"
+            state = "verificado"
         elif match:
-            verified = str(match.get("status", "?"))
+            state = str(match.get("status", "sin verificar"))
         else:
-            verified = "pendiente"
-        rows.append([user, password, verified, source])
+            state = "sin verificar"
+        clues.append(
+            {
+                "user": user,
+                "string": str(item.get("password", "")),
+                "source": str(item.get("source_file", "")),
+                "confidence": str(item.get("confidence", "")),
+                "pattern": str(item.get("pattern", "")),
+                "verify_state": state,
+            }
+        )
+    return clues
+
+
+def _discovered_cred_rows(ws_path: Path) -> list[list[str]]:
+    """CLI table: loot file string + verification state (not the working password)."""
+    rows: list[list[str]] = []
+    for clue in loot_clue_rows(ws_path):
+        rows.append(
+            [
+                clue["user"],
+                clue["string"],
+                clue["verify_state"],
+                clue["source"][:28],
+            ]
+        )
     return rows
 
 
 def _acl_exploit_blocker(ws_path: Path) -> str | None:
     log = _load_json(ws_path / "exploit_log.json") or {}
-    for step in reversed(log.get("steps") or []):
+    steps = log.get("steps") or []
+    if any(
+        s.get("phase") == "acl_exploit" and s.get("status") == "success" for s in steps
+    ):
+        return None
+    for step in reversed(steps):
         if step.get("phase") != "acl_exploit" or step.get("status") != "skipped":
             continue
         detail = str(step.get("detail", "")).strip()
@@ -101,12 +120,25 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
                 "gMSA necesita solo TGT (no ticket HTTP WinRM) — "
                 "actualiza admapper y vuelve a ejecutar brief"
             )
-        if "clock skew" in detail_l:
+        if "clock skew" in detail_l or "krb_ap_err_skew" in detail_l:
             skew = load_workspace_clock_skew(ws_path)
-            skew_note = f" (workspace: {skew})" if skew else ""
+            if skew:
+                return (
+                    f"Kerberos clock skew (offset {skew}) — "
+                    "sincroniza con sntp o `admapper run --clock-skew` y re-ejecuta exploit"
+                )
+            creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+            valid_users = {
+                str(c.get("username", "")).lower()
+                for c in creds
+                if str(c.get("status")) == "valid"
+            }
+            # Stale skew from an earlier attempt — cred already verifies at system time.
+            if valid_users:
+                return None
             return (
-                f"Kerberos clock skew{skew_note} — reloj del host ≠ DC. "
-                "Actualiza admapper (LDAP GSSAPI bajo libfaketime) y vuelve a ejecutar brief"
+                "Kerberos clock skew — sincroniza reloj (`sntp -sS <DC_IP>`) "
+                "o instala libfaketime y re-ejecuta exploit"
             )
         return detail[:220]
     return None
@@ -260,6 +292,8 @@ def build_engagement_map(
         f"  ● owned   : {', '.join(owned) if owned else '(ninguno)'}",
         f"  ● pivot   : {pivot}{pivot_note}",
     ]
+    lines.extend(methodology_lines(ws_path))
+    lines.extend(enum_highlights(ws_path))
 
     cred_rows = _discovered_cred_rows(ws_path)
     if cred_rows:
@@ -294,39 +328,37 @@ def build_engagement_map(
             + "┴".join("─" * w for w in col_w)
             + "┘"
         )
-        lines.append("  * el log puede estar desactualizado — prueba variantes de año en la contraseña")
+        lines.append(
+            "  * cadena del archivo = pista — el operador decide qué probar (creds add / verify)"
+        )
 
     lines.extend(_hash_section_lines(ws_path, domain=domain))
 
-    pw_data = _load_json(ws_path / "password_candidates.json") or {}
-    pw_rows = pw_data.get("candidates") or []
-    if pw_rows:
-        lines.extend(["", "  CANDIDATOS DE CONTRASEÑA (propuestos — verificar en orden)"])
-        by_user: dict[str, list[dict]] = {}
-        for item in pw_rows:
-            user = str(item.get("username", "")).lower()
-            by_user.setdefault(user, []).append(item)
-        for user_l, user_cands in sorted(by_user.items()):
-            username = str(user_cands[0].get("username", user_l))
-            parts = []
-            for c in user_cands[:8]:
-                mark = "✓" if c.get("verified") else "?"
-                parts.append(f"{c.get('password')}({c.get('reason')}{mark})")
-            lines.append(f"  {username}: {', '.join(parts)}")
+    from admapper.core.verbosity import is_verbose
+
+    if is_verbose():
+        pw_data = _load_json(ws_path / "password_candidates.json") or {}
         wordlist = pw_data.get("wordlist") or []
         if wordlist:
-            lines.append(f"  wordlist → {ws_path / 'password_candidates.json'} ({len(wordlist)} lines)")
+            lines.append(
+                f"  (verbose) variantes internas → {ws_path / 'password_candidates.json'}"
+            )
 
     intel = _load_json(ws_path / "user_intel.json") or {}
     intel_users = intel.get("users") or []
-    loot_matched = [u for u in intel_users if "share_loot" in (u.get("sources") or [])]
-    if loot_matched:
-        lines.extend(["", "  USER MATCH (loot ↔ LDAP)"])
-        for u in loot_matched[:8]:
-            src = ",".join(u.get("sources") or [])
-            domain_ok = "sí" if u.get("in_domain") else "loot-only"
-            cred = u.get("cred_status") or "-"
-            lines.append(f"  {u.get('username'):<20} domain={domain_ok}  cred={cred}  sources={src}")
+    loot_anomalies = [
+        u
+        for u in intel_users
+        if "share_loot" in (u.get("sources") or [])
+        and str(u.get("cred_status", "")).lower() not in {"valid", "verified"}
+    ]
+    if loot_anomalies:
+        lines.extend(["", "  LOOT SIN VERIFICAR (usuario en LDAP, cred pendiente)"])
+        for u in loot_anomalies[:6]:
+            lines.append(
+                f"  {u.get('username'):<20} cred={u.get('cred_status') or 'pendiente'}  "
+                f"→ creds add + creds verify"
+            )
 
     acl_blocker = _acl_exploit_blocker(ws_path)
     if acl_blocker:
@@ -370,17 +402,17 @@ def build_engagement_map(
         findings = scan.get("findings") or []
         if findings and pivot.endswith("$"):
             f = findings[0]
-            run_as = str(f.get("run_as_user") or "jaylee.clifton")
-            zip_name = str(f.get("payload_zip") or "Settings_Update.zip")
-            drop = str(f.get("drop_path") or r"C:\ProgramData\UpdateMonitor")
+            run_as = str(f.get("run_as_user") or "?")
+            zip_name = str(f.get("payload_zip") or "payload.zip")
+            drop = str(f.get("drop_path") or "?")
+            task = str(f.get("task_name") or f.get("technique") or "scheduled task")
             lines.extend(
                 [
                     "",
                     "  SIGUIENTE PASO  [listo]",
                     f"  {pivot} ──dll_hijack_scheduled_task──► {run_as}",
-                    f"  Técnica   : Drop {zip_name} → {drop} (task Update Check)",
+                    f"  Técnica   : {task} → {drop}\\{zip_name}",
                     f"  Comando   : admapper postex run -w {workspace}",
-                    f"  Después   : {run_as} → UpdateSrv (Server Auth) → WSUS → DA",
                 ]
             )
 
@@ -400,16 +432,86 @@ def build_engagement_map(
             lines.append(f"  {edge.target} ──{edge.technique}──► {edge.module} ({state})")
 
     access = _access_matrix_rows(ws_path)
-    if access:
-        lines.extend(["", "  ESTADO DE CREDENCIALES (compacto)"])
+    owned_l = {u.lower() for u in owned}
+    access_owned = [row for row in access if str(row[0]).lower() in owned_l]
+    if access_owned:
+        lines.extend(["", "  ACCESO PIVOT / OWNED (ldap · smb · krb · winrm)"])
         lines.append("  usuario              ldap  smb  krb  winrm   nota")
-        for row in access:
+        for row in access_owned:
             lines.append(
                 f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}"
             )
 
     lines.extend(["", "═" * 39, ""])
     return "\n".join(lines)
+
+
+def build_engagement_summary(
+    ws_path: Path,
+    *,
+    workspace: str,
+    domain: str | None,
+    owned_users: list[str] | None = None,
+    pivot_user: str | None = None,
+) -> dict[str, object]:
+    """Structured rollup for game UI / compact terminal (learner-friendly)."""
+    owned = list(owned_users or [])
+    pivot = pivot_user or (owned[-1] if owned else "")
+    domain_s = domain or "(sin dominio)"
+    from admapper.report.methodology import methodology_lines
+
+    phases = [
+        ln.strip().lstrip("✓·").strip()
+        for ln in methodology_lines(ws_path)
+        if ln.strip().startswith(("✓", "·"))
+    ]
+    acl_blocker = _acl_exploit_blocker(ws_path)
+    edges = collect_edges_from_pivot(
+        pivot_user=pivot,
+        owned_users=owned,
+        ws_path=ws_path,
+        domain=domain_s,
+    )
+    next_edge = pick_next_edge(edges)
+    next_title = ""
+    next_technique = ""
+    if next_edge:
+        next_title = (
+            f"{pivot} ──{next_edge.technique}──► {next_edge.target}"
+            if pivot
+            else next_edge.title
+        )
+        next_technique = _edge_technique_detail(next_edge)
+
+    return {
+        "domain": domain_s,
+        "owned": owned,
+        "pivot": pivot,
+        "phases": phases,
+        "blocker": acl_blocker,
+        "next_title": next_title,
+        "next_technique": next_technique,
+        "workspace": workspace,
+    }
+
+
+def format_engagement_summary_lines(summary: dict[str, object]) -> list[str]:
+    lines = ["── RESUMEN ──"]
+    owned = summary.get("owned") or []
+    pivot = summary.get("pivot") or "—"
+    lines.append(f"Owned: {', '.join(owned) if owned else '—'} · Pivot: {pivot}")
+    for phase in (summary.get("phases") or [])[:6]:
+        lines.append(f"  ✓ {phase}")
+    blocker = summary.get("blocker")
+    if blocker:
+        lines.append(f"⚠ Bloqueo: {blocker}")
+    next_title = summary.get("next_title")
+    if next_title:
+        lines.append(f"→ Siguiente: {next_title}")
+        tech = summary.get("next_technique")
+        if tech:
+            lines.append(f"  {tech}")
+    return lines
 
 
 def print_engagement_map(
@@ -420,6 +522,27 @@ def print_engagement_map(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
 ) -> None:
+    from admapper.core.verbosity import is_compact
+
+    if is_compact():
+        summary = build_engagement_summary(
+            ws_path,
+            workspace=workspace,
+            domain=domain,
+            owned_users=owned_users,
+            pivot_user=pivot_user,
+        )
+        from admapper.core.output import print_info, print_success, print_warning
+
+        for line in format_engagement_summary_lines(summary):
+            if line.startswith("⚠"):
+                print_warning(line.removeprefix("⚠ ").strip())
+            elif line.startswith("Owned") or line.startswith("  ✓"):
+                print_success(line)
+            else:
+                print_info(line)
+        return
+
     text = build_engagement_map(
         ws_path,
         workspace=workspace,

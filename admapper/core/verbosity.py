@@ -12,6 +12,13 @@ def is_verbose() -> bool:
     return _verbose
 
 
+def is_compact() -> bool:
+    """Game UI / learner mode — short structured output, no raw CLI dumps."""
+    from admapper.core.game_mode import is_game_mode
+
+    return is_game_mode()
+
+
 def print_phase(message: str) -> None:
     """Print phase banners only in verbose mode."""
     if _verbose:

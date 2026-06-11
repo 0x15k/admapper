@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from admapper.auth.bloodhound_export import export_bloodhound_minimal
@@ -13,9 +15,11 @@ from admapper.core.graph import GraphStore
 from admapper.core.output import print_info, print_success, print_table, print_warning
 from admapper.core.users import UsersStore
 from admapper.creds.common import apply_cracked_credentials
+from admapper.creds.policy import apply_lockout_states, fetch_lockout_context
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import Credential
 from admapper.models.finding import Finding, FindingSeverity
+from admapper.models.spray import DomainLockoutPolicy
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
@@ -93,6 +97,7 @@ def run_auth_enumeration(
     if ldap_session is None:
         raise ValueError(err or "LDAP session failed")
 
+    ldap_base_dn = ldap_session.base_dn
     try:
         result.ldap = enumerate_ldap_authenticated(ldap_session)
     finally:
@@ -132,9 +137,34 @@ def run_auth_enumeration(
         rows = [[g.user, g.password, g.source_file] for g in result.smb.gpp_credentials]
         print_table("GPP credentials", ["user", "password", "source"], rows)
 
+    ldap_users = result.ldap.users
+    lockout_ctx = fetch_lockout_context(dc_ip, base_dn=ldap_base_dn)
+    if lockout_ctx.user_states:
+        ldap_users = apply_lockout_states(ldap_users, lockout_ctx.user_states)
+    lockout_path = session.workspaces.path_for(ws_name) / "lockout_policy.json"
+    lockout_payload = {
+        "fetched_at": datetime.now(UTC).isoformat(),
+        "host": lockout_ctx.host,
+        "base_dn": lockout_ctx.base_dn,
+        "error": lockout_ctx.error,
+        "policy": (lockout_ctx.policy or DomainLockoutPolicy(source_host=dc_ip)).to_dict(),
+        "user_states": [
+            {
+                "username": s.username,
+                "bad_pwd_count": s.bad_pwd_count,
+                "lockout_time": s.lockout_time,
+            }
+            for s in lockout_ctx.user_states
+        ],
+    }
+    lockout_path.write_text(
+        json.dumps(lockout_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
     inventory = AuthInventoryStore(session.workspaces, ws_name)
     inv_path = inventory.save(
-        users=result.ldap.users,
+        users=ldap_users,
         groups=result.ldap.groups,
         computers=result.ldap.computers,
         ous=result.ldap.ous,

@@ -48,12 +48,35 @@ def print_info(message: str) -> None:
 
 
 def print_table(title: str, columns: list[str], rows: list[list[str]]) -> None:
+    from admapper.core.verbosity import is_compact
+
+    if is_compact():
+        _print_table_compact(title, columns, rows)
+        return
     table = Table(title=title, show_header=True, header_style="bold")
     for column in columns:
         table.add_column(column)
     for row in rows:
         table.add_row(*row)
     console.print(table)
+
+
+def _print_table_compact(title: str, columns: list[str], rows: list[list[str]]) -> None:
+    title_l = title.lower()
+    if title == "Auth checks" and len(columns) >= 2:
+        parts = {str(r[0]): str(r[1]) for r in rows if len(r) >= 2}
+        print_info(
+            "Auth: "
+            + " · ".join(f"{k}={v}" for k, v in parts.items())
+        )
+        return
+    if "post-exploitation" in title_l or "post-exploitation" in title_l.replace("_", "-"):
+        print_info(f"POST-EX: {len(rows)} oportunidad(es) — detalle en panel derecho")
+        return
+    if title in {"Engagement", "Domain controller"}:
+        return
+    if rows:
+        print_info(f"{title}: {len(rows)} fila(s)")
 
 
 def confirm(

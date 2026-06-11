@@ -30,7 +30,48 @@ def _load_unauth_report(ws_path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def print_scan_summary(session: Session) -> None:
+def sync_hosts_from_session(session: Session, *, enabled: bool = True) -> None:
+    """Update /etc/hosts from unauth scan DC row when FQDN is known."""
+    if not enabled or session.workspace is None:
+        return
+    ws_path = session.workspaces.path_for(session.workspace.name)
+    report = _load_unauth_report(ws_path)
+    for host in report.get("hosts") or []:
+        if host.get("is_domain_controller") or str(host.get("address")) == session.workspace.hosts:
+            fqdn = str(host.get("hostname") or "")
+            ip = str(host.get("address") or session.workspace.hosts or "")
+            if ip and fqdn and fqdn != "-":
+                _sync_dc_hosts_entry(ip, fqdn, sync_hosts=True)
+                return
+
+
+def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
+    if not sync_hosts:
+        hint = format_hosts_hint(ip, fqdn)
+        if hint:
+            print_info(hint)
+        return
+
+    from admapper.core.system_hosts import (
+        HostsSyncStatus,
+        ensure_system_hosts_entry,
+        format_hosts_sync_message,
+    )
+
+    result = ensure_system_hosts_entry(ip, fqdn)
+    message = format_hosts_sync_message(result)
+    if result.status in {HostsSyncStatus.PRESENT, HostsSyncStatus.ADDED, HostsSyncStatus.UPDATED}:
+        print_success(message)
+    elif result.status == HostsSyncStatus.FAILED:
+        print_warning(message)
+        hint = format_hosts_hint(ip, fqdn)
+        if hint:
+            print_info(hint)
+    else:
+        print_info(message)
+
+
+def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
     """Black-box summary after unauthenticated recon."""
     if session.workspace is None:
         return
@@ -78,10 +119,8 @@ def print_scan_summary(session: Session) -> None:
     if dc_rows:
         print_table("Domain controller", ["ip", "hostname", "ports", "dc"], dc_rows)
         for row in dc_rows:
-            hint = format_hosts_hint(str(row[0]), str(row[1]))
-            if hint:
-                print_info(hint)
-                break
+            _sync_dc_hosts_entry(str(row[0]), str(row[1]), sync_hosts=sync_hosts)
+            break
 
     findings = report.get("findings") or []
     if findings:
@@ -108,6 +147,37 @@ def print_scan_summary(session: Session) -> None:
     print_warning("No credentials were used — workspace is recon-only until you add creds.")
 
 
+def sync_dc_engagement(
+    session: Session,
+    *,
+    ip_dc: str,
+    workspace: str | None = None,
+    sync_hosts: bool = True,
+) -> None:
+    """One-shot local prep: sync clock to DC and optional /etc/hosts (requires sudo)."""
+    ip = ip_dc.strip()
+    if not ip:
+        raise ValueError("DC IP is required")
+
+    ws_name = workspace or default_workspace_name(ip)
+    session.select_workspace(ws_name, create=True)
+    dispatch(session, f"set hosts {ip}")
+    session.persist_workspace()
+
+    from admapper.core.output import print_info, print_success
+    from admapper.creds.time_sync import ensure_dc_clock
+
+    ws_path = session.workspaces.path_for(ws_name)
+    print_info(f"sync-dc @ {ip} → workspace {ws_name}")
+    if ensure_dc_clock(ip, enabled=True, ws_path=ws_path, force=True):
+        print_success("reloj sincronizado con el DC")
+    else:
+        print_info("reloj: usa libfaketime si Kerberos sigue fallando")
+
+    print_scan_summary(session, sync_hosts=sync_hosts)
+    session.persist_workspace()
+
+
 def scan_engagement(
     session: Session,
     *,
@@ -116,6 +186,7 @@ def scan_engagement(
     domain: str | None = None,
     mode: OperationMode = OperationMode.SEMI,
     sync_clock: bool = True,
+    sync_hosts: bool = True,
 ) -> None:
     """
     Phase 0 black-box entry: only the DC IP is required.
@@ -146,14 +217,17 @@ def scan_engagement(
     except ValueError:
         print_warning("domain not inferred — PTR/LDAP may be restricted; set domain manually if known")
 
+    from admapper.core.game_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.time_sync import ensure_dc_clock
 
+    sync_clock = effective_sync_clock(sync_clock)
+    sync_hosts = effective_sync_hosts(sync_hosts)
     ws_path = (
         session.workspaces.path_for(session.workspace.name) if session.workspace else None
     )
     ensure_dc_clock(ip, enabled=sync_clock, ws_path=ws_path)
 
-    print_scan_summary(session)
+    print_scan_summary(session, sync_hosts=sync_hosts)
 
     if session.workspace is not None:
         session.persist_workspace()

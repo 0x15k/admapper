@@ -84,7 +84,10 @@ def run_brief(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
+    from admapper.core.game_mode import effective_sync_clock
+
     apply_clock_skew_option(clock_skew)
+    sync_clock = effective_sync_clock(sync_clock)
 
     ws_name = session.workspace.name
     ws_path = session.workspaces.path_for(ws_name)
@@ -152,16 +155,11 @@ def run_brief(
         owned_users=list(session.workspace.owned_users or []),
         pivot_user=session.workspace.pivot_user,
     )
-    print_info(f"attack graph (web) → file://{graph_html.resolve()}")
-    if not is_verbose():
-        from admapper.core.provenance import Tool, print_step
-
-        print_step(
-            "abre attack_graph.html en el navegador (grafo + user match)",
-            source=Tool.ADMAPPER,
-            manual="admapper graph -w <workspace> --serve",
-        )
+    if is_verbose():
+        print_info(f"attack graph (web) → file://{graph_html.resolve()}")
     else:
+        print_info(f"grafo → file://{graph_html.resolve()}")
+    if is_verbose():
         from admapper.graph.show import print_attack_graph
 
         print_attack_graph(

@@ -111,7 +111,13 @@ def check_kerberos_tgt(
     skew = preferred_clock_skew or get_clock_skew()
     step_seconds = get_last_ntp_step_seconds()
     step_derived = seconds_to_faketime_offset(step_seconds) if step_seconds else None
-    skip_system_time = kerberos_only and (bool(skew) or is_clock_unstable())
+    from admapper.creds.time_sync import was_dc_clock_synced
+
+    skip_system_time = (
+        kerberos_only
+        and not was_dc_clock_synced(dc_ip)
+        and (bool(skew) or is_clock_unstable())
+    )
     ok, _applied = check_kerberos_with_skew(
         domain,
         username,

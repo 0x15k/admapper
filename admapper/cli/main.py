@@ -385,6 +385,13 @@ def scan(
         bool,
         typer.Option("--no-sync", help="Skip automatic clock sync with the DC"),
     ] = False,
+    no_hosts_sync: Annotated[
+        bool,
+        typer.Option(
+            "--no-hosts-sync",
+            help="Do not update /etc/hosts (default: auto-add DC FQDN via sudo)",
+        ),
+    ] = False,
 ) -> None:
     """Black-box recon: discover domain and AD surface from DC IP only (no credentials)."""
     from admapper.core.output import print_error
@@ -398,8 +405,49 @@ def scan(
             workspace=workspace,
             domain=domain,
             sync_clock=not no_sync,
+            sync_hosts=not no_hosts_sync,
         )
     except (ValueError, RuntimeError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("sync-dc")
+def sync_dc(
+    ip_dc: Annotated[
+        str,
+        typer.Option(
+            "--ip-dc",
+            "-H",
+            "--host",
+            help="Domain controller IP",
+        ),
+    ],
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: derived from IP)"),
+    ] = None,
+    no_hosts_sync: Annotated[
+        bool,
+        typer.Option(
+            "--no-hosts-sync",
+            help="Only sync clock — do not update /etc/hosts",
+        ),
+    ] = False,
+) -> None:
+    """Sync local clock (and /etc/hosts) to the DC — run once with sudo, outside the game UI."""
+    from admapper.cli.scan import sync_dc_engagement
+    from admapper.core.output import print_error
+
+    session = Session.bootstrap()
+    try:
+        sync_dc_engagement(
+            session,
+            ip_dc=ip_dc,
+            workspace=workspace,
+            sync_hosts=not no_hosts_sync,
+        )
+    except (ValueError, RuntimeError, PermissionError) as exc:
         print_error(str(exc))
         raise typer.Exit(code=1) from exc
 
@@ -436,6 +484,13 @@ def run(
         bool,
         typer.Option("--no-sync", help="Skip automatic clock sync with the DC"),
     ] = False,
+    no_hosts_sync: Annotated[
+        bool,
+        typer.Option(
+            "--no-hosts-sync",
+            help="Do not update /etc/hosts (default: auto-add DC FQDN via sudo)",
+        ),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("-v", "--verbose", help="Full phase output, guides, and scenario report"),
@@ -458,6 +513,7 @@ def run(
         minimal=minimal,
         clock_skew=clock_skew,
         sync_clock=not no_sync,
+        sync_hosts=not no_hosts_sync,
         verbose=verbose,
         auto=auto,
     )
@@ -604,6 +660,71 @@ def graph(
         domain=session.workspace.domain,
         pivot_user=session.workspace.pivot_user,
         owned_users=list(session.workspace.owned_users or []),
+    )
+
+
+@app.command()
+def game(
+    host: Annotated[
+        str | None,
+        typer.Option(
+            "-H",
+            "--host",
+            "--ip",
+            help="Target IP — blackbox start (creates workspace target-<ip>)",
+        ),
+    ] = None,
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Game server port (default 8766)"),
+    ] = 8766,
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open game in browser"),
+    ] = True,
+) -> None:
+    """AD Ops — blackbox AD engagement game (IP → scan → topology → escalate)."""
+    from admapper.cli.commands import dispatch
+    from admapper.core.discovery import default_workspace_name
+    from admapper.core.output import print_error, print_info
+    from admapper.core.session import Session
+    from admapper.graph.game_server import run_game_server
+    from admapper.graph.game_ui import write_game_html
+
+    session = Session.bootstrap()
+    if host:
+        ws_name = workspace or default_workspace_name(host)
+        session.select_workspace(ws_name, create=True)
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        print_info(f"blackbox → workspace {ws_name} · target {host.strip()}")
+    elif workspace:
+        session.select_workspace(workspace, create=False)
+    elif session.workspace is None:
+        print_error("blackbox: admapper game -H <IP>   o   admapper game -w <workspace>")
+        raise typer.Exit(1)
+    ws = session.workspace
+    ws_path = session.workspaces.path_for(ws.name)
+    write_game_html(
+        ws_path,
+        workspace=ws.name,
+        domain=ws.domain,
+        pivot_user=ws.pivot_user,
+        owned_users=list(ws.owned_users or []),
+    )
+    run_game_server(
+        ws_path=ws_path,
+        workspace=ws.name,
+        domain=ws.domain,
+        owned_users=list(ws.owned_users or []),
+        pivot_user=ws.pivot_user,
+        host=ws.hosts,
+        port=port,
+        open_browser=open_browser,
     )
 
 

@@ -11,3 +11,10 @@ build/
 workspaces/
 *.local.json
 .DS_Store
+.venv*/
+attack_graph.html
+**/ad_ops.html
+credentials.json
+**/credentials.json
+**/password_candidates.json
+**/kerberos_hashes.json

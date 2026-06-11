@@ -12,9 +12,18 @@ _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 
 def _validate_workspace_name(name: str) -> str:
     cleaned = name.strip()
+    # Bracketed-paste artifact: iTerm/Terminal sometimes appends '~'
+    if cleaned.endswith("~"):
+        candidate = cleaned[:-1].strip()
+        if _WORKSPACE_NAME_RE.fullmatch(candidate):
+            cleaned = candidate
     if not _WORKSPACE_NAME_RE.fullmatch(cleaned):
+        hint = ""
+        if name.strip().endswith("~"):
+            hint = f" — ¿quisiste '{name.strip().rstrip('~')}'? (quita el ~ del pegado)"
         raise ValueError(
             "workspace name must be 1-64 chars: letters, digits, '.', '_' or '-'"
+            + hint
         )
     return cleaned
 

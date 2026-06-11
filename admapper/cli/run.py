@@ -30,10 +30,12 @@ def run_engagement(
     minimal: bool = False,
     clock_skew: str | None = None,
     sync_clock: bool = True,
+    sync_hosts: bool = True,
     verbose: bool = False,
     auto: bool = False,
 ) -> None:
     """Non-interactive engagement — con creds ejecuta analyst por defecto."""
+    from admapper.core.game_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.kerberos_skew import apply_clock_skew_option
     from admapper.creds.time_sync import ensure_dc_clock
 
@@ -41,6 +43,8 @@ def run_engagement(
 
     apply_clock_skew_option(clock_skew)
     set_verbose(verbose)
+    sync_clock = effective_sync_clock(sync_clock)
+    sync_hosts = effective_sync_hosts(sync_hosts)
 
     ws_name = workspace or default_workspace_name(host)
 
@@ -68,7 +72,7 @@ def run_engagement(
             else None
         )
         ensure_dc_clock(host, enabled=sync_clock, ws_path=ws_path)
-        print_scan_summary(session)
+        print_scan_summary(session, sync_hosts=sync_hosts)
         if session.workspace is not None:
             session.persist_workspace()
         return
@@ -90,6 +94,10 @@ def run_engagement(
         print_info(str(exc))
 
     ensure_dc_clock(host, enabled=sync_clock, ws_path=ws_path)
+
+    from admapper.cli.scan import sync_hosts_from_session
+
+    sync_hosts_from_session(session, enabled=sync_hosts)
 
     if not session.workspace or not session.workspace.domain:
         from admapper.recon.ldap_probe import discover_domain_from_bind

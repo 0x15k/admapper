@@ -8,7 +8,7 @@ from typing import Any
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 from admapper.creds.common import collect_gained_hashes, format_evil_winrm_pth
 from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import _acl_exploit_blocker
+from admapper.report.engagement_map import _acl_exploit_blocker, loot_clue_rows
 
 
 def _esc(text: str) -> str:
@@ -34,12 +34,59 @@ def _node_color(node: dict[str, Any], *, pivot: str, owned: set[str]) -> str:
     return "#64748b"
 
 
+def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop orphan LDAP groups — sparse graphs collapse into one blob in vis-network."""
+    nodes = payload.get("nodes") or []
+    edges = payload.get("edges") or []
+    if len(nodes) <= 14:
+        return {**payload, "hidden_nodes": 0}
+
+    connected: set[str] = set()
+    for edge in edges:
+        connected.add(str(edge.get("from", "")))
+        connected.add(str(edge.get("to", "")))
+    connected.discard("")
+
+    keep = set(connected)
+    pivot = str(payload.get("pivot") or "").lower()
+    owned = {str(u).lower() for u in (payload.get("owned") or [])}
+
+    for node in nodes:
+        nid = str(node.get("id", ""))
+        label = str(node.get("label", "")).lower()
+        group = str(node.get("group", ""))
+        if group in ("gmsa", "dc", "operator", "computer"):
+            keep.add(nid)
+        if label.startswith("★"):
+            keep.add(nid)
+        if pivot and pivot in label:
+            keep.add(nid)
+        for user in owned:
+            if user and user in label:
+                keep.add(nid)
+
+    filtered_nodes = [n for n in nodes if str(n.get("id", "")) in keep]
+    filtered_edges = [
+        e
+        for e in edges
+        if str(e.get("from", "")) in keep and str(e.get("to", "")) in keep
+    ]
+    hidden = len(nodes) - len(filtered_nodes)
+    return {
+        **payload,
+        "nodes": filtered_nodes,
+        "edges": filtered_edges,
+        "hidden_nodes": hidden,
+    }
+
+
 def build_graph_payload(
     ws_path: Path,
     *,
     domain: str,
     pivot_user: str | None = None,
     owned_users: list[str] | None = None,
+    tactical: bool = False,
 ) -> dict[str, Any]:
     """Collect nodes/edges for vis-network from graph.json + ACLs + escalate."""
     owned = {u.lower() for u in (owned_users or [])}
@@ -50,8 +97,22 @@ def build_graph_payload(
     vis_nodes: dict[str, dict] = {}
     vis_edges: list[dict] = []
 
-    def add_node(nid: str, label: str, group: str, color: str, title: str = "") -> None:
+    def add_node(
+        nid: str,
+        label: str,
+        group: str,
+        color: str,
+        title: str = "",
+        *,
+        username: str = "",
+        identity_role: str = "unknown",
+    ) -> None:
         if nid in vis_nodes:
+            existing = vis_nodes[nid]
+            if username:
+                existing["username"] = username
+            if identity_role != "unknown":
+                existing["identity_role"] = identity_role
             return
         vis_nodes[nid] = {
             "id": nid,
@@ -60,21 +121,33 @@ def build_graph_payload(
             "color": color,
             "title": title or label,
             "font": {"color": "#f8fafc" if color != "#64748b" else "#0f172a"},
+            "username": username,
+            "identity_role": identity_role,
         }
 
     for node in graph.get("nodes", []):
         nid = str(node.get("id", ""))
         if not nid:
             continue
-        label = str(node.get("username") or node.get("name") or nid.split(":")[0])
-        if node.get("owned"):
+        username = str(node.get("username") or node.get("name") or nid.split(":")[0])
+        label = username
+        is_owned = bool(node.get("owned")) or username.lower() in owned
+        if is_owned:
             label = f"★ {label}"
+        role = "unknown"
+        ul = username.lower()
+        if ul == pivot.lower():
+            role = "pivot"
+        elif is_owned:
+            role = "owned"
         add_node(
             nid,
             label,
             str(node.get("type", "object")),
             _node_color(node, pivot=pivot, owned=owned),
             title=json.dumps(node, indent=2),
+            username=username,
+            identity_role=role,
         )
 
     for edge in graph.get("edges", []):
@@ -83,13 +156,17 @@ def build_graph_payload(
         if not src or not tgt:
             continue
         etype = str(edge.get("type", edge.get("right", "edge")))
+        from_pivot = pivot and src == f"user:{pivot.lower()}@{domain.lower()}"
         vis_edges.append(
             {
+                "id": f"e:{src}:{tgt}:{etype}",
                 "from": src,
                 "to": tgt,
                 "label": etype.replace("_", " ")[:24],
                 "arrows": "to",
-                "color": {"color": "#94a3b8"},
+                "color": {"color": "#3dffcf" if from_pivot else "#94a3b8"},
+                "width": 3 if from_pivot else 2,
+                "pivot_edge": from_pivot,
             }
         )
 
@@ -101,10 +178,20 @@ def build_graph_payload(
             continue
         p_id = f"user:{principal.lower()}@{domain.lower()}"
         t_id = f"gmsa:{target.lower()}@{domain.lower()}"
-        add_node(p_id, principal, "user", _node_color({"username": principal, "owned": principal.lower() in owned}, pivot=pivot, owned=owned))
+        add_node(
+            p_id,
+            principal,
+            "user",
+            _node_color({"username": principal, "owned": principal.lower() in owned}, pivot=pivot, owned=owned),
+            username=principal,
+            identity_role="pivot" if principal.lower() == pivot.lower() else (
+                "owned" if principal.lower() in owned else "unknown"
+            ),
+        )
         add_node(t_id, target, "gmsa", "#06b6d4", title=finding.get("detail", ""))
         vis_edges.append(
             {
+                "id": f"e:{p_id}:{t_id}:{right}",
                 "from": p_id,
                 "to": t_id,
                 "label": right,
@@ -148,7 +235,7 @@ def build_graph_payload(
 
     acl_blocker = _acl_exploit_blocker(ws_path)
 
-    return {
+    result: dict[str, Any] = {
         "nodes": list(vis_nodes.values()),
         "edges": vis_edges,
         "pivot": pivot,
@@ -157,7 +244,11 @@ def build_graph_payload(
         "next_hop_cmd": next_hop_cmd,
         "gained_hashes": gained_hashes,
         "acl_blocker": acl_blocker,
+        "hidden_nodes": 0,
     }
+    if tactical:
+        return filter_tactical_graph(result)
+    return result
 
 
 def build_attack_graph_html(
@@ -176,7 +267,6 @@ def build_attack_graph_html(
         owned_users=owned_users,
     )
     intel = _load_json(ws_path / "user_intel.json") or {}
-    pw_data = _load_json(ws_path / "password_candidates.json") or {}
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     dc_ip = ""
     for host in unauth.get("hosts") or []:
@@ -194,16 +284,14 @@ def build_attack_graph_html(
             f"<td><code>{_esc(src)}</code></td></tr>"
         )
 
-    pw_rows = ""
-    by_user: dict[str, list] = {}
-    for c in pw_data.get("candidates") or []:
-        by_user.setdefault(str(c.get("username", "")), []).append(c)
-    for user, cands in sorted(by_user.items()):
-        cells = []
-        for c in cands[:8]:
-            mark = "✓" if c.get("verified") else "?"
-            cells.append(f"<code>{_esc(c.get('password'))}</code> <small>({_esc(c.get('reason'))}{mark})</small>")
-        pw_rows += f"<tr><td>{_esc(user)}</td><td>{' '.join(cells)}</td></tr>"
+    clue_rows = ""
+    for clue in loot_clue_rows(ws_path):
+        clue_rows += (
+            f"<tr><td>{_esc(clue['user'])}</td>"
+            f"<td><code>{_esc(clue['string'])}</code></td>"
+            f"<td>{_esc(clue['verify_state'])}</td>"
+            f"<td><code>{_esc(clue['source'])}</code></td></tr>"
+        )
 
     graph_json = json.dumps(payload)
 
@@ -296,9 +384,9 @@ def build_attack_graph_html(
       <h2>User match (LDAP · loot · enum)</h2>
       <table><thead><tr><th>user</th><th>AD</th><th>cred</th><th>sources</th></tr></thead>
       <tbody>{user_rows or '<tr><td colspan="4"><em>run start_auth / enum users</em></td></tr>'}</tbody></table>
-      <h2>Candidatos de contraseña</h2>
-      <table><thead><tr><th>user</th><th>proposed</th></tr></thead>
-      <tbody>{pw_rows or '<tr><td colspan="2"><em>no loot creds</em></td></tr>'}</tbody></table>
+      <h2>Pistas (loot)</h2>
+      <table><thead><tr><th>user</th><th>string del archivo</th><th>estado</th><th>origen</th></tr></thead>
+      <tbody>{clue_rows or '<tr><td colspan="4"><em>sin pistas</em></td></tr>'}</tbody></table>
       <h2>Leyenda</h2>
       <p class="legend">
         <span style="background:#22c55e"></span>owned

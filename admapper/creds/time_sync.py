@@ -37,8 +37,24 @@ def get_last_ntp_step_seconds() -> float | None:
     return float(value) if value is not None else None
 
 
+def was_dc_clock_synced(dc_ip: str | None = None) -> bool:
+    """True when ensure_dc_clock successfully synced to this DC in-process."""
+    synced = _dc_clock_state.get("synced_dc")
+    if not synced:
+        return False
+    if dc_ip and str(synced) != str(dc_ip):
+        return False
+    return not bool(_dc_clock_state.get("unstable"))
+
+
+def _sntp_binary() -> str | None:
+    from admapper.core.platform import resolve_executable
+
+    return resolve_executable(["sntp"])
+
+
 def _sntp_available() -> bool:
-    return shutil.which("sntp") is not None
+    return _sntp_binary() is not None
 
 
 def _resolve_linux_ntp_binary() -> str | None:
@@ -111,9 +127,10 @@ def sync_time_to_dc(dc_ip: str, *, timeout: int = 30) -> tuple[bool, str]:
             if ok:
                 return True, detail
 
-    if _sntp_available():
+    sntp_bin = _sntp_binary()
+    if sntp_bin:
         ok, detail = _run_sync_command(
-            ["sudo", "sntp", "-sS", dc_ip],
+            ["sudo", sntp_bin, "-sS", dc_ip],
             timeout=timeout,
             ok_prefix=f"sntp synced to {dc_ip}",
         )
@@ -213,6 +230,11 @@ def ensure_dc_clock(
             if not get_clock_skew():
                 set_clock_skew(None)
         _dc_clock_state["synced_dc"] = dc_ip
+        if not _dc_clock_state.get("unstable"):
+            from admapper.creds.kerberos_skew import save_workspace_clock_skew
+
+            set_clock_skew(None)
+            save_workspace_clock_skew(ws_path, None)
         print_success(detail)
         return True
 
