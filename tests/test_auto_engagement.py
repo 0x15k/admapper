@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from admapper.core.config import GlobalConfig
 from admapper.core.session import Session
 from admapper.core.workspace import WorkspaceManager
@@ -134,6 +136,7 @@ def test_run_auto_postex_scan_calls_analysis_once(tmp_path: Path) -> None:
     )
 
     with (
+        patch("admapper.engage.auto.require_target_reachable", return_value="10.129.20.182"),
         patch("admapper.postex.remote_scan.run_remote_task_hijack_scan") as mock_scan,
         patch("admapper.postex.analyze.run_postex_analysis") as mock_analysis,
         patch("admapper.core.provenance.print_step"),
@@ -202,3 +205,140 @@ def test_pick_wired_next_skips_acl_prefers_postex() -> None:
     edge = _pick_wired_next(state)
     assert edge is not None
     assert edge["technique"] == "dll_hijack_scheduled_task"
+
+
+def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> None:
+    from admapper.core.connectivity import TargetUnreachableError
+
+    session = _session(tmp_path, owned=["msa_health$"])
+    ws_path = tmp_path / "ws" / "lab"
+    session.workspace.hosts = "10.129.20.182"
+    session.persist_workspace()
+    (ws_path / "exploit_log.json").write_text(
+        json.dumps({"new_hashes": [{"account": "msa_health$", "nthash": "a" * 32}]}),
+        encoding="utf-8",
+    )
+
+    with (
+        patch(
+            "admapper.engage.auto.require_target_reachable",
+            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+        ),
+        patch("admapper.postex.remote_scan.run_remote_task_hijack_scan") as mock_scan,
+        patch("admapper.engage.auto.print_error") as mock_err,
+    ):
+        assert run_auto_postex_scan(session) is False
+
+    mock_scan.assert_not_called()
+    mock_err.assert_called_once()
+
+
+def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> None:
+    session = _session(tmp_path, owned=["jaylee.clifton"])
+    session.workspace.mode = OperationMode.AUTO
+    session.workspace.hosts = "10.129.20.182"
+    session.persist_workspace()
+    ws_path = tmp_path / "ws" / "lab"
+    (ws_path / "escalate.json").write_text(
+        json.dumps(
+            {
+                "edges": [
+                    {
+                        "module": "wsus",
+                        "technique": "wsus_cert_chain",
+                        "target": "10.129.20.182",
+                        "ready": True,
+                        "target_owned": False,
+                        "op_id": "wsus-004",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from admapper.core.connectivity import TargetUnreachableError
+
+    with (
+        patch("admapper.engage.auto.run_escalate_analysis"),
+        patch("admapper.engage.auto.require_target_reachable", side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host")),
+        patch("admapper.engage.auto.run_escalate_exec") as mock_exec,
+        patch("admapper.engage.auto.print_error"),
+        patch("admapper.core.provenance.print_step"),
+    ):
+        steps = run_auto_exec(session)
+
+    assert steps == 0
+    mock_exec.assert_not_called()
+
+
+def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
+    from admapper.core.connectivity import TargetUnreachableError
+
+    session = _session(tmp_path, owned=["wallace.everette"])
+    ws_path = tmp_path / "ws" / "lab"
+    session.workspace.hosts = "10.129.20.182"
+    session.persist_workspace()
+    (ws_path / "auth_inventory.json").write_text(
+        json.dumps({"users": [], "computers": []}),
+        encoding="utf-8",
+    )
+
+    with (
+        patch(
+            "admapper.engage.auto.require_target_reachable",
+            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+        ),
+        patch("admapper.engage.auto.run_auto_exec") as mock_exec,
+        patch("admapper.engage.auto.run_escalate_analysis") as mock_analysis,
+        patch("admapper.engage.auto.print_error") as mock_err,
+    ):
+        finalize_auto(session)
+
+    mock_exec.assert_not_called()
+    mock_analysis.assert_called_once()
+    mock_err.assert_called_once()
+    assert "no alcanzable" in str(mock_err.call_args)
+
+
+def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
+    from admapper.core.connectivity import TargetUnreachableError
+
+    session = _session(tmp_path, owned=["msa_health$"])
+    session.workspace.mode = OperationMode.AUTO
+    session.workspace.hosts = "10.129.20.182"
+    session.persist_workspace()
+    ws_path = tmp_path / "ws" / "lab"
+    (ws_path / "postex_scan.json").write_text(
+        json.dumps(
+            {
+                "dc_ip": "10.129.20.182",
+                "shell_user": "msa_health$",
+                "findings": [
+                    {
+                        "drop_path": r"C:\ProgramData\UpdateMonitor",
+                        "payload_zip": "payload.zip",
+                        "payload_dll": "payload.dll",
+                        "task_name": "UpdateChecker Agent",
+                        "run_as_user": "jaylee.clifton",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from admapper.postex.deploy import deploy_dll_hijack
+
+    with (
+        patch(
+            "admapper.postex.deploy.require_target_reachable",
+            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+        ),
+        patch("admapper.postex.deploy.prepare_hijack_payload") as mock_build,
+        patch("admapper.postex.deploy.resolve_winrm_cred"),
+    ):
+        with pytest.raises(RuntimeError, match="no alcanzable"):
+            deploy_dll_hijack(session)
+
+    mock_build.assert_not_called()

@@ -242,6 +242,15 @@ def run_dll_hijack(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
+    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.models.workspace import OperationMode
+
+    if not dry_run and session.workspace.mode == OperationMode.AUTO:
+        try:
+            require_target_reachable(session)
+        except TargetUnreachableError as exc:
+            raise RuntimeError(format_unreachable_message(exc)) from exc
+
     default_dns, default_ca_host, default_ca_name = _resolve_enroll_targets(session)
     enroll_dns = enroll_dns or default_dns
     enroll_ca_host = enroll_ca_host or default_ca_host

@@ -112,6 +112,15 @@ def run_wsus_cert_chain(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
+    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.models.workspace import OperationMode
+
+    if enroll and session.workspace.mode == OperationMode.AUTO:
+        try:
+            require_target_reachable(session)
+        except TargetUnreachableError as exc:
+            raise RuntimeError(format_unreachable_message(exc)) from exc
+
     op = get_wsus_op(session, op_id)
     if op is None:
         raise ValueError(f"WSUS op not found: {op_id} — run wsus first")

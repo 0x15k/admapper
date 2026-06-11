@@ -202,7 +202,15 @@ def get_escalation_state(session: Session) -> dict[str, Any] | None:
 
 def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
     """Execute the next (or specified) escalation edge when wired."""
+    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
     from admapper.core.output import print_error
+    from admapper.models.workspace import OperationMode
+
+    if session.workspace and session.workspace.mode == OperationMode.AUTO:
+        try:
+            require_target_reachable(session)
+        except TargetUnreachableError as exc:
+            raise RuntimeError(format_unreachable_message(exc)) from exc
 
     state = get_escalation_state(session)
     if state is None:

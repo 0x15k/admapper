@@ -6,7 +6,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
 from admapper.core.output import ConfirmLevel, confirm, print_info, print_success, print_warning
+from admapper.models.workspace import OperationMode
 from admapper.postex.creds import WinRMCred, resolve_winrm_cred
 from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.payload import PayloadMode, prepare_hijack_payload
@@ -156,6 +158,12 @@ def deploy_dll_hijack(
     run_as = str(finding.get("run_as_user") or "unknown")
     shell_user = str(scan.get("shell_user") or op.get("context") or "")
     target_host = str(scan.get("dc_ip") or op.get("target_host") or "")
+
+    if not dry_run and session.workspace.mode == OperationMode.AUTO:
+        try:
+            require_target_reachable(session, host=target_host or None)
+        except TargetUnreachableError as exc:
+            raise RuntimeError(format_unreachable_message(exc)) from exc
 
     cred = resolve_winrm_cred(
         session,

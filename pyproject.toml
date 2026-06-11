@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "admapper"
-version = "0.1.26"
+version = "0.1.27"
 description = "ADMapper — cross-platform Active Directory pentesting CLI (Python)"
 readme = "README.md"
 requires-python = ">=3.11"

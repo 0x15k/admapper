@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success
+from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+from admapper.core.output import print_error, print_info, print_success
 from admapper.core.owned import is_valid_owned_username
 from admapper.core.provenance import Tool, print_step
 from admapper.creds.common import collect_gained_hashes
@@ -126,6 +127,12 @@ def run_auto_postex_scan(session: Session) -> bool:
     if not scan_stale and not ops_stale:
         return False
 
+    try:
+        require_target_reachable(session)
+    except TargetUnreachableError as exc:
+        print_error(format_unreachable_message(exc))
+        return False
+
     ws_name = session.workspace.name
     from admapper.postex.analyze import run_postex_analysis
     from admapper.postex.remote_scan import run_remote_task_hijack_scan
@@ -211,6 +218,11 @@ def run_auto_exec(session: Session, *, max_steps: int = 4) -> int:
             source=Tool.ADMAPPER,
         )
         try:
+            require_target_reachable(session)
+        except TargetUnreachableError as exc:
+            print_error(format_unreachable_message(exc))
+            break
+        try:
             run_escalate_exec(session, op_id=str(edge.get("op_id") or "") or None)
         except (ValueError, RuntimeError) as exc:
             print_info(f"auto exec stop — {exc}")
@@ -235,6 +247,12 @@ def finalize_auto(session: Session) -> None:
         return
     sync_owned_from_intel(session)
     auto_set_pivot(session)
+    try:
+        require_target_reachable(session)
+    except TargetUnreachableError as exc:
+        print_error(format_unreachable_message(exc))
+        run_escalate_analysis(session)
+        return
     run_auto_exec(session, max_steps=4)
     sync_owned_from_intel(session)
     auto_set_pivot(session)
