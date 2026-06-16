@@ -14,7 +14,7 @@ from admapper.acl.rights import abuse_right
 from admapper.auth.ldap_session import open_ldap_session
 from admapper.core.auth_inventory import AuthInventoryStore
 from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.core.output import print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.ad_object import AclAbuseFinding

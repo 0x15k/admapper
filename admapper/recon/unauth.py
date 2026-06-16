@@ -6,11 +6,16 @@ from typing import TYPE_CHECKING
 
 from admapper.core.findings import FindingsStore
 from admapper.core.hosts import HostsStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.core.output import print_info, print_success, print_table
 from admapper.guides.render import print_manual_guides_for_keys
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.host import HostRecord
-from admapper.recon.dns import discover_domain_dns, dn_to_domain, infer_domain_from_hostname, reverse_ptr
+from admapper.recon.dns import (
+    discover_domain_dns,
+    dn_to_domain,
+    infer_domain_from_hostname,
+    reverse_ptr,
+)
 from admapper.recon.ldap_probe import discover_domain_from_ldap, probe_ldap
 from admapper.recon.ports import scan_host, scan_hosts, service_name
 from admapper.recon.smb_probe import probe_smb_null

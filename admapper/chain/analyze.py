@@ -4,7 +4,9 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from admapper.core.json_io import load_json
 from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.core.owned import session_owned_users as _owned_users
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.chain_op import ChainOpportunity, ChainStep
@@ -15,15 +17,7 @@ if TYPE_CHECKING:
 
 
 def _load_json(path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _owned_users(session: Session) -> list[str]:
-    if session.workspace is None:
-        return []
-    return list(session.workspace.owned_users)
+    return load_json(path)
 
 
 def _find_op(ops: list[dict], technique: str, *, context: str | None = None) -> dict | None:
@@ -123,7 +117,6 @@ def build_attack_chains(
             ),
         ]
 
-        next_step = next((s for s in steps if not s.ready), None)
         commands: list[str] = []
         if not hijack_ready and hijack_id:
             commands.append(f"admapper postex run --op {hijack_id} -w <workspace>")
@@ -131,7 +124,7 @@ def build_attack_chains(
             commands.append(f"admapper adcs -w <workspace>  # re-run as {pivot}")
             commands.append("certipy find -u <user>@<domain> -hashes :<NTLM> -dc-ip <DC> -vulnerable")
         elif enroll_ready and not wsus_ready:
-            commands.append(f"admapper wsus -w <workspace>")
+            commands.append("admapper wsus -w <workspace>")
             if template:
                 commands.append(
                     f"certipy req -u {pivot}@<domain> -hashes :<NTLM> -ca <CA> "

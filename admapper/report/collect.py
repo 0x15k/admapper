@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from admapper.core.json_io import load_json
 from admapper.models.finding import Finding
 from admapper.models.report_item import ReportItem
 
@@ -12,9 +12,7 @@ _SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return load_json(path)
 
 
 def _norm_severity(value: str | None) -> str:

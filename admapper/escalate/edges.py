@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import Any
 
+from admapper.core.json_io import load_json
 from admapper.models.escalation import EscalationEdge
 from admapper.wsus.prerequisites import owned_groups_for_user
 
@@ -29,9 +29,7 @@ _TECHNIQUE_RANK = {
 
 
 def _load(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return load_json(path)
 
 
 def _owned_set(owned: list[str]) -> set[str]:
@@ -219,7 +217,6 @@ def collect_edges_from_pivot(
         )
 
     # ── Graph: first hop on shortest path from pivot ──
-    graph = _load(ws_path / "graph.json") or {}
     paths = _load(ws_path / "paths.json") or {}
     pivot_node = f"user:{pivot_l}@{domain.lower()}" if domain else ""
     for path in paths.get("paths") or []:

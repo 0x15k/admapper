@@ -1,6 +1,17 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from admapper.core.session import Session
+
+
+def session_owned_users(session: Session) -> list[str]:
+    """Owned usernames for the active workspace (empty when no workspace)."""
+    if session.workspace is None:
+        return []
+    return list(session.workspace.owned_users)
 
 # Parser artifacts mistaken for usernames (Kerberos etype lines, etc.)
 _INVALID_OWNED_PATTERNS = (

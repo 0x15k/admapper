@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
 
 def _pick_credential(session: Session, cred_id: str | None):
-    from admapper.models.credential import Credential
 
     store = session.credentials
     if store is None:

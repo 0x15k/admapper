@@ -5,11 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from admapper.creds.kerberos_skew import load_workspace_clock_skew
-from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
+from admapper.creds.policy import apply_lockout_states, fetch_lockout_context
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import loot_clue_rows
 
 
 @dataclass

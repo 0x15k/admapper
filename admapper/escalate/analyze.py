@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from admapper.core.graph import GraphStore
 from admapper.core.output import print_info, print_success, print_warning
-from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
+from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 from admapper.escalate.render import print_escalation_state
 from admapper.guides.render import print_manual_guide
-from admapper.models.escalation import EscalationEdge, EscalationState
+from admapper.models.escalation import EscalationState
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
@@ -202,7 +202,11 @@ def get_escalation_state(session: Session) -> dict[str, Any] | None:
 
 def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
     """Execute the next (or specified) escalation edge when wired."""
-    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.core.connectivity import (
+        TargetUnreachableError,
+        format_unreachable_message,
+        require_target_reachable,
+    )
     from admapper.core.output import print_error
     from admapper.models.workspace import OperationMode
 
@@ -268,9 +272,9 @@ def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
         return
 
     if module == "postex" and technique == "dll_hijack_scheduled_task":
+        from admapper.models.workspace import OperationMode
         from admapper.postex.analyze import resolve_hijack_op_id
         from admapper.postex.runner import run_dll_hijack
-        from admapper.models.workspace import OperationMode
 
         record_escalation_step(
             session,

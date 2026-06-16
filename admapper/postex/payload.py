@@ -6,13 +6,12 @@ import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-
 from typing import Any, Literal
 
 from admapper.core.network import log_detected_callback_ip
 from admapper.core.output import print_info, print_success, print_warning
 from admapper.core.platform import resolve_executable
-from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch
+from admapper.postex.pe_arch import TargetArch
 
 PayloadMode = Literal["shell", "enroll"]
 

@@ -5,16 +5,18 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.creds.common import pick_dc_ip
 from admapper.core.hosts import HostsStore
+from admapper.core.json_io import load_json
 from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.core.owned import session_owned_users as _owned_users
+from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.postex_op import PostexOpportunity
 from admapper.postex.catalog import postex_meta
 from admapper.postex.loot_intel import loot_intel_to_dict, scan_loot_directory
 from admapper.postex.task_hijack import (
-    analyze_task_hijack,
     analysis_from_scan_payload,
+    analyze_task_hijack,
     findings_to_opportunities,
 )
 from admapper.postex.templates import apply_postex_templates, build_template_context
@@ -32,15 +34,7 @@ _LOCAL_SHELL_TECHNIQUES = (
 
 
 def _load_json(path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _owned_users(session: Session) -> list[str]:
-    if session.workspace is None:
-        return []
-    return list(session.workspace.owned_users)
+    return load_json(path)
 
 
 def _opportunity(

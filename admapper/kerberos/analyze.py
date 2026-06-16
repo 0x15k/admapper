@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from admapper.core.graph import GraphStore
+from admapper.core.json_io import load_json
 from admapper.core.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guide
 from admapper.kerberos.catalog import technique_meta
@@ -29,9 +30,7 @@ def _owned_set(session: Session) -> set[str]:
 
 
 def _load_json(path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return load_json(path)
 
 
 def _opportunity(

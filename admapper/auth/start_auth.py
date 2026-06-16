@@ -11,8 +11,6 @@ from admapper.core.graph import GraphStore
 from admapper.core.output import (
     ConfirmLevel,
     confirm,
-    print_info,
-    print_success,
     print_table,
     print_warning,
 )

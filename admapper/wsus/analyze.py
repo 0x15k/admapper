@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pathlib import Path
-
+from admapper.core.json_io import load_json
 from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.core.owned import session_owned_users as _owned_users
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.wsus_op import WsusOpportunity
@@ -22,15 +23,7 @@ if TYPE_CHECKING:
 
 
 def _load_json(path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _owned_users(session: Session) -> list[str]:
-    if session.workspace is None:
-        return []
-    return list(session.workspace.owned_users)
+    return load_json(path)
 
 
 def _opportunity(

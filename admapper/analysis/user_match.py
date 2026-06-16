@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from admapper.core.json_io import load_json
 from admapper.core.users import UsersStore
 from admapper.models.user import UserRecord
 
@@ -29,9 +30,7 @@ class MatchedUser:
 
 
 def _load_json(path: Path) -> dict:
-    if not path.is_file():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    return load_json(path) or {}
 
 
 def _best_cred_status(credentials: list[dict], username: str) -> str | None:

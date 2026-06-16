@@ -1,9 +1,7 @@
-import os
 from pathlib import Path
 
 from admapper.core.paths import (
     WORKSPACES_ENV_VAR,
-    default_user_workspaces_root,
     resolve_workspaces_root,
     set_cli_workspaces_root,
 )
