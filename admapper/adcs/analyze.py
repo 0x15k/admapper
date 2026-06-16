@@ -4,11 +4,11 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.adcs.detect import detect_esc_vulnerabilities
+from admapper.acl.enum import resolve_principal_context
 from admapper.adcs.acl_detect import detect_owned_adcs_abuse
 from admapper.adcs.certipy import certipy_install_hint, resolve_certipy
+from admapper.adcs.detect import detect_esc_vulnerabilities
 from admapper.adcs.enum import enumerate_adcs
-from admapper.acl.enum import resolve_principal_context
 from admapper.auth.ldap_session import open_ldap_session
 from admapper.core.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
@@ -97,33 +97,38 @@ def run_adcs_analysis(session: Session, *, cred_id: str | None = None) -> AdcsAn
     if ldap_session is None:
         raise ValueError(err or "LDAP bind failed")
 
-    enum_result = enumerate_adcs(ldap_session)
-    if not enum_result.enrollment_services:
-        print_warning("no AD CS enrollment services found in LDAP")
-    else:
-        print_success(
-            f"found {len(enum_result.enrollment_services)} CA(s), "
-            f"{len(enum_result.templates)} template(s)"
+    try:
+        enum_result = enumerate_adcs(ldap_session)
+        if not enum_result.enrollment_services:
+            print_warning("no AD CS enrollment services found in LDAP")
+        else:
+            print_success(
+                f"found {len(enum_result.enrollment_services)} CA(s), "
+                f"{len(enum_result.templates)} template(s)"
+            )
+
+        findings = detect_esc_vulnerabilities(
+            templates=enum_result.templates,
+            enrollment_services=enum_result.enrollment_services,
         )
 
-    findings = detect_esc_vulnerabilities(
-        templates=enum_result.templates,
-        enrollment_services=enum_result.enrollment_services,
-    )
-
-    owned = list(session.workspace.owned_users or [])
-    principals = []
-    for username in owned:
-        if username.endswith("$") or ":" in username:
-            continue
-        try:
-            ctx = resolve_principal_context(ldap_session, username)
-        except Exception as exc:
-            print_warning(f"principal context {username}: {exc}")
-            continue
-        if ctx:
-            principals.append(ctx)
-            print_info(f"AD CS principal context: {username} (+ {len(ctx.group_sids)} groups)")
+        owned = list(session.workspace.owned_users or [])
+        principals = []
+        for username in owned:
+            if username.endswith("$") or ":" in username:
+                continue
+            try:
+                ctx = resolve_principal_context(ldap_session, username)
+            except Exception as exc:
+                print_warning(f"principal context {username}: {exc}")
+                continue
+            if ctx:
+                principals.append(ctx)
+                print_info(
+                    f"AD CS principal context: {username} (+ {len(ctx.group_sids)} groups)"
+                )
+    finally:
+        ldap_session.close()
 
     if principals:
         owned_findings = detect_owned_adcs_abuse(

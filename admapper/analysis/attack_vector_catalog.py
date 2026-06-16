@@ -148,8 +148,8 @@ def _mssql_present(ctx: WorkspaceContext) -> bool:
         for p in host.get("open_ports") or []:
             if int(p) == 1433:
                 return True
-    postex = _load_json(ctx.ws_path / "postex_findings.json") or {}
-    return bool(postex.get("mssql_instances"))
+    inventory = _load_json(ctx.ws_path / "mssql_inventory.json") or {}
+    return bool(inventory.get("instances"))
 
 
 def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:

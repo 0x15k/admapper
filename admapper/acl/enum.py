@@ -38,6 +38,35 @@ def _attr_str(entry, name: str) -> str | None:
     return str(getattr(entry, name).value)
 
 
+def _sid_from_attr(attr) -> str | None:
+    """Parse an objectSid from either an ldap3 attribute (``raw_values``) or the
+    Kerberos LDAP shim attribute (``value``/``values``). Handles canonical
+    ``S-…`` strings, latin-1 encoded bytes, and raw byte values."""
+    if attr is None:
+        return None
+
+    raw = None
+    raw_values = getattr(attr, "raw_values", None)
+    if raw_values:
+        raw = raw_values[0]
+    elif hasattr(attr, "value"):
+        raw = attr.value
+    else:
+        raw = attr
+    if raw is None:
+        return None
+
+    if isinstance(raw, str):
+        if raw.startswith("S-"):
+            return raw
+        raw = raw.encode("latin-1", errors="surrogateescape")
+    if isinstance(raw, (bytes, bytearray)):
+        from impacket.ldap.ldaptypes import LDAP_SID
+
+        return LDAP_SID(data=bytes(raw)).formatCanonical()
+    return str(raw)
+
+
 def _attr_list(entry, name: str) -> list[str]:
     if not getattr(entry, name, None):
         return []
@@ -62,13 +91,10 @@ def resolve_principal_context(
 
     entry = session.conn.entries[0]
     user_dn = _attr_str(entry, "distinguishedName")
-    sid_raw = entry.objectSid.raw_values[0] if entry.objectSid else None
-    if not sid_raw:
+    user_sid = _sid_from_attr(getattr(entry, "objectSid", None))
+    if not user_sid:
         return None
 
-    from impacket.ldap.ldaptypes import LDAP_SID
-
-    user_sid = LDAP_SID(data=sid_raw).formatCanonical()
     sid_to_name = {user_sid: username}
     group_sids: dict[str, str] = {}
 
@@ -84,10 +110,9 @@ def resolve_principal_context(
             continue
         gentry = session.conn.entries[0]
         gname = _attr_str(gentry, "sAMAccountName") or group_dn
-        gsid_raw = gentry.objectSid.raw_values[0] if gentry.objectSid else None
-        if not gsid_raw:
+        gsid = _sid_from_attr(getattr(gentry, "objectSid", None))
+        if not gsid:
             continue
-        gsid = LDAP_SID(data=gsid_raw).formatCanonical()
         group_sids[gsid] = gname
         sid_to_name[gsid] = gname
 

@@ -20,6 +20,13 @@ class LdapSession:
     def close(self) -> None:
         if self._kerberos_repl is not None:
             self._kerberos_repl.close()
+            return
+        conn = self.conn
+        if conn is not None and hasattr(conn, "unbind"):
+            try:
+                conn.unbind()
+            except Exception:
+                pass
 
 
 def _needs_kerberos_ldap(

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from admapper.core.output import print_info, print_success, print_warning
 from admapper.core.provenance import Tool, print_ok, print_step, print_warn
+from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.evil_winrm_output import extract_winrm_command_body, strip_evil_winrm_output
 from admapper.postex.hijack_intel import (
     extract_hijack_intel,
@@ -14,20 +15,28 @@ from admapper.postex.hijack_intel import (
     parse_schtasks_list_output,
     parse_task_xml_file_output,
 )
-from admapper.postex.creds import resolve_winrm_cred
-from admapper.postex.pe_arch import infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.loot_intel import scan_loot_directory
+from admapper.postex.pe_arch import (
+    infer_arch_from_monitor_log,
+    normalize_arch,
+    ps_read_pe_arch_script,
+)
 from admapper.postex.scenario_intel import (
     detect_scenario,
     scenario_to_finding,
     scenario_to_hijack_intel,
 )
-from admapper.postex.task_hijack import TaskHijackAnalysis, analyze_task_hijack, analysis_to_dict
+from admapper.postex.task_hijack import TaskHijackAnalysis, analysis_to_dict, analyze_task_hijack
 from admapper.winrm.client import WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
+    from admapper.winrm.client import WinRMClient
+
+# Literal backslash — kept out of f-string expressions for Python 3.11 compatibility
+# (escape sequences inside f-string replacement fields require Python 3.12+).
+_BACKSLASH = "\\"
 
 
 _MONITOR_LOG_PATHS = (
@@ -434,7 +443,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         intel = intel_from_com_tasks(com_out)
 
     if intel is not None:
-        monitor_path = intel.monitor_log_path or f"{intel.drop_path.rstrip('\\')}\\Logs\\monitor.log"
+        monitor_path = intel.monitor_log_path or f"{intel.drop_path.rstrip(_BACKSLASH)}\\Logs\\monitor.log"
         acl_scripts: list[tuple[str, str]] = []
         if not monitor_log.strip():
             acl_scripts.append(("monitor.log", _ps_monitor_log(monitor_path)))
