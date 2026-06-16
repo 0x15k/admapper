@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from admapper.analysis.identity_capabilities import collect_identity_capabilities
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
-from admapper.graph.game_state import collect_identity_capabilities
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json

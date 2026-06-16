@@ -446,74 +446,6 @@ def build_engagement_map(
     return "\n".join(lines)
 
 
-def build_engagement_summary(
-    ws_path: Path,
-    *,
-    workspace: str,
-    domain: str | None,
-    owned_users: list[str] | None = None,
-    pivot_user: str | None = None,
-) -> dict[str, object]:
-    """Structured rollup for game UI / compact terminal (learner-friendly)."""
-    owned = list(owned_users or [])
-    pivot = pivot_user or (owned[-1] if owned else "")
-    domain_s = domain or "(sin dominio)"
-    from admapper.report.methodology import methodology_lines
-
-    phases = [
-        ln.strip().lstrip("✓·").strip()
-        for ln in methodology_lines(ws_path)
-        if ln.strip().startswith(("✓", "·"))
-    ]
-    acl_blocker = _acl_exploit_blocker(ws_path)
-    edges = collect_edges_from_pivot(
-        pivot_user=pivot,
-        owned_users=owned,
-        ws_path=ws_path,
-        domain=domain_s,
-    )
-    next_edge = pick_next_edge(edges)
-    next_title = ""
-    next_technique = ""
-    if next_edge:
-        next_title = (
-            f"{pivot} ──{next_edge.technique}──► {next_edge.target}"
-            if pivot
-            else next_edge.title
-        )
-        next_technique = _edge_technique_detail(next_edge)
-
-    return {
-        "domain": domain_s,
-        "owned": owned,
-        "pivot": pivot,
-        "phases": phases,
-        "blocker": acl_blocker,
-        "next_title": next_title,
-        "next_technique": next_technique,
-        "workspace": workspace,
-    }
-
-
-def format_engagement_summary_lines(summary: dict[str, object]) -> list[str]:
-    lines = ["── RESUMEN ──"]
-    owned = summary.get("owned") or []
-    pivot = summary.get("pivot") or "—"
-    lines.append(f"Owned: {', '.join(owned) if owned else '—'} · Pivot: {pivot}")
-    for phase in (summary.get("phases") or [])[:6]:
-        lines.append(f"  ✓ {phase}")
-    blocker = summary.get("blocker")
-    if blocker:
-        lines.append(f"⚠ Bloqueo: {blocker}")
-    next_title = summary.get("next_title")
-    if next_title:
-        lines.append(f"→ Siguiente: {next_title}")
-        tech = summary.get("next_technique")
-        if tech:
-            lines.append(f"  {tech}")
-    return lines
-
-
 def print_engagement_map(
     ws_path: Path,
     *,
@@ -522,27 +454,6 @@ def print_engagement_map(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
 ) -> None:
-    from admapper.core.verbosity import is_compact
-
-    if is_compact():
-        summary = build_engagement_summary(
-            ws_path,
-            workspace=workspace,
-            domain=domain,
-            owned_users=owned_users,
-            pivot_user=pivot_user,
-        )
-        from admapper.core.output import print_info, print_success, print_warning
-
-        for line in format_engagement_summary_lines(summary):
-            if line.startswith("⚠"):
-                print_warning(line.removeprefix("⚠ ").strip())
-            elif line.startswith("Owned") or line.startswith("  ✓"):
-                print_success(line)
-            else:
-                print_info(line)
-        return
-
     text = build_engagement_map(
         ws_path,
         workspace=workspace,

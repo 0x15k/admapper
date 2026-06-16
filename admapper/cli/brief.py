@@ -84,10 +84,7 @@ def run_brief(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.game_mode import effective_sync_clock
-
     apply_clock_skew_option(clock_skew)
-    sync_clock = effective_sync_clock(sync_clock)
 
     ws_name = session.workspace.name
     ws_path = session.workspaces.path_for(ws_name)

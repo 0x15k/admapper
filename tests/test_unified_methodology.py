@@ -5,10 +5,8 @@ from pathlib import Path
 
 from admapper.methodology.unified import (
     ENGAGEMENT_FRAMEWORK,
-    GAME_PHASES,
     UNIFIED_PHASES,
     build_study_map,
-    game_phase_status,
     methodology_progress_lines,
     phase_status_from_workspace,
 )
@@ -16,7 +14,6 @@ from admapper.methodology.unified import (
 
 def test_unified_has_twelve_phases() -> None:
     assert len(UNIFIED_PHASES) == 12
-    assert len(GAME_PHASES) == 9
     assert "CRTP" in ENGAGEMENT_FRAMEWORK
 
 
@@ -40,16 +37,6 @@ def test_phase_status_progression(tmp_path: Path) -> None:
     )
     st2 = phase_status_from_workspace(ws)
     assert st2["p05"] == "done"
-
-
-def test_game_phases_include_framework(tmp_path: Path) -> None:
-    ws = tmp_path
-    (ws / "state.json").write_text("{}")
-    (ws / "unauth_scan.json").write_text(json.dumps({"hosts": [{}]}))
-    phases = game_phase_status(ws)
-    assert phases[0]["code"] == "RECON"
-    assert "framework" in phases[0]
-    assert phases[0]["framework"]["crtp"]
 
 
 def test_methodology_lines_use_unified(tmp_path: Path) -> None:

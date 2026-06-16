@@ -34,59 +34,12 @@ def _node_color(node: dict[str, Any], *, pivot: str, owned: set[str]) -> str:
     return "#64748b"
 
 
-def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
-    """Drop orphan LDAP groups — sparse graphs collapse into one blob in vis-network."""
-    nodes = payload.get("nodes") or []
-    edges = payload.get("edges") or []
-    if len(nodes) <= 14:
-        return {**payload, "hidden_nodes": 0}
-
-    connected: set[str] = set()
-    for edge in edges:
-        connected.add(str(edge.get("from", "")))
-        connected.add(str(edge.get("to", "")))
-    connected.discard("")
-
-    keep = set(connected)
-    pivot = str(payload.get("pivot") or "").lower()
-    owned = {str(u).lower() for u in (payload.get("owned") or [])}
-
-    for node in nodes:
-        nid = str(node.get("id", ""))
-        label = str(node.get("label", "")).lower()
-        group = str(node.get("group", ""))
-        if group in ("gmsa", "dc", "operator", "computer"):
-            keep.add(nid)
-        if label.startswith("★"):
-            keep.add(nid)
-        if pivot and pivot in label:
-            keep.add(nid)
-        for user in owned:
-            if user and user in label:
-                keep.add(nid)
-
-    filtered_nodes = [n for n in nodes if str(n.get("id", "")) in keep]
-    filtered_edges = [
-        e
-        for e in edges
-        if str(e.get("from", "")) in keep and str(e.get("to", "")) in keep
-    ]
-    hidden = len(nodes) - len(filtered_nodes)
-    return {
-        **payload,
-        "nodes": filtered_nodes,
-        "edges": filtered_edges,
-        "hidden_nodes": hidden,
-    }
-
-
 def build_graph_payload(
     ws_path: Path,
     *,
     domain: str,
     pivot_user: str | None = None,
     owned_users: list[str] | None = None,
-    tactical: bool = False,
 ) -> dict[str, Any]:
     """Collect nodes/edges for vis-network from graph.json + ACLs + escalate."""
     owned = {u.lower() for u in (owned_users or [])}
@@ -246,8 +199,6 @@ def build_graph_payload(
         "acl_blocker": acl_blocker,
         "hidden_nodes": 0,
     }
-    if tactical:
-        return filter_tactical_graph(result)
     return result
 
 

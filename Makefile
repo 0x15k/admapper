@@ -22,4 +22,4 @@ lint:
 	python3 -m ruff check admapper tests
 
 security:
-	python3 -m bandit -r admapper -ll -q -x admapper/graph/game_html.py || true
+	python3 -m bandit -r admapper -ll -q || true

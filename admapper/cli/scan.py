@@ -217,11 +217,8 @@ def scan_engagement(
     except ValueError:
         print_warning("domain not inferred — PTR/LDAP may be restricted; set domain manually if known")
 
-    from admapper.core.game_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.time_sync import ensure_dc_clock
 
-    sync_clock = effective_sync_clock(sync_clock)
-    sync_hosts = effective_sync_hosts(sync_hosts)
     ws_path = (
         session.workspaces.path_for(session.workspace.name) if session.workspace else None
     )

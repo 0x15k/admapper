@@ -6,7 +6,7 @@ Canonical AD pentest phase model — merges the best of:
 - **CRTO** (Zero-Point): operator loop recon → pivot → execute → repeat
 - **MITRE ATT&CK**: tactic/technique tags per phase (not the primary spine)
 
-Game UI exposes a shortened GAME_PHASES view; CLI/reporting use UNIFIED_PHASES (P1–P12).
+CLI/reporting use UNIFIED_PHASES (P1–P12).
 """
 
 from __future__ import annotations
@@ -186,114 +186,6 @@ UNIFIED_PHASES: tuple[PhaseDef, ...] = (
 )
 
 
-@dataclass(frozen=True)
-class GamePhaseDef:
-    """Shortened bar for the game UI (learner-friendly)."""
-
-    id: str
-    code: str
-    title: str
-    tech: str
-    unified_ids: tuple[str, ...]
-    action: str
-    button: str
-    detail: str
-
-
-GAME_PHASES: tuple[GamePhaseDef, ...] = (
-    GamePhaseDef(
-        "g02",
-        "RECON",
-        "Perímetro",
-        "DNS · LDAP · SMB · Kerberos",
-        ("p02",),
-        "scan",
-        "ESCANEAR",
-        "admapper scan -H <DC>",
-    ),
-    GamePhaseDef(
-        "g03",
-        "IDENT",
-        "Superficie de identidades",
-        "Usuarios · SPN · AS-REP · lockout",
-        ("p03",),
-        "brief",
-        "ENUM USUARIOS",
-        "enum users (tras scan)",
-    ),
-    GamePhaseDef(
-        "g04",
-        "CREDS",
-        "Acceso a credenciales",
-        "Roast · spray · loot · GPP",
-        ("p04",),
-        "brief",
-        "VECTORES CREDS",
-        "asreproast · kerberoast · spray",
-    ),
-    GamePhaseDef(
-        "g05",
-        "FOOTHOLD",
-        "Foothold",
-        "LDAP · SMB · Kerberos TGT",
-        ("p05",),
-        "run",
-        "AUTENTICAR",
-        "admapper run -u … -p …",
-    ),
-    GamePhaseDef(
-        "g06",
-        "ENUM",
-        "Enum de dominio",
-        "LDAP · SMB · BloodHound",
-        ("p06",),
-        "run",
-        "ENUMERAR",
-        "start_auth",
-    ),
-    GamePhaseDef(
-        "g07",
-        "PATHS",
-        "Rutas de ataque",
-        "Grafo · paths · ACL map",
-        ("p07",),
-        "acls",
-        "MAPEAR RUTAS",
-        "paths · acls",
-    ),
-    GamePhaseDef(
-        "g08",
-        "PRIVESC",
-        "Escalada de privilegios",
-        "ACL · Kerberos · AD CS",
-        ("p08",),
-        "exploit",
-        "ESCALAR",
-        "admapper exploit",
-    ),
-    GamePhaseDef(
-        "g09",
-        "MOVE",
-        "Lateral & coerción",
-        "WinRM · relay · MSSQL",
-        ("p09", "p10"),
-        "brief",
-        "LATERAL",
-        "postex · coerce",
-    ),
-    GamePhaseDef(
-        "g11",
-        "DOMINATE",
-        "Dominio",
-        "DCSync · Golden · persistencia",
-        ("p11",),
-        "brief",
-        "DOMINIO",
-        "postex / DCSync manual",
-    ),
-)
-
-
 def _st(done: bool, pending: bool) -> PhaseStatus:
     if done:
         return "done"
@@ -364,48 +256,8 @@ def phase_status_from_workspace(ws_path: Path) -> dict[str, PhaseStatus]:
     }
 
 
-def game_phase_status(ws_path: Path) -> list[dict[str, Any]]:
-    """Build game UI phase bar from GAME_PHASES + workspace."""
-    unified = phase_status_from_workspace(ws_path)
-
-    def game_st(gp: GamePhaseDef) -> PhaseStatus:
-        statuses = [unified.get(uid, "locked") for uid in gp.unified_ids]
-        if all(s == "done" for s in statuses):
-            return "done"
-        if any(s == "active" for s in statuses):
-            return "active"
-        if any(s == "done" for s in statuses):
-            return "active"
-        return "locked"
-
-    by_id = {p.id: p for p in UNIFIED_PHASES}
-    out: list[dict[str, Any]] = []
-    for gp in GAME_PHASES:
-        st = game_st(gp)
-        primary = by_id[gp.unified_ids[0]]
-        out.append(
-            {
-                "id": gp.id,
-                "code": gp.code,
-                "title": gp.title,
-                "tech": gp.tech,
-                "status": st,
-                "detail": gp.detail,
-                "action": gp.action,
-                "button": gp.button,
-                "framework": {
-                    "crtp": primary.crtp,
-                    "crte": primary.crte if primary.crte != "—" else None,
-                    "crto": primary.crto if primary.crto != "—" else None,
-                    "mitre": list(primary.mitre_tactics),
-                },
-            }
-        )
-    return out
-
-
 def build_study_map() -> list[dict[str, Any]]:
-    """CRTP / CRTE / CRTO cross-reference for the manual and game panel."""
+    """CRTP / CRTE / CRTO cross-reference for the manual."""
     rows: list[dict[str, Any]] = []
     for ph in UNIFIED_PHASES:
         rows.append(
