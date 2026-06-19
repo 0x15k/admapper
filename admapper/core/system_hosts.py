@@ -108,8 +108,9 @@ def _write_hosts_file(path: Path, content: str, *, use_sudo: bool) -> None:
         path.write_text(content, encoding="utf-8")
         return
 
+    # Try non-interactive sudo first (works if cached or NOPASSWD)
     proc = subprocess.run(
-        ["sudo", "tee", str(path)],
+        ["sudo", "-n", "tee", str(path)],
         input=content,
         capture_output=True,
         text=True,
@@ -118,7 +119,7 @@ def _write_hosts_file(path: Path, content: str, *, use_sudo: bool) -> None:
     )
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
-        raise PermissionError(err or "sudo tee /etc/hosts failed — check password or NOPASSWD")
+        raise PermissionError(err or "sudo tee /etc/hosts failed")
 
 
 def ensure_system_hosts_entry(
@@ -197,3 +198,30 @@ def format_hosts_sync_message(result: HostsSyncResult) -> str:
     if result.status == HostsSyncStatus.SKIPPED:
         return f"/etc/hosts omitido — {result.detail}"
     return f"/etc/hosts falló — {result.detail}"
+
+
+def hosts_entry_exists(
+    ip: str,
+    hostname: str,
+    *,
+    hosts_path: Path | None = None,
+) -> bool:
+    """Read-only check: does ``ip  hostname`` already exist in /etc/hosts?"""
+    ip = ip.strip()
+    hostname = hostname.strip().rstrip(".")
+    if not ip or not _valid_hostname(hostname):
+        return False
+    path = hosts_path or system_hosts_path()
+    if not path.is_file():
+        return False
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+    except OSError:
+        return False
+    idx = _find_hostname_line(lines, hostname)
+    if idx is None:
+        return False
+    parsed = _parse_line(lines[idx])
+    if parsed is None:
+        return False
+    return parsed[0] == ip

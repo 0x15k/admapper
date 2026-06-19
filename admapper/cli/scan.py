@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,10 @@ from admapper.recon.unauth import run_unauth_scan
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
+
+
+_HOSTS_POLL_INTERVAL = 3   # seconds between checks
+_HOSTS_POLL_MAX = 20       # max attempts (~60s total)
 
 
 def format_hosts_hint(ip: str, fqdn: str) -> str | None:
@@ -56,19 +61,40 @@ def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
         HostsSyncStatus,
         ensure_system_hosts_entry,
         format_hosts_sync_message,
+        hosts_entry_exists,
     )
 
+    # 1) Try automatic write (sudo -n, non-interactive)
     result = ensure_system_hosts_entry(ip, fqdn)
     message = format_hosts_sync_message(result)
+
     if result.status in {HostsSyncStatus.PRESENT, HostsSyncStatus.ADDED, HostsSyncStatus.UPDATED}:
         print_success(message)
-    elif result.status == HostsSyncStatus.FAILED:
-        print_warning(message)
-        hint = format_hosts_hint(ip, fqdn)
-        if hint:
-            print_info(hint)
-    else:
+        return
+
+    if result.status != HostsSyncStatus.FAILED:
         print_info(message)
+        return
+
+    # 2) Auto-write failed — show command and poll for manual entry
+    print_warning("/etc/hosts needs update. Run this in another terminal:")
+    print_info("")
+    print_info(f"  sudo sh -c 'echo \"{ip}  {fqdn}\" >> /etc/hosts'")
+    print_info("")
+    print_info(f"Waiting for /etc/hosts entry... (Ctrl+C to skip, checking every {_HOSTS_POLL_INTERVAL}s)")
+
+    try:
+        for attempt in range(1, _HOSTS_POLL_MAX + 1):
+            time.sleep(_HOSTS_POLL_INTERVAL)
+            if hosts_entry_exists(ip, fqdn):
+                print_success(f"/etc/hosts updated! {ip}  {fqdn}")
+                return
+            print_info(f"  checking... ({attempt}/{_HOSTS_POLL_MAX})")
+    except KeyboardInterrupt:
+        print_warning("skipped — Kerberos may fail without /etc/hosts entry")
+        return
+
+    print_warning(f"timeout after {_HOSTS_POLL_MAX * _HOSTS_POLL_INTERVAL}s — continuing without /etc/hosts")
 
 
 def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
