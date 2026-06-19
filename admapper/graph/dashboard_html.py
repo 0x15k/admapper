@@ -10,7 +10,6 @@ Generates a single-page app with:
 from __future__ import annotations
 
 import html
-import json
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +31,6 @@ def build_dashboard_html(
     domain_s = _esc(domain or "")
     workspace_s = _esc(workspace)
     pivot_s = _esc(pivot_user or "")
-    owned_s = _esc(", ".join(owned_users or []))
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -50,7 +48,7 @@ def build_dashboard_html(
   --text:#e2e8f0;--text-dim:#94a3b8;--text-muted:#64748b;
   --accent:#3b82f6;--accent-glow:#60a5fa;
   --green:#22c55e;--orange:#f97316;--red:#ef4444;--cyan:#06b6d4;
-  --purple:#8b5cf6;--yellow:#eab308;
+  --purple:#8b5cf6;--yellow:#eab308;--indigo:#6366f1;
   --font:'Segoe UI',system-ui,-apple-system,sans-serif;
   --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
 }}
@@ -62,41 +60,41 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 /* ── Layout ───────────────────────────────────────────────── */
 .app{{display:flex;flex-direction:column;height:100vh;overflow:hidden}}
 .header{{
-  display:flex;align-items:center;gap:1rem;flex-shrink:0;
-  padding:0.5rem 1rem;background:var(--bg-panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:0.75rem;flex-shrink:0;
+  padding:0.4rem 1rem;background:var(--bg-panel);border-bottom:1px solid var(--border);
   z-index:10;
 }}
 .header .logo{{font-weight:700;font-size:1.1rem;color:var(--accent-glow);letter-spacing:-0.02em}}
-.header .meta{{color:var(--text-dim);font-size:0.8rem;display:flex;gap:1rem;flex:1}}
-.header .meta span{{display:flex;align-items:center;gap:0.3rem}}
+.header .meta{{color:var(--text-dim);font-size:0.78rem;display:flex;gap:0.75rem;flex:1;flex-wrap:wrap}}
+.header .meta span{{display:flex;align-items:center;gap:0.25rem}}
 .header .meta strong{{color:var(--text);font-weight:500}}
 .header .status{{
-  display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;
-  padding:0.25rem 0.6rem;border-radius:999px;
+  display:flex;align-items:center;gap:0.4rem;font-size:0.72rem;
+  padding:0.2rem 0.55rem;border-radius:999px;white-space:nowrap;
 }}
 .status-idle{{background:#14532d;color:#86efac}}
 .status-running{{background:#713f12;color:#fde68a}}
 
-.main{{display:grid;grid-template-columns:1fr 320px;flex:1;min-height:0;overflow:hidden}}
+.main{{display:grid;grid-template-columns:1fr 300px;flex:1;min-height:0;overflow:hidden}}
 .graph-area{{position:relative;background:var(--bg-dark);overflow:hidden}}
 #graph-canvas{{position:absolute;top:0;left:0;right:0;bottom:0}}
 .graph-controls{{
-  position:absolute;top:0.75rem;left:0.75rem;display:flex;gap:0.4rem;z-index:5;
+  position:absolute;top:0.6rem;left:0.6rem;display:flex;gap:0.3rem;z-index:5;
 }}
 .graph-controls button{{
   background:var(--bg-card);border:1px solid var(--border-light);color:var(--text);
-  padding:0.35rem 0.6rem;border-radius:4px;font-size:0.75rem;cursor:pointer;
+  padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;cursor:pointer;
 }}
 .graph-controls button:hover{{background:var(--bg-hover)}}
 
 /* Legend overlay */
 .legend{{
-  position:absolute;bottom:0.75rem;left:0.75rem;
-  background:var(--bg-card);border:1px solid var(--border-light);
-  border-radius:6px;padding:0.5rem 0.75rem;font-size:0.7rem;z-index:5;
-  display:flex;gap:0.75rem;align-items:center;
+  position:absolute;bottom:0.6rem;left:0.6rem;
+  background:rgba(17,24,39,0.9);border:1px solid var(--border-light);
+  border-radius:6px;padding:0.4rem 0.6rem;font-size:0.65rem;z-index:5;
+  display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;
 }}
-.legend-item{{display:flex;align-items:center;gap:0.3rem}}
+.legend-item{{display:flex;align-items:center;gap:0.2rem;white-space:nowrap}}
 .legend-dot{{width:8px;height:8px;border-radius:2px;flex-shrink:0}}
 
 /* ── Right Sidebar ────────────────────────────────────────── */
@@ -104,88 +102,123 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   background:var(--bg-panel);border-left:1px solid var(--border);
   overflow-y:auto;display:flex;flex-direction:column;
 }}
-.panel{{border-bottom:1px solid var(--border);padding:0.75rem}}
+.panel{{border-bottom:1px solid var(--border);padding:0.6rem 0.65rem}}
 .panel-header{{
-  font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;
-  color:var(--text-muted);font-weight:600;margin-bottom:0.5rem;
+  font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;
   display:flex;justify-content:space-between;align-items:center;
 }}
 .panel-count{{
   background:var(--bg-card);padding:0.1rem 0.4rem;border-radius:999px;
-  font-size:0.65rem;color:var(--text-dim);
+  font-size:0.62rem;color:var(--text-dim);
 }}
 
+/* Pivot identity card */
+.pivot-card{{
+  background:linear-gradient(135deg,#1e293b 0%,#172033 100%);
+  border-radius:6px;padding:0.55rem 0.65rem;
+  border:1px solid var(--orange);
+  display:flex;align-items:center;gap:0.5rem;
+}}
+.pivot-card .avatar{{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--orange);display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:0.8rem;color:#fff;flex-shrink:0;
+}}
+.pivot-card .info .name{{font-weight:600;font-size:0.82rem;color:var(--orange)}}
+.pivot-card .info .detail{{font-size:0.68rem;color:var(--text-dim)}}
+
+/* Node detail */
+.node-detail{{
+  background:var(--bg-card);border-radius:6px;padding:0.55rem 0.65rem;
+  border:1px solid var(--border-light);
+}}
+.node-detail .nd-name{{font-weight:600;font-size:0.82rem;margin-bottom:0.3rem}}
+.node-detail .nd-type{{font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.3rem}}
+.node-detail .nd-row{{font-size:0.7rem;color:var(--text-dim);margin-bottom:0.15rem;display:flex;justify-content:space-between}}
+.node-detail .nd-row strong{{color:var(--text);font-weight:500}}
+.node-detail .nd-edges{{margin-top:0.35rem;max-height:100px;overflow-y:auto}}
+.node-detail .nd-edge{{font-size:0.65rem;color:var(--text-dim);padding:0.1rem 0}}
+.nd-empty{{font-size:0.7rem;color:var(--text-muted);font-style:italic}}
+
 /* Phase bar */
-.phases{{display:flex;gap:2px;margin-bottom:0.25rem}}
+.phases{{display:flex;gap:2px;margin-bottom:0.2rem}}
 .phase{{
-  flex:1;height:4px;border-radius:2px;background:var(--border-light);
+  flex:1;height:3px;border-radius:2px;background:var(--border-light);
   position:relative;
 }}
 .phase.done{{background:var(--green)}}
 .phase.partial{{background:var(--yellow)}}
-.phase-labels{{display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted)}}
+.phase-labels{{display:flex;justify-content:space-between;font-size:0.58rem;color:var(--text-muted)}}
 
 /* Action buttons */
-.actions{{display:flex;flex-wrap:wrap;gap:0.35rem;margin-top:0.5rem}}
+.action-group{{margin-bottom:0.35rem}}
+.action-group-label{{font-size:0.6rem;color:var(--text-muted);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.05em}}
+.actions{{display:flex;flex-wrap:wrap;gap:0.25rem}}
 .btn{{
-  padding:0.3rem 0.6rem;border-radius:4px;font-size:0.72rem;font-weight:500;
+  padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:500;
   cursor:pointer;border:1px solid var(--border-light);background:var(--bg-card);
   color:var(--text);transition:all 0.15s;
 }}
 .btn:hover:not(:disabled){{background:var(--bg-hover);border-color:var(--accent)}}
-.btn:disabled{{opacity:0.4;cursor:not-allowed}}
+.btn:disabled{{opacity:0.35;cursor:not-allowed}}
 .btn-primary{{background:var(--accent);border-color:var(--accent);color:#fff}}
 .btn-primary:hover:not(:disabled){{background:#2563eb}}
+.btn-danger{{border-color:var(--red);color:var(--red)}}
+.btn-danger:hover:not(:disabled){{background:rgba(239,68,68,0.15)}}
 
 /* Findings list */
 .finding{{
-  padding:0.4rem 0.5rem;margin-bottom:0.35rem;border-radius:4px;
+  padding:0.35rem 0.5rem;margin-bottom:0.25rem;border-radius:4px;
   background:var(--bg-card);border-left:3px solid var(--text-muted);
-  font-size:0.75rem;
+  font-size:0.72rem;
 }}
 .finding.critical{{border-color:var(--red)}}
 .finding.high{{border-color:var(--orange)}}
 .finding.medium{{border-color:var(--yellow)}}
-.finding .title{{font-weight:500;margin-bottom:0.15rem}}
-.finding .detail{{color:var(--text-dim);font-size:0.7rem}}
+.finding .title{{font-weight:500;margin-bottom:0.1rem}}
+.finding .detail{{color:var(--text-dim);font-size:0.66rem}}
 
 /* Credential rows */
 .cred-row{{
   display:flex;justify-content:space-between;align-items:center;
-  padding:0.3rem 0.5rem;margin-bottom:0.2rem;border-radius:3px;
-  background:var(--bg-card);font-size:0.75rem;
+  padding:0.25rem 0.4rem;margin-bottom:0.15rem;border-radius:3px;
+  background:var(--bg-card);font-size:0.72rem;cursor:pointer;
+  transition:background 0.1s;
 }}
+.cred-row:hover{{background:var(--bg-hover)}}
 .cred-row .user{{font-weight:500}}
 .cred-row .badge{{
-  padding:0.1rem 0.35rem;border-radius:3px;font-size:0.65rem;font-weight:600;
+  padding:0.08rem 0.3rem;border-radius:3px;font-size:0.6rem;font-weight:600;
 }}
 .badge-valid{{background:#14532d;color:#86efac}}
 .badge-hash{{background:#312e81;color:#a5b4fc}}
-.badge-owned{{background:#7c2d12;color:#fdba74}}
-
-/* Identity card */
-.identity-card{{
-  background:var(--bg-card);border-radius:6px;padding:0.6rem;
-  margin-bottom:0.4rem;border:1px solid var(--border-light);
-}}
-.identity-card .name{{font-weight:600;font-size:0.85rem}}
-.identity-card .role{{font-size:0.7rem;color:var(--text-dim)}}
 
 /* ── Bottom Terminal ──────────────────────────────────────── */
 .terminal-bar{{
   background:var(--bg-panel);border-top:1px solid var(--border);
-  display:flex;flex-direction:column;height:180px;min-height:80px;
-  resize:vertical;overflow:hidden;
+  display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
+  transition:height 0.2s;
 }}
+.terminal-bar.collapsed{{height:28px!important}}
+.terminal-bar.collapsed .terminal-output,
+.terminal-bar.collapsed .input-bar{{display:none}}
 .terminal-header{{
   display:flex;justify-content:space-between;align-items:center;
-  padding:0.35rem 0.75rem;font-size:0.7rem;color:var(--text-muted);
-  border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:0.25rem 0.65rem;font-size:0.68rem;color:var(--text-muted);
+  border-bottom:1px solid var(--border);flex-shrink:0;cursor:pointer;
 }}
-.terminal-header .dot{{width:6px;height:6px;border-radius:50%;margin-right:0.3rem}}
+.terminal-header:hover{{background:var(--bg-hover)}}
+.terminal-header .dot{{width:6px;height:6px;border-radius:50%;margin-right:0.25rem}}
+.terminal-header .term-actions{{display:flex;gap:0.3rem}}
+.terminal-header .term-actions button{{
+  background:none;border:none;color:var(--text-muted);cursor:pointer;
+  font-size:0.65rem;padding:0.1rem 0.3rem;border-radius:3px;
+}}
+.terminal-header .term-actions button:hover{{color:var(--text);background:var(--bg-card)}}
 .terminal-output{{
-  flex:1;overflow-y:auto;padding:0.5rem 0.75rem;
-  font-family:var(--mono);font-size:0.72rem;line-height:1.6;
+  flex:1;overflow-y:auto;padding:0.35rem 0.65rem;
+  font-family:var(--mono);font-size:0.7rem;line-height:1.5;
 }}
 .term-line{{white-space:pre-wrap;word-break:break-all}}
 .term-cmd{{color:var(--accent-glow);font-weight:600}}
@@ -193,36 +226,49 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .term-error{{color:var(--red)}}
 .term-phase{{color:var(--cyan);font-weight:500}}
 .term-log{{color:var(--text-dim)}}
-.term-time{{color:var(--text-muted);font-size:0.6rem;margin-right:0.4rem}}
+.term-time{{color:var(--text-muted);font-size:0.58rem;margin-right:0.35rem}}
 
 /* ── Input bar ────────────────────────────────────────────── */
 .input-bar{{
-  display:flex;gap:0.5rem;padding:0.4rem 0.75rem;
+  display:flex;gap:0.35rem;padding:0.3rem 0.65rem;
   border-top:1px solid var(--border);background:var(--bg-card);flex-shrink:0;
+  flex-wrap:wrap;
 }}
 .input-bar input{{
-  flex:1;background:var(--bg-dark);border:1px solid var(--border-light);
-  color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;
-  font-family:var(--mono);font-size:0.75rem;outline:none;
+  background:var(--bg-dark);border:1px solid var(--border-light);
+  color:var(--text);padding:0.25rem 0.4rem;border-radius:4px;
+  font-family:var(--mono);font-size:0.7rem;outline:none;min-width:0;
 }}
 .input-bar input:focus{{border-color:var(--accent)}}
 .input-bar input::placeholder{{color:var(--text-muted)}}
 
-/* ── Node tooltip ─────────────────────────────────────────── */
+/* ── Spray inline input ───────────────────────────────────── */
+.spray-inline{{display:flex;gap:0.25rem;align-items:center}}
+.spray-inline input{{
+  background:var(--bg-dark);border:1px solid var(--border-light);
+  color:var(--text);padding:0.2rem 0.35rem;border-radius:3px;
+  font-size:0.68rem;width:90px;outline:none;
+}}
+.spray-inline input:focus{{border-color:var(--accent)}}
+
+/* ── vis-network tooltip ──────────────────────────────────── */
 .vis-tooltip{{
   background:var(--bg-card)!important;color:var(--text)!important;
   border:1px solid var(--border-light)!important;border-radius:6px!important;
-  padding:0.5rem 0.75rem!important;font-size:0.75rem!important;
+  padding:0.4rem 0.6rem!important;font-size:0.72rem!important;
   font-family:var(--mono)!important;max-width:350px!important;
   box-shadow:0 4px 12px rgba(0,0,0,0.4)!important;
 }}
 
 /* ── Responsive ───────────────────────────────────────────── */
-@media(max-width:900px){{
+@media(max-width:640px){{
   .main{{grid-template-columns:1fr;grid-template-rows:1fr auto}}
-  .graph-area{{min-height:300px}}
-  .sidebar{{max-height:40vh;border-left:none;border-top:1px solid var(--border);overflow-y:auto}}
+  .graph-area{{min-height:250px}}
+  .sidebar{{max-height:35vh;border-left:none;border-top:1px solid var(--border);overflow-y:auto}}
 }}
+
+/* ── Pulse animation for pivot node ───────────────────────── */
+@keyframes pulse{{0%{{box-shadow:0 0 0 0 rgba(249,115,22,0.4)}}70%{{box-shadow:0 0 0 8px rgba(249,115,22,0)}}100%{{box-shadow:0 0 0 0 rgba(249,115,22,0)}}}}
 </style>
 </head>
 <body>
@@ -232,10 +278,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   <div class="header">
     <span class="logo">ADMapper</span>
     <div class="meta">
-      <span>Workspace: <strong id="h-workspace">{workspace_s}</strong></span>
       <span>Domain: <strong id="h-domain">{domain_s or '...'}</strong></span>
       <span>DC: <strong id="h-dc">...</strong></span>
-      <span>Pivot: <strong id="h-pivot">{pivot_s or 'none'}</strong></span>
+      <span>Pivot: <strong id="h-pivot" style="color:var(--orange)">{pivot_s or 'none'}</strong></span>
     </div>
     <div class="status status-idle" id="h-status">
       <span class="dot" style="background:var(--green)"></span> Ready
@@ -246,33 +291,49 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   <div class="main">
     <div class="graph-area">
       <div class="graph-controls">
-        <button onclick="graphFit()" title="Fit graph">Fit</button>
-        <button onclick="graphPhysics()" id="btn-physics" title="Toggle physics">Physics</button>
+        <button onclick="graphFit()" title="Fit to viewport">Fit</button>
+        <button onclick="graphPhysics()" id="btn-physics" title="Toggle physics simulation">Physics</button>
+        <button onclick="centerOnPivot()" title="Center on pivot user">Center</button>
         <button onclick="refreshState()" title="Refresh data">Refresh</button>
       </div>
       <div id="graph-canvas"></div>
       <div class="legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--orange);border-radius:50%"></span>Pivot</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Owned</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span>Pivot</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>High value</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span>gMSA</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>High-Value</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Group</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Computer</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--indigo)"></span>Computer</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span>gMSA</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#475569"></span>User</div>
       </div>
     </div>
 
     <div class="sidebar">
+      <!-- Current Identity / Pivot -->
+      <div class="panel" id="panel-pivot">
+        <div class="panel-header">Current Identity</div>
+        <div id="pivot-display">
+          <div class="nd-empty">No pivot user set</div>
+        </div>
+      </div>
+
+      <!-- Node Detail (populated on click) -->
+      <div class="panel" id="panel-node-detail" style="display:none">
+        <div class="panel-header">Node Detail</div>
+        <div id="node-detail-content"></div>
+      </div>
+
       <!-- Phases -->
       <div class="panel">
         <div class="panel-header">Attack Chain <span class="panel-count" id="phase-count">0/12</span></div>
         <div class="phases" id="phase-bar"></div>
-        <div class="phase-labels"><span>P01</span><span>P06</span><span>P12</span></div>
+        <div class="phase-labels"><span>Recon</span><span>Attack</span><span>Post</span></div>
       </div>
 
-      <!-- Actions -->
+      <!-- Actions — grouped -->
       <div class="panel" id="panel-actions">
         <div class="panel-header">Actions</div>
-        <div class="actions" id="action-buttons"></div>
+        <div id="action-buttons"></div>
       </div>
 
       <!-- Credentials -->
@@ -298,28 +359,28 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div class="panel-header">Findings <span class="panel-count" id="finding-count">0</span></div>
         <div id="finding-list"></div>
       </div>
-
-      <!-- Identities -->
-      <div class="panel">
-        <div class="panel-header">Identities <span class="panel-count" id="id-count">0</span></div>
-        <div id="identity-list"></div>
-      </div>
     </div>
   </div>
 
   <!-- ── Terminal ───────────────────────────────────────── -->
-  <div class="terminal-bar">
-    <div class="terminal-header">
+  <div class="terminal-bar" id="terminal-bar" style="height:160px">
+    <div class="terminal-header" onclick="toggleTerminal()">
       <span><span class="dot" style="background:var(--green)"></span> Terminal</span>
-      <span id="term-status">waiting for events...</span>
+      <span style="display:flex;align-items:center;gap:0.5rem">
+        <span id="term-status" style="font-size:0.62rem">waiting for events...</span>
+        <span class="term-actions">
+          <button onclick="event.stopPropagation();clearTerminal()" title="Clear">Clear</button>
+          <button id="btn-collapse" onclick="event.stopPropagation();toggleTerminal()">_</button>
+        </span>
+      </span>
     </div>
     <div class="terminal-output" id="terminal"></div>
     <div class="input-bar">
-      <input id="input-user" placeholder="username" style="max-width:140px"/>
-      <input id="input-pass" placeholder="password" type="password" style="max-width:160px"/>
-      <button class="btn btn-primary" onclick="doAuth()">Authenticate</button>
-      <input id="input-ip" placeholder="target IP" style="max-width:130px"/>
-      <button class="btn" onclick="doScan()">Scan</button>
+      <input id="input-user" placeholder="username" style="flex:1;max-width:130px"/>
+      <input id="input-pass" placeholder="password" type="password" style="flex:1;max-width:140px"/>
+      <button class="btn btn-primary" onclick="doAuth()" id="btn-auth">Authenticate</button>
+      <input id="input-ip" placeholder="target IP" style="flex:1;max-width:120px"/>
+      <button class="btn" onclick="doScan()" id="btn-scan">Scan</button>
     </div>
   </div>
 
@@ -330,6 +391,10 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 let state = {{}};
 let network = null;
 let physicsOn = true;
+let opRunning = false;
+let selectedNodeId = null;
+let graphNodes = [];
+let graphEdges = [];
 
 /* ── SSE live events ──────────────────────────────────────── */
 const term = document.getElementById('terminal');
@@ -343,12 +408,25 @@ function termLog(text, kind) {{
   el.innerHTML = '<span class="term-time">' + ts + '</span>' + escHtml(text);
   term.appendChild(el);
   term.scrollTop = term.scrollHeight;
+  /* Uncollapse terminal when new events arrive */
+  document.getElementById('terminal-bar').classList.remove('collapsed');
 }}
 
 function escHtml(s) {{
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}}
+
+function clearTerminal() {{
+  term.innerHTML = '';
+  termLog('Terminal cleared', 'log');
+}}
+
+function toggleTerminal() {{
+  const tb = document.getElementById('terminal-bar');
+  tb.classList.toggle('collapsed');
+  document.getElementById('btn-collapse').textContent = tb.classList.contains('collapsed') ? '+' : '_';
 }}
 
 function connectSSE() {{
@@ -372,13 +450,23 @@ function connectSSE() {{
 function updateStatus(kind) {{
   const el = document.getElementById('h-status');
   if (kind === 'phase') {{
+    opRunning = true;
     el.className = 'status status-running';
     el.innerHTML = '<span class="dot" style="background:var(--yellow)"></span> Running';
+    setButtonsDisabled(true);
   }} else if (kind === 'done' || kind === 'error') {{
+    opRunning = false;
     el.className = 'status status-idle';
     el.innerHTML = '<span class="dot" style="background:var(--green)"></span> Ready';
+    setButtonsDisabled(false);
     setTimeout(refreshState, 500);
   }}
+}}
+
+function setButtonsDisabled(disabled) {{
+  document.querySelectorAll('#action-buttons .btn, #btn-auth, #btn-scan').forEach(b => {{
+    b.disabled = disabled;
+  }});
 }}
 
 /* ── API calls ────────────────────────────────────────────── */
@@ -392,6 +480,7 @@ function apiPost(path, body) {{
 
 function doScan() {{
   const ip = document.getElementById('input-ip').value.trim();
+  if (!ip) return;
   apiPost('/api/scan', {{ip}});
 }}
 
@@ -408,10 +497,16 @@ function doEnum() {{ apiPost('/api/enum'); }}
 function doAsrep() {{ apiPost('/api/asreproast'); }}
 function doKerb() {{ apiPost('/api/kerberoast'); }}
 function doBrief() {{ apiPost('/api/brief', {{auto: true}}); }}
+
 function doSpray() {{
-  const pw = prompt('Password to spray:');
-  if (pw) apiPost('/api/spray', {{password: pw}});
+  const input = document.getElementById('spray-pw');
+  if (!input) return;
+  const pw = input.value.trim();
+  if (!pw) {{ input.focus(); return; }}
+  apiPost('/api/spray', {{password: pw}});
+  input.value = '';
 }}
+
 function doPivot(username) {{
   apiPost('/api/pivot', {{username}}).then(r => r.json()).then(d => {{
     if (d.state) renderState(d.state);
@@ -431,19 +526,110 @@ async function refreshState() {{
 function renderState(s) {{
   state = s;
   const meta = s.meta || {{}};
-  document.getElementById('h-workspace').textContent = meta.workspace || '';
-  document.getElementById('h-domain').textContent = meta.domain || '...';
-  document.getElementById('h-dc').textContent = meta.dc_ip ? (meta.dc_host || meta.dc_ip) : '...';
+  document.getElementById('h-domain').textContent = meta.domain && meta.domain !== '???' ? meta.domain : '...';
+  document.getElementById('h-dc').textContent = meta.dc_host || meta.dc_ip || '...';
   document.getElementById('h-pivot').textContent = (s.player||{{}}).pivot || 'none';
 
+  renderPivotCard(s);
   renderPhases(s.phases || []);
   renderActions(s);
   renderCredentials(s.creds || [], s.pth_sessions || []);
   renderHashes(s.pth_sessions || []);
   renderPaths(s.quests || [], s.objective || {{}});
   renderFindings(s.highlights || [], s.engagement_intel || {{}});
-  renderIdentities(s.selectable_identities || []);
   renderGraph(s.graph || {{}});
+}}
+
+/* ── Pivot Card ───────────────────────────────────────────── */
+function renderPivotCard(s) {{
+  const el = document.getElementById('pivot-display');
+  const pivot = (s.player || {{}}).pivot;
+  const meta = s.meta || {{}};
+  if (!pivot) {{
+    el.innerHTML = '<div class="nd-empty">Authenticate to set a pivot user</div>';
+    return;
+  }}
+  const initial = pivot.charAt(0).toUpperCase();
+  const domain = meta.domain && meta.domain !== '???' ? meta.domain : '';
+  el.innerHTML =
+    '<div class="pivot-card">' +
+      '<div class="avatar">' + escHtml(initial) + '</div>' +
+      '<div class="info">' +
+        '<div class="name">' + escHtml(pivot) + '</div>' +
+        '<div class="detail">' +
+          (domain ? escHtml(domain) + ' &middot; ' : '') +
+          'Pivot User' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}}
+
+/* ── Node Detail (sidebar, on graph click) ────────────────── */
+function showNodeDetail(nodeId) {{
+  const panel = document.getElementById('panel-node-detail');
+  const content = document.getElementById('node-detail-content');
+  const node = graphNodes.find(n => n.id === nodeId);
+  if (!node) {{ panel.style.display = 'none'; return; }}
+
+  panel.style.display = '';
+  selectedNodeId = nodeId;
+
+  const typeMap = {{
+    dc: 'Domain Controller', operator: 'Pivot User', user: 'User',
+    computer: 'Computer', group: 'Group', gmsa: 'gMSA Account',
+    domain: 'Domain', highvalue: 'High-Value Target'
+  }};
+  const nodeType = typeMap[node.group] || node.group || 'Unknown';
+
+  /* Find connected edges */
+  const inEdges = graphEdges.filter(e => e.to === nodeId);
+  const outEdges = graphEdges.filter(e => e.from === nodeId);
+
+  let html = '<div class="node-detail">';
+  html += '<div class="nd-type">' + escHtml(nodeType) + '</div>';
+  html += '<div class="nd-name">' + escHtml(node.label || node.username || node.id) + '</div>';
+
+  if (node.username) {{
+    html += '<div class="nd-row"><span>Username</span><strong>' + escHtml(node.username) + '</strong></div>';
+  }}
+  if (node.title) {{
+    html += '<div class="nd-row" style="flex-direction:column;gap:0.1rem"><span style="color:var(--text-muted)">Properties</span>';
+    html += '<span style="font-size:0.65rem;color:var(--text-dim);white-space:pre-wrap">' + node.title + '</span></div>';
+  }}
+
+  /* Inbound relationships */
+  if (inEdges.length) {{
+    html += '<div class="nd-edges"><div style="font-size:0.62rem;color:var(--text-muted);margin-bottom:0.15rem">Inbound (' + inEdges.length + ')</div>';
+    inEdges.slice(0, 10).forEach(e => {{
+      const src = graphNodes.find(n => n.id === e.from);
+      html += '<div class="nd-edge">' + escHtml(src?.label || e.from) + ' &rarr; ' + escHtml(e.label || 'MemberOf') + '</div>';
+    }});
+    if (inEdges.length > 10) html += '<div class="nd-edge" style="color:var(--text-muted)">... +' + (inEdges.length-10) + ' more</div>';
+    html += '</div>';
+  }}
+
+  /* Outbound relationships */
+  if (outEdges.length) {{
+    html += '<div class="nd-edges"><div style="font-size:0.62rem;color:var(--text-muted);margin-bottom:0.15rem">Outbound (' + outEdges.length + ')</div>';
+    outEdges.slice(0, 10).forEach(e => {{
+      const tgt = graphNodes.find(n => n.id === e.to);
+      html += '<div class="nd-edge">' + escHtml(e.label || 'MemberOf') + ' &rarr; ' + escHtml(tgt?.label || e.to) + '</div>';
+    }});
+    if (outEdges.length > 10) html += '<div class="nd-edge" style="color:var(--text-muted)">... +' + (outEdges.length-10) + ' more</div>';
+    html += '</div>';
+  }}
+
+  if (!inEdges.length && !outEdges.length) {{
+    html += '<div class="nd-empty">No relationships</div>';
+  }}
+
+  html += '</div>';
+  content.innerHTML = html;
+
+  /* Highlight in graph */
+  if (network) {{
+    network.selectNodes([nodeId], true);
+  }}
 }}
 
 /* ── Phases ────────────────────────────────────────────────── */
@@ -461,28 +647,65 @@ function renderPhases(phases) {{
   document.getElementById('phase-count').textContent = done + '/' + phases.length;
 }}
 
-/* ── Actions ──────────────────────────────────────────────── */
+/* ── Actions (grouped) ────────────────────────────────────── */
 function renderActions(s) {{
   const container = document.getElementById('action-buttons');
   container.innerHTML = '';
   const progress = s.progress || {{}};
-  const btns = [
-    {{ label: 'Enum Users', fn: 'doEnum()', show: true }},
-    {{ label: 'AS-REP Roast', fn: 'doAsrep()', show: true }},
-    {{ label: 'Kerberoast', fn: 'doKerb()', show: true }},
-    {{ label: 'Spray', fn: 'doSpray()', show: true }},
-    {{ label: 'Exploit', fn: 'doExploit()', show: progress.scan }},
-    {{ label: 'ACLs', fn: 'doAcls()', show: progress.scan }},
-    {{ label: 'Brief', fn: 'doBrief()', show: progress.exploit }},
-  ];
-  btns.forEach(b => {{
-    if (!b.show) return;
-    const el = document.createElement('button');
-    el.className = 'btn';
-    el.textContent = b.label;
-    el.setAttribute('onclick', b.fn);
-    container.appendChild(el);
-  }});
+  const hasCreds = (s.creds || []).length > 0;
+
+  /* Recon group */
+  const reconGroup = document.createElement('div');
+  reconGroup.className = 'action-group';
+  reconGroup.innerHTML = '<div class="action-group-label">Reconnaissance</div><div class="actions" id="recon-btns"></div>';
+  container.appendChild(reconGroup);
+
+  const reconBtns = reconGroup.querySelector('#recon-btns');
+  addBtn(reconBtns, 'Enum Users', 'doEnum()', true);
+  addBtn(reconBtns, 'AS-REP Roast', 'doAsrep()', true);
+  addBtn(reconBtns, 'Kerberoast', 'doKerb()', true);
+  addBtn(reconBtns, 'ACLs', 'doAcls()', progress.scan);
+
+  /* Attack group */
+  if (progress.scan || hasCreds) {{
+    const atkGroup = document.createElement('div');
+    atkGroup.className = 'action-group';
+    atkGroup.innerHTML = '<div class="action-group-label">Attack</div><div class="actions" id="atk-btns"></div>';
+    container.appendChild(atkGroup);
+
+    const atkBtns = atkGroup.querySelector('#atk-btns');
+    addBtn(atkBtns, 'Exploit', 'doExploit()', progress.scan);
+
+    /* Spray with inline input */
+    const sprayWrap = document.createElement('div');
+    sprayWrap.className = 'spray-inline';
+    sprayWrap.innerHTML = '<input id="spray-pw" placeholder="password" style="font-family:var(--mono)"/>';
+    const sprayBtn = document.createElement('button');
+    sprayBtn.className = 'btn';
+    sprayBtn.textContent = 'Spray';
+    sprayBtn.onclick = doSpray;
+    sprayWrap.appendChild(sprayBtn);
+    atkBtns.appendChild(sprayWrap);
+  }}
+
+  /* Report group */
+  if (progress.exploit) {{
+    const repGroup = document.createElement('div');
+    repGroup.className = 'action-group';
+    repGroup.innerHTML = '<div class="action-group-label">Report</div><div class="actions" id="rep-btns"></div>';
+    container.appendChild(repGroup);
+    addBtn(repGroup.querySelector('#rep-btns'), 'Generate Brief', 'doBrief()', true);
+  }}
+}}
+
+function addBtn(container, label, fn, show) {{
+  if (!show) return;
+  const el = document.createElement('button');
+  el.className = 'btn';
+  el.textContent = label;
+  el.setAttribute('onclick', fn);
+  if (opRunning) el.disabled = true;
+  container.appendChild(el);
 }}
 
 /* ── Credentials ──────────────────────────────────────────── */
@@ -492,7 +715,7 @@ function renderCredentials(creds, pth) {{
   const total = creds.length + pth.length;
   document.getElementById('cred-count').textContent = total;
   if (!total) {{
-    el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted)">No credentials yet</div>';
+    el.innerHTML = '<div class="nd-empty">No credentials yet</div>';
     return;
   }}
   creds.forEach(c => {{
@@ -500,8 +723,8 @@ function renderCredentials(creds, pth) {{
     row.className = 'cred-row';
     row.innerHTML = '<span class="user">' + escHtml(c.user) + '</span>' +
       '<span class="badge badge-valid">' + escHtml(c.status) + '</span>';
-    row.style.cursor = 'pointer';
     row.onclick = () => doPivot(c.user);
+    row.title = 'Click to pivot to ' + c.user;
     el.appendChild(row);
   }});
 }}
@@ -519,12 +742,12 @@ function renderHashes(pth) {{
     row.className = 'cred-row';
     row.innerHTML = '<span class="user">' + escHtml(h.account) + '</span>' +
       '<span class="badge badge-hash">NT</span>';
-    row.title = h.winrm_cmd || h.nthash;
-    row.style.cursor = 'pointer';
+    row.title = h.winrm_cmd || h.nthash || 'Click to copy';
     row.onclick = () => {{
-      if (h.winrm_cmd) {{
-        navigator.clipboard.writeText(h.winrm_cmd);
-        termLog('Copied: ' + h.winrm_cmd, 'done');
+      const text = h.winrm_cmd || h.nthash || '';
+      if (text) {{
+        navigator.clipboard.writeText(text);
+        termLog('Copied: ' + text, 'done');
       }}
     }};
     el.appendChild(row);
@@ -540,8 +763,15 @@ function renderPaths(quests, objective) {{
   if (objective.headline) {{
     const ob = document.createElement('div');
     ob.className = 'finding high';
-    ob.innerHTML = '<div class="title">Next: ' + escHtml(objective.headline) + '</div>' +
+    ob.innerHTML = '<div class="title">' + escHtml(objective.headline) + '</div>' +
       (objective.command ? '<div class="detail"><code>' + escHtml(objective.command) + '</code></div>' : '');
+    ob.style.cursor = 'pointer';
+    ob.onclick = () => {{
+      if (objective.command) {{
+        navigator.clipboard.writeText(objective.command);
+        termLog('Copied: ' + objective.command, 'done');
+      }}
+    }};
     el.appendChild(ob);
   }}
   ready.forEach(q => {{
@@ -549,14 +779,14 @@ function renderPaths(quests, objective) {{
     f.className = 'finding ' + (q.severity || 'medium');
     f.innerHTML = '<div class="title">' + escHtml(q.title) + '</div>' +
       '<div class="detail">' + escHtml(q.technique || '') + ' &rarr; ' + escHtml(q.target || '') + '</div>';
-    if (q.ready) {{
+    if (q.ready && !opRunning) {{
       f.style.cursor = 'pointer';
       f.onclick = () => apiPost('/api/exploit');
     }}
     el.appendChild(f);
   }});
   if (!ready.length && !objective.headline) {{
-    el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted)">Run ACLs to discover paths</div>';
+    el.innerHTML = '<div class="nd-empty">Run ACLs to discover paths</div>';
   }}
 }}
 
@@ -580,62 +810,98 @@ function renderFindings(highlights, intel) {{
     el.appendChild(d);
   }});
   if (!items.length) {{
-    el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted)">No findings yet</div>';
+    el.innerHTML = '<div class="nd-empty">No findings yet</div>';
   }}
-}}
-
-/* ── Identities ───────────────────────────────────────────── */
-function renderIdentities(ids) {{
-  const el = document.getElementById('identity-list');
-  el.innerHTML = '';
-  document.getElementById('id-count').textContent = ids.length;
-  ids.forEach(id => {{
-    const card = document.createElement('div');
-    card.className = 'identity-card';
-    const role = id.selectable === 'pivot' ? 'Pivot' : (id.selectable === 'view' ? 'View' : '');
-    card.innerHTML = '<div class="name">' + escHtml(id.username) + '</div>' +
-      '<div class="role">' + escHtml(id.role || '') + (role ? ' &middot; ' + role : '') + '</div>';
-    if (id.selectable === 'pivot') {{
-      card.style.cursor = 'pointer';
-      card.style.borderColor = 'var(--accent)';
-      card.onclick = () => doPivot(id.username);
-    }}
-    el.appendChild(card);
-  }});
 }}
 
 /* ── Graph ────────────────────────────────────────────────── */
 function renderGraph(graphData) {{
   if (!graphData.nodes || !graphData.nodes.length) return;
 
-  const nodes = graphData.nodes.map(n => ({{
-    ...n,
-    shape: n.shape || 'dot',
-    size: n.group === 'dc' ? 24 : (n.group === 'operator' ? 20 : 16),
-    borderWidth: 2,
-    shadow: {{ enabled: true, size: 8, color: 'rgba(0,0,0,0.3)' }},
-    font: n.font || {{ color: '#e2e8f0', size: 11 }},
-  }}));
+  const pivotUser = (state.player || {{}}).pivot || '';
 
-  const edges = graphData.edges.map(e => ({{
+  graphNodes = graphData.nodes.map(n => {{
+    const isPivot = n.username && n.username.toLowerCase() === pivotUser.toLowerCase();
+    const isOwned = n.group === 'operator';
+    const isDC = n.group === 'dc';
+    const isHV = n.group === 'highvalue';
+    const isGroup = n.group === 'group';
+    const isComputer = n.group === 'computer';
+    const isGmsa = n.group === 'gmsa';
+
+    /* Size by importance */
+    let size = 12;
+    if (isPivot) size = 26;
+    else if (isDC) size = 22;
+    else if (isHV) size = 18;
+    else if (isOwned) size = 18;
+    else if (isGroup) size = 14;
+    else if (isComputer) size = 14;
+
+    /* Shape by type */
+    let shape = 'dot';
+    if (isPivot) shape = 'star';
+    else if (isDC) shape = 'diamond';
+    else if (isGroup) shape = 'diamond';
+    else if (isComputer) shape = 'square';
+    else if (isGmsa) shape = 'triangle';
+
+    /* Colors - override backend colors for consistency */
+    let color = n.color || {{}};
+    if (isPivot) {{
+      color = {{ background: '#f97316', border: '#fb923c', highlight: {{ background: '#fb923c', border: '#fdba74' }} }};
+    }} else if (isDC) {{
+      color = {{ background: '#22c55e', border: '#4ade80', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
+    }} else if (isOwned) {{
+      color = {{ background: '#22c55e', border: '#16a34a', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
+    }} else if (isHV) {{
+      color = {{ background: '#ef4444', border: '#f87171', highlight: {{ background: '#f87171', border: '#fca5a5' }} }};
+    }} else if (isGroup) {{
+      color = {{ background: '#8b5cf6', border: '#a78bfa', highlight: {{ background: '#a78bfa', border: '#c4b5fd' }} }};
+    }} else if (isComputer) {{
+      color = {{ background: '#6366f1', border: '#818cf8', highlight: {{ background: '#818cf8', border: '#a5b4fc' }} }};
+    }} else if (isGmsa) {{
+      color = {{ background: '#06b6d4', border: '#22d3ee', highlight: {{ background: '#22d3ee', border: '#67e8f9' }} }};
+    }} else {{
+      color = {{ background: '#475569', border: '#64748b', highlight: {{ background: '#64748b', border: '#94a3b8' }} }};
+    }}
+
+    /* Truncate long labels and strip redundant symbols */
+    let label = n.label || n.username || n.id;
+    label = label.replace(/^[\\u2605\\u2606\\u2726]\\s*/g, '');  /* Strip star prefix — shape already indicates pivot */
+    if (label.length > 22) label = label.substring(0, 20) + '...';
+
+    return {{
+      ...n,
+      label,
+      shape,
+      size,
+      color,
+      borderWidth: isPivot ? 3 : 2,
+      shadow: {{ enabled: true, size: isPivot ? 12 : 6, color: 'rgba(0,0,0,0.3)' }},
+      font: {{ color: '#e2e8f0', size: isPivot ? 13 : (isDC ? 12 : 10), strokeWidth: 2, strokeColor: '#0a0e1a' }},
+    }};
+  }});
+
+  graphEdges = graphData.edges.map(e => ({{
     ...e,
     smooth: {{ type: 'dynamic' }},
-    font: {{ color: '#94a3b8', size: 9, strokeWidth: 0 }},
+    font: {{ color: '#64748b', size: 0, strokeWidth: 0 }},
+    color: {{ color: '#334155', highlight: '#60a5fa', hover: '#60a5fa', opacity: 0.6 }},
+    hoverWidth: 1.5,
   }}));
 
   const container = document.getElementById('graph-canvas');
 
   if (network) {{
-    // Update existing network
     network.setData({{
-      nodes: new vis.DataSet(nodes),
-      edges: new vis.DataSet(edges),
+      nodes: new vis.DataSet(graphNodes),
+      edges: new vis.DataSet(graphEdges),
     }});
     network.fit();
     return;
   }}
 
-  /* Force container to have a concrete pixel size for vis-network */
   const graphArea = container.parentElement;
   const w = graphArea.clientWidth;
   const h = graphArea.clientHeight;
@@ -643,31 +909,31 @@ function renderGraph(graphData) {{
   container.style.height = h + 'px';
 
   network = new vis.Network(container, {{
-    nodes: new vis.DataSet(nodes),
-    edges: new vis.DataSet(edges),
+    nodes: new vis.DataSet(graphNodes),
+    edges: new vis.DataSet(graphEdges),
   }}, {{
     width: w + 'px',
     height: h + 'px',
     autoResize: false,
     physics: {{
-      stabilization: {{ iterations: 150 }},
-      barnesHut: {{ gravitationalConstant: -6000, springLength: 180 }},
+      stabilization: {{ iterations: 200, updateInterval: 25 }},
+      barnesHut: {{ gravitationalConstant: -5000, springLength: 160, springConstant: 0.03 }},
     }},
     interaction: {{
       hover: true,
-      tooltipDelay: 100,
+      tooltipDelay: 200,
       zoomView: true,
       dragView: true,
+      multiselect: false,
     }},
     edges: {{
-      arrows: {{ to: {{ enabled: true, scaleFactor: 0.7 }} }},
+      arrows: {{ to: {{ enabled: true, scaleFactor: 0.6 }} }},
       smooth: {{ type: 'dynamic' }},
     }},
     nodes: {{
       shape: 'dot',
-      size: 16,
+      size: 12,
       borderWidth: 2,
-      shadow: true,
     }},
   }});
 
@@ -675,10 +941,11 @@ function renderGraph(graphData) {{
     network.setOptions({{ physics: false }});
     physicsOn = false;
     document.getElementById('btn-physics').textContent = 'Physics: Off';
-    network.fit();
+    /* Center on pivot if available, otherwise fit all */
+    centerOnPivot() || network.fit();
   }});
 
-  /* Resize observer — keeps graph fitted when window resizes */
+  /* ResizeObserver */
   const ro = new ResizeObserver(() => {{
     if (!network) return;
     const rw = graphArea.clientWidth;
@@ -687,29 +954,51 @@ function renderGraph(graphData) {{
     container.style.height = rh + 'px';
     network.setSize(rw + 'px', rh + 'px');
     network.redraw();
-    network.fit();
   }});
   ro.observe(graphArea);
 
-  // Click node to pivot
+  /* Click node -> show detail */
   network.on('click', (params) => {{
     if (params.nodes.length) {{
+      showNodeDetail(params.nodes[0]);
+    }} else {{
+      document.getElementById('panel-node-detail').style.display = 'none';
+      selectedNodeId = null;
+    }}
+  }});
+
+  /* Double click -> pivot */
+  network.on('doubleClick', (params) => {{
+    if (params.nodes.length) {{
       const nodeId = params.nodes[0];
-      const node = nodes.find(n => n.id === nodeId);
+      const node = graphNodes.find(n => n.id === nodeId);
       if (node && node.username) {{
-        termLog('Selected: ' + node.username, 'log');
+        doPivot(node.username);
+        termLog('Pivoting to: ' + node.username, 'cmd');
       }}
     }}
   }});
 
-  // Double click to pivot
-  network.on('doubleClick', (params) => {{
-    if (params.nodes.length) {{
-      const nodeId = params.nodes[0];
-      const node = nodes.find(n => n.id === nodeId);
-      if (node && node.username) doPivot(node.username);
+  /* Hover edge -> show label */
+  network.on('hoverEdge', (params) => {{
+    const edge = graphEdges.find(e => e.id === params.edge);
+    if (edge && edge.label) {{
+      network.body.data.edges.update({{ id: params.edge, font: {{ size: 9, color: '#94a3b8', strokeWidth: 0 }} }});
     }}
   }});
+  network.on('blurEdge', (params) => {{
+    network.body.data.edges.update({{ id: params.edge, font: {{ size: 0 }} }});
+  }});
+}}
+
+function centerOnPivot() {{
+  if (!network) return false;
+  const pivotUser = (state.player || {{}}).pivot || '';
+  if (!pivotUser) return false;
+  const pivotNode = graphNodes.find(n => n.username && n.username.toLowerCase() === pivotUser.toLowerCase());
+  if (!pivotNode) return false;
+  network.focus(pivotNode.id, {{ scale: 1.2, animation: {{ duration: 500, easingFunction: 'easeInOutQuad' }} }});
+  return true;
 }}
 
 function graphFit() {{ if (network) network.fit({{ animation: true }}); }}

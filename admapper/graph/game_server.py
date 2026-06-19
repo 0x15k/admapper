@@ -29,6 +29,16 @@ from admapper.graph.terminal_filter import GameTerminalFilter
 from admapper.analysis.user_match import refresh_workspace_intel
 
 
+def _load_json_safe(path: Path) -> dict[str, Any]:
+    """Load JSON from path, return empty dict on any error."""
+    try:
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {}
+
+
 class GameContext:
     """Per-server workspace state, event bus, and op lock."""
 
@@ -52,8 +62,12 @@ class GameContext:
         self.op_lock = threading.Lock()
         self.running = False
         self.terminal_filter = GameTerminalFilter()
-        self.progress = GameProgress.fresh()
-        self.progress.save(self.ws_path)
+        saved = GameProgress.load(self.ws_path)
+        if saved.scan or saved.enum_users:
+            self.progress = saved
+        else:
+            self.progress = GameProgress.fresh()
+            self.progress.save(self.ws_path)
 
     def emit(self, line: str, *, kind: str = "log") -> None:
         self.events.put({"type": kind, "line": line, "ts": time.time()})
@@ -258,14 +272,61 @@ class GameContext:
             self.emit("fin · código 1", kind="error")
             return False
 
+    def _get_stored_credential(self) -> tuple[str, str, str] | None:
+        """Return (username, password, domain) from workspace credentials if available."""
+        creds_path = self.ws_path / "credentials.json"
+        if not creds_path.is_file():
+            return None
+        data = json.loads(creds_path.read_text(encoding="utf-8"))
+        for c in data.get("credentials") or []:
+            if str(c.get("status")) == "valid" and c.get("secret"):
+                return (
+                    str(c.get("username", "")),
+                    str(c.get("secret", "")),
+                    str(c.get("domain") or self.domain or ""),
+                )
+        return None
+
     def run_enum_users(self) -> None:
-        self._run_workspace_script(
-            "from admapper.enumeration.scan import run_user_enumeration\n"
-            "run_user_enumeration(session)",
-            label="enum users",
-        )
-        self.progress.enum_users = True
-        self.progress.save(self.ws_path)
+        stored = self._get_stored_credential()
+        if stored:
+            username, password, domain = stored
+            import base64
+
+            u_b64 = base64.b64encode(username.encode()).decode()
+            p_b64 = base64.b64encode(password.encode()).decode()
+            d_b64 = base64.b64encode(domain.encode()).decode()
+            state_data = _load_json_safe(self.ws_path / "unauth_scan.json")
+            dc_ip = ""
+            for host in (state_data.get("hosts") or []):
+                if host.get("is_domain_controller"):
+                    dc_ip = str(host.get("address", ""))
+                    break
+            if not dc_ip:
+                dc_ip = self.host or ""
+            dc_b64 = base64.b64encode(dc_ip.encode()).decode()
+            ok = self._run_workspace_script(
+                "import base64\n"
+                "from admapper.auth.auth_enum import run_auth_enumeration\n"
+                "from admapper.models.credential import Credential\n"
+                f"cred = Credential(username=base64.b64decode('{u_b64}').decode(), "
+                f"secret=base64.b64decode('{p_b64}').decode(), "
+                f"domain=base64.b64decode('{d_b64}').decode(), "
+                "status='valid')\n"
+                f"dc_ip = base64.b64decode('{dc_b64}').decode()\n"
+                f"domain = base64.b64decode('{d_b64}').decode()\n"
+                "run_auth_enumeration(session, cred, dc_ip, domain)",
+                label="enum users (authenticated)",
+            )
+        else:
+            ok = self._run_workspace_script(
+                "from admapper.enumeration.scan import run_user_enumeration\n"
+                "run_user_enumeration(session)",
+                label="enum users",
+            )
+        if ok:
+            self.progress.enum_users = True
+            self.progress.save(self.ws_path)
 
     def run_asreproast(self) -> None:
         self._run_workspace_script(
