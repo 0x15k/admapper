@@ -664,6 +664,63 @@ def graph(
 
 
 @app.command()
+def web(
+    host: Annotated[
+        str | None,
+        typer.Option(
+            "-H",
+            "--host",
+            "--ip",
+            help="Target IP (creates workspace target-<ip>)",
+        ),
+    ] = None,
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Dashboard server port (default 8766)"),
+    ] = 8766,
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open/--no-open", help="Open dashboard in browser"),
+    ] = True,
+) -> None:
+    """Web dashboard — live attack graph, terminal, and findings."""
+    from admapper.cli.commands import dispatch
+    from admapper.core.discovery import default_workspace_name
+    from admapper.core.output import print_error, print_info
+    from admapper.core.session import Session
+    from admapper.graph.game_server import run_game_server
+
+    session = Session.bootstrap()
+    if host:
+        ws_name = workspace or default_workspace_name(host)
+        session.select_workspace(ws_name, create=True)
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        print_info(f"workspace {ws_name} · target {host.strip()}")
+    elif workspace:
+        session.select_workspace(workspace, create=False)
+    elif session.workspace is None:
+        print_error("usage: admapper web -H <IP>   or   admapper web -w <workspace>")
+        raise typer.Exit(1)
+    ws = session.workspace
+    ws_path = session.workspaces.path_for(ws.name)
+    run_game_server(
+        ws_path=ws_path,
+        workspace=ws.name,
+        domain=ws.domain,
+        owned_users=[],
+        pivot_user=None,
+        host=ws.hosts,
+        port=port,
+        open_browser=open_browser,
+    )
+
+
+@app.command()
 def game(
     host: Annotated[
         str | None,

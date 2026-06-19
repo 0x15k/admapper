@@ -272,7 +272,7 @@ def test_game_server_state_endpoint(tmp_path: Path) -> None:
         resp = conn.getresponse()
         assert resp.status == 200
         html = resp.read().decode("utf-8")
-        assert "AD OPS" in html
+        assert "ADMapper" in html
         assert "vis-network" in html
         conn.close()
     finally:

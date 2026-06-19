@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlparse
 
 from admapper.core.game_mode import enable_game_mode, game_subprocess_env
 from admapper.graph.game_progress import GameProgress
+from admapper.graph.dashboard_html import build_dashboard_html
 from admapper.graph.game_ui import build_game_html, build_game_payload
 from admapper.graph.terminal_filter import GameTerminalFilter
 from admapper.analysis.user_match import refresh_workspace_intel
@@ -454,8 +455,8 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:  # noqa: N802
             path = urlparse(self.path).path
-            if path in {"/", "/ad_ops.html", "/index.html"}:
-                html = build_game_html(
+            if path in {"/", "/index.html", "/dashboard"}:
+                html_content = build_dashboard_html(
                     ctx.ws_path,
                     workspace=ctx.workspace,
                     domain=ctx.domain,
@@ -463,7 +464,24 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
                     pivot_user=ctx.pivot_user,
                     api_mode=True,
                 )
-                body = html.encode("utf-8")
+                body = html_content.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            if path == "/game":
+                html_content = build_game_html(
+                    ctx.ws_path,
+                    workspace=ctx.workspace,
+                    domain=ctx.domain,
+                    owned_users=ctx.owned_users,
+                    pivot_user=ctx.pivot_user,
+                    api_mode=True,
+                )
+                body = html_content.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -625,12 +643,9 @@ def run_game_server(
     url = f"http://127.0.0.1:{bound_port}/"
     from admapper.core.output import print_info, print_success
 
-    print_success(f"AD Ops game → {url}")
+    print_success(f"ADMapper dashboard → {url}")
     print_info("Ctrl+C para detener el servidor")
-    print_info(
-        "modo juego: sin sudo — prep local: admapper sync-dc -H <DC>  "
-        "(o panel «Tu máquina» en el juego)"
-    )
+    print_info("game UI legacy disponible en /game")
     if open_browser:
         try:
             webbrowser.open(url)
