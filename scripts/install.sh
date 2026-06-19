@@ -251,13 +251,14 @@ do_uninstall() {
 # ── Post-install doctor + tips ──────────────────────────────────
 post_install() {
     echo ""
-    printf "${BOLD}Recommended external tools:${NC}\n"
+    printf "${BOLD}Recommended companion tools (install separately):${NC}\n"
+    echo "  pipx install certipy-ad       # AD CS exploitation (ESC1-14)"
+    echo "  pipx install pywhisker        # Shadow Credentials"
+    echo "  pipx install netexec          # nxc (SMB/WinRM/LDAP)"
     if [[ "$OS" == "macos" ]]; then
         echo "  brew install hashcat john-jumbo libfaketime"
-        echo "  pipx install netexec certipy-ad"
     else
         echo "  sudo apt install -y hashcat john   # Kali/Debian"
-        echo "  pipx install netexec certipy-ad"
     fi
 
     echo ""

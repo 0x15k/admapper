@@ -39,13 +39,14 @@ dependencies = [
 recon = [
     "impacket>=0.12,<0.14",
 ]
+# Full engagement tier (Impacket + WinRM + Kerberos).
+# certipy-ad and pywhisker are standalone CLIs — install them
+# separately:  pipx install certipy-ad  /  pipx install pywhisker
 full = [
     "impacket>=0.12,<0.14",
     "pypsrp>=0.8,<0.9",
     "gssapi>=1.8",
     "krb5>=0.5",
-    "certipy-ad>=4.8",
-    "pywhisker>=0.1",
 ]
 dev = [
     "pytest>=8.0,<9.0",

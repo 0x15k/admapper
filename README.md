@@ -90,7 +90,7 @@ admapper
 |------|----------------|---------|
 | **core** | LDAP, DNS, CLI (no Impacket) | `pip install .` |
 | **recon** | + Impacket (SMB, Kerberos, SAMR) | `pip install ".[recon]"` |
-| **full** | + certipy, pywhisker, WinRM, GSSAPI | `pip install ".[full]"` (default) |
+| **full** | + WinRM, GSSAPI, Kerberos libs | `pip install ".[full]"` (default) |
 | **dev** | + pytest, ruff, bandit | `pip install ".[dev]"` |
 
 ### Platform Support
@@ -101,17 +101,23 @@ admapper
 | **Linux** | Supported | Kali/Parrot/Debian — auto-handles PEP 668 |
 | **Windows** | Supported | PowerShell + pipx or venv |
 
-### Optional External Tools
+### Companion Tools (install separately via pipx)
 
 ```bash
+pipx install certipy-ad       # AD CS exploitation (ESC1-14)
+pipx install pywhisker        # Shadow Credentials
+pipx install netexec          # nxc (SMB/WinRM/LDAP)
+
 # macOS
 brew install hashcat john-jumbo libfaketime
-pipx install netexec certipy-ad
 
 # Linux / Kali
 sudo apt install -y hashcat john
-pipx install netexec certipy-ad
 ```
+
+> **Why separate?** certipy-ad and pywhisker have conflicting dependency trees
+> with Impacket. Installing them in isolated pipx environments avoids version
+> conflicts and keeps everything working.
 
 ## Make Targets
 
