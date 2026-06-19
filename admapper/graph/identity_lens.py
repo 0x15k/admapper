@@ -12,7 +12,7 @@ from admapper.graph.game_state import (
     collect_verified_missions,
 )
 from admapper.report.engagement import _load_json
-from admapper.engagement import loot_clue_rows
+from admapper.graph.game_progress import GameProgress, filtered_loot_clues
 from admapper.report.scenario import _access_matrix_rows
 
 
@@ -27,6 +27,24 @@ def _user_node_id(username: str, domain: str) -> str:
 _GLOBAL_ACTION_IDS = frozenset(
     {"scan", "cred", "enum", "enum_users", "asreproast", "kerberoast", "spray", "loot", "acls"}
 )
+
+
+def _normalize_account(name: str) -> str:
+    base = str(name or "").strip().lower().rstrip("$")
+    return base
+
+
+def _machine_hash_row(ws_path: Path, username: str) -> dict[str, str] | None:
+    from admapper.creds.common import collect_gained_hashes
+
+    want = _normalize_account(username)
+    if not want:
+        return None
+    for account, nthash in collect_gained_hashes(ws_path):
+        if _normalize_account(account) == want and nthash:
+            name = account if account.endswith("$") else f"{account}$"
+            return {"username": name, "nthash": nthash}
+    return None
 
 
 def _lookup_inventory_user(ws_path: Path, username: str) -> dict[str, Any] | None:
@@ -63,11 +81,15 @@ def build_selectable_identities(
     *,
     domain: str,
     owned_users: list[str],
+    game_progress: GameProgress | None = None,
 ) -> list[dict[str, Any]]:
     """Humans the operator can focus on — owned, cred-valid, or loot-pending."""
     ws_path = Path(ws_path)
     owned = _owned_lower(owned_users)
-    valid = _valid_cred_users(ws_path)
+    if game_progress is not None:
+        valid = game_progress.verified_set()
+    else:
+        valid = _valid_cred_users(ws_path)
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
 
@@ -117,7 +139,7 @@ def build_selectable_identities(
             detail="credencial válida — no marcado owned",
         )
 
-    for clue in loot_clue_rows(ws_path):
+    for clue in filtered_loot_clues(ws_path, game_progress):
         user = str(clue.get("user", ""))
         if not user or user.lower() in seen:
             continue
@@ -131,10 +153,30 @@ def build_selectable_identities(
             detail=f"pista en {str(clue.get('source', ''))[:40]}",
         )
 
+    if game_progress is not None and game_progress.exploit:
+        from admapper.creds.common import collect_gained_hashes
+
+        for account, nthash in collect_gained_hashes(ws_path):
+            if not nthash:
+                continue
+            name = account if account.endswith("$") else f"{account}$"
+            add(
+                name,
+                role="machine_pth",
+                selectable="pivot",
+                cred_valid=True,
+                detail="NTLM hash — WinRM Pass-the-Hash (no LDAP password)",
+            )
+
+    if game_progress is not None and not game_progress.enum_users:
+        return rows
+
     inv = _load_json(ws_path / "auth_inventory.json") or {}
     for u in inv.get("users") or []:
         name = str(u.get("username", ""))
         if not name or name.lower() in seen or u.get("is_machine_account"):
+            continue
+        if name.lower() in {"krbtgt", "administrator", "guest"}:
             continue
         flags: list[str] = []
         if u.get("kerberoastable"):
@@ -161,13 +203,52 @@ def build_identity_lens(
     domain: str,
     pivot_user: str,
     owned_users: list[str],
+    game_progress: GameProgress | None = None,
 ) -> dict[str, Any]:
     """Everything the UI should show for the active identity (pivot)."""
     ws_path = Path(ws_path)
     pivot = pivot_user.strip()
     owned = _owned_lower(owned_users)
-    valid = _valid_cred_users(ws_path)
-    pl = pivot.lower()
+    if game_progress is not None:
+        valid = game_progress.verified_set()
+    else:
+        valid = _valid_cred_users(ws_path)
+    pl = pivot.lower().rstrip("$")
+    machine = _machine_hash_row(ws_path, pivot) if pivot.endswith("$") or "msa_" in pl else None
+    if machine:
+        from admapper.creds.common import format_admapper_winrm_pth
+
+        account = machine["username"]
+        nthash = machine["nthash"]
+        _, winrm_cmd = format_admapper_winrm_pth(
+            account=account,
+            nthash=nthash,
+            domain=domain,
+            ws_path=ws_path,
+        )
+        return {
+            "username": account,
+            "node_id": f"gmsa:{pl}@{domain.lower()}",
+            "status": "machine_pth",
+            "status_label": "gMSA / máquina — WinRM PTH (sin password LDAP)",
+            "read_only": False,
+            "owned": True,
+            "cred_valid": True,
+            "cred_status": "nthash",
+            "access_matrix": [account, "skip", "skip", "skip", "sí*", "hash gMSA — WinRM PTH"],
+            "capabilities": [],
+            "missions": [],
+            "enabled_missions": [],
+            "targets": [],
+            "loot_clue": None,
+            "inventory": {"dn": f"CN={pl},CN=Managed Service Accounts,DC={domain.replace('.', ',DC=')}"},
+            "enum_flags": [],
+            "edges": [],
+            "next_edge": None,
+            "is_machine": True,
+            "nthash": nthash,
+            "winrm_cmd": winrm_cmd,
+        }
 
     capabilities: list[dict[str, Any]] = []
     for ident in collect_identity_capabilities(ws_path, domain=domain, owned_users=owned_users):
@@ -215,12 +296,17 @@ def build_identity_lens(
             )
 
     loot_clue = next(
-        (c for c in loot_clue_rows(ws_path) if str(c.get("user", "")).lower() == pl),
+        (c for c in filtered_loot_clues(ws_path, game_progress) if str(c.get("user", "")).lower() == pl),
         None,
     )
 
-    inv_user = _lookup_inventory_user(ws_path, pivot)
+    inv_user = _lookup_inventory_user(ws_path, pivot) if game_progress is None or game_progress.enum_users else None
     enum_flags = _enum_flags(inv_user)
+    if game_progress is not None and not game_progress.acls:
+        capabilities = []
+        missions = []
+        enabled_missions = []
+        targets = []
 
     if pl in owned and pl in valid:
         status = "owned_ready"

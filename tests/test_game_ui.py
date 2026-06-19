@@ -95,11 +95,18 @@ def test_build_game_html_real_terms(tmp_path: Path) -> None:
     assert "ESCANEAR" in html
     assert "CRTP" in html
     assert "TERMINAL" in html
+    assert "NOTAS" in html
+    assert "note-kv" in html
+    assert "note-arr" in html
     assert "Prerrequisitos por ataque" in html
     assert "MANUAL" in html
     assert "book-reader" in html
     assert "Identidades" in html
-    assert "AUTENTICAR COMO ESTE USUARIO" in html
+    assert "AUTENTICAR" in html
+    assert "CONECTAR WINRM PTH" in html
+    assert "screen-hq" in html
+    assert "hq-canvas" in html
+    assert "tab-hq" in html
     assert "Política de bloqueo" in html
     assert "Usuarios del dominio" in html
     assert "Análisis de pista" in html

@@ -120,12 +120,24 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
                 "gMSA necesita solo TGT (no ticket HTTP WinRM) — "
                 "actualiza admapper y vuelve a ejecutar brief"
             )
+        if "preauth_failed" in detail_l or "pre-authentication" in detail_l:
+            return (
+                "Contraseña Kerberos rechazada — prueba variante de año del loot "
+                "(p. ej. 2026 vs 2025) y vuelve a ejecutar exploit"
+            )
         if "clock skew" in detail_l or "krb_ap_err_skew" in detail_l:
             skew = load_workspace_clock_skew(ws_path)
             if skew:
+                from admapper.core.platform import resolve_faketime
+
+                if resolve_faketime():
+                    return (
+                        f"Kerberos skew (offset {skew}) — libfaketime activo; "
+                        "re-ejecuta ▶ genericwrite (o `admapper exploit -w …`)"
+                    )
                 return (
                     f"Kerberos clock skew (offset {skew}) — "
-                    "sincroniza con sntp o `admapper run --clock-skew` y re-ejecuta exploit"
+                    "instala libfaketime y re-ejecuta exploit"
                 )
             creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
             valid_users = {

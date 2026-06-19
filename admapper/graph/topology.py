@@ -5,7 +5,6 @@ from __future__ import annotations
 Nodes and edges appear only from discovered workspace facts — blackbox safe.
 """
 
-import math
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +89,8 @@ def build_network_topology(
     *,
     domain: str | None,
     owned_users: list[str] | None = None,
+    reveal_scan: bool = True,
+    reveal_enum: bool = True,
 ) -> dict[str, Any]:
     """Build THM-style infra map from scan → enum → owned discoveries."""
     nodes: list[dict[str, Any]] = []
@@ -101,7 +102,7 @@ def build_network_topology(
     owned = list(owned_users or [])
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     inv = _load_json(ws_path / "auth_inventory.json") or {}
-    has_scan = bool(unauth.get("hosts"))
+    has_scan = bool(unauth.get("hosts")) and reveal_scan
 
     _add_node(
         nodes,
@@ -155,6 +156,7 @@ def build_network_topology(
         discoveries.append(f"Dominio: {discovered_domain}")
 
     dc_id: str | None = None
+    targets: list[dict[str, Any]] = []
     host_rows = unauth.get("hosts") or []
     for idx, host in enumerate(host_rows):
         addr = str(host.get("address", ""))
@@ -164,7 +166,13 @@ def build_network_topology(
         hostname = str(host.get("hostname") or "")
         hn_show = hostname if hostname and hostname not in {"-", "?"} else "desconocido"
         role = "DOMAIN CONTROLLER" if is_dc else "HOST"
-        label = f"{role}\n{addr}\n{hn_show}"
+        ports = list(host.get("open_ports") or [])[:12]
+        services = [
+            {"port": int(port), "label": _PORT_LABELS.get(int(port), f"TCP/{port}")}
+            for port in ports
+        ]
+        svc_short = " · ".join(s["label"] for s in services[:6]) if services else "sin puertos abiertos"
+        label = f"{role}\n{addr}"
         hx = 80 + idx * 220
         hid = f"host:{addr}"
         if is_dc:
@@ -178,7 +186,8 @@ def build_network_topology(
             color="#6366f1" if is_dc else "#64748b",
             x=hx,
             y=0,
-            title=f"Puertos: {host.get('open_ports', [])}",
+            shape="box",
+            title=f"{hn_show}\n{svc_short}",
         )
         _add_edge(
             edges,
@@ -191,40 +200,25 @@ def build_network_topology(
             width=3,
         )
         discoveries.append(f"Host {addr} ({hn_show})")
-
-        ports = list(host.get("open_ports") or [])[:8]
-        for pi, port in enumerate(ports):
-            angle = (pi / max(len(ports), 1)) * math.pi * 2 - math.pi / 2
-            sx = hx + 95 * math.cos(angle)
-            sy = 95 * math.sin(angle)
-            sid = f"svc:{addr}:{port}"
-            plabel = _PORT_LABELS.get(int(port), f":{port}")
-            _add_node(
-                nodes,
-                n_seen,
-                nid=sid,
-                label=plabel,
-                group="service",
-                color="#06b6d4",
-                x=sx,
-                y=sy,
-                shape="dot",
-                size=16,
-            )
-            _add_edge(
-                edges,
-                e_seen,
-                eid=f"{hid}-{sid}",
-                src=hid,
-                tgt=sid,
-                label="",
-                color="#334155",
-                width=1,
-            )
+        if services:
+            discoveries.append(f"Servicios {addr}: {svc_short}")
+        targets.append(
+            {
+                "id": hid,
+                "address": addr,
+                "hostname": hn_show,
+                "role": role,
+                "is_dc": is_dc,
+                "services": services,
+            }
+        )
+        for port in ports:
             if int(port) == 88:
-                discoveries.append(f"Kerberos en {addr}")
+                discoveries.append(f"Kerberos KDC en {addr}")
             elif int(port) == 389:
                 discoveries.append(f"LDAP en {addr}")
+            elif int(port) == 445:
+                discoveries.append(f"SMB en {addr}")
 
     if domain_known and dc_id:
         _add_node(
@@ -249,15 +243,13 @@ def build_network_topology(
             width=2,
         )
 
-    computers = inv.get("computers") or []
+    computers = inv.get("computers") or [] if reveal_enum else []
     enum_hosts = [c for c in computers if not str(c.get("name", "")).lower().startswith("msa_")][:8]
     for ci, comp in enumerate(enum_hosts):
         name = str(comp.get("name") or comp.get("dns_host") or "")
         if not name:
             continue
         dns = str(comp.get("dns_host") or name)
-        if dc_id and dns in str(nodes):
-            continue
         cy = 180 + (ci % 4) * 70
         cx = 40 + (ci // 4) * 200
         cid = f"computer:{name.lower()}"
@@ -277,10 +269,10 @@ def build_network_topology(
             _add_edge(
                 edges,
                 e_seen,
-                eid=f"domain-{cid}",
-                src="domain" if domain_known else dc_id,
+                eid=f"dc-{cid}",
+                src=dc_id,
                 tgt=cid,
-                label="enum",
+                label="member",
                 color="#475569",
                 dashes=True,
             )
@@ -319,31 +311,6 @@ def build_network_topology(
             )
         discoveries.append(f"gMSA: {name}")
 
-    for oi, user in enumerate(owned[:6]):
-        uid = f"owned:{user.lower().rstrip('$')}"
-        _add_node(
-            nodes,
-            n_seen,
-            nid=uid,
-            label=f"★ {user[:18]}",
-            group="owned",
-            color="#22c55e",
-            x=-420,
-            y=100 + oi * 55,
-            shape="dot",
-            size=20,
-        )
-        _add_edge(
-            edges,
-            e_seen,
-            eid=f"op-{uid}",
-            src="operator",
-            tgt=uid,
-            label="session",
-            color="#22c55e",
-            width=2,
-        )
-
     max_steps = 12
     pct = min(100, int(len(discoveries) / max_steps * 100))
 
@@ -353,6 +320,7 @@ def build_network_topology(
         "mode": "network",
         "discovery_pct": pct,
         "discoveries": discoveries[-16:],
+        "targets": targets,
         "has_scan": True,
         "domain_known": domain_known,
         "domain": discovered_domain if domain_known else None,

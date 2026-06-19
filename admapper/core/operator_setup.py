@@ -6,6 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from admapper.core.platform import is_macos, resolve_faketime
+
+
+def _gssapi_installed() -> bool:
+    try:
+        import gssapi  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
 from admapper.creds.kerberos_skew import load_workspace_clock_skew
 from admapper.creds.time_sync import suggest_time_sync, was_dc_clock_synced
 
@@ -41,10 +50,17 @@ def build_operator_setup(
         notes.append("Reloj sincronizado con el DC en esta sesión.")
     if hosts_entry:
         notes.append("Añade la línea de hosts si LDAP/Kerberos resuelven mal el FQDN.")
+    gssapi_ok = _gssapi_installed()
+    if not gssapi_ok:
+        notes.append(
+            "gssapi no instalado — ▶ genericwrite / gMSA fallará hasta: "
+            "pip install 'admapper[full]'"
+        )
 
     return {
         "clock_ready": clock_ok,
         "kerberos_skew": skew,
+        "gssapi_installed": gssapi_ok,
         "libfaketime_installed": faketime_ok,
         "hosts_entry": hosts_entry or None,
         "sync_clock_cmd": suggest_time_sync(dc_ip) if dc_ip else None,

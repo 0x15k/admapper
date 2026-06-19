@@ -6,13 +6,113 @@ from pathlib import Path
 from typing import Any
 
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
-from admapper.creds.common import collect_gained_hashes, format_evil_winrm_pth
+from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth, format_evil_winrm_pth
 from admapper.report.engagement import _load_json
 from admapper.report.engagement_map import _acl_exploit_blocker, loot_clue_rows
 
 
 def _esc(text: str) -> str:
     return html.escape(str(text or ""))
+
+
+_GRAPH_SKIP_USERS = frozenset({"krbtgt", "administrator", "guest"})
+
+
+def _contrast_text(hex_color: str) -> str:
+    """Readable label on node fill (WCAG-ish luminance threshold)."""
+    raw = str(hex_color or "").lstrip("#")
+    if len(raw) != 6:
+        return "#f8fafc"
+    r = int(raw[0:2], 16)
+    g = int(raw[2:4], 16)
+    b = int(raw[4:6], 16)
+    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#0f172a" if lum > 0.52 else "#f8fafc"
+
+
+def _node_font(hex_color: str) -> dict[str, Any]:
+    fg = _contrast_text(hex_color)
+    stroke = "#080b10" if fg == "#f8fafc" else "#f8fafc"
+    return {
+        "color": fg,
+        "size": 11,
+        "face": "IBM Plex Sans, sans-serif",
+        "strokeWidth": 3,
+        "strokeColor": stroke,
+    }
+
+
+def _gmsa_base(name: str) -> str:
+    return str(name or "").lower().rstrip("$").replace("@", "").split(".")[0]
+
+
+def _dedupe_gmsa_nodes(vis_nodes: dict[str, dict]) -> None:
+    """One node per gMSA — drop duplicate user:msa_* when gmsa:* exists."""
+    gmsa_bases = {
+        _gmsa_base(str(n.get("label", "")))
+        for n in vis_nodes.values()
+        if str(n.get("group", "")) == "gmsa"
+    }
+    drop: list[str] = []
+    for nid, node in vis_nodes.items():
+        if str(node.get("group", "")) != "user":
+            continue
+        user = str(node.get("username") or node.get("label", "")).replace("★", "").strip()
+        if _gmsa_base(user) in gmsa_bases and "msa_" in user.lower():
+            drop.append(nid)
+    for nid in drop:
+        vis_nodes.pop(nid, None)
+
+
+def _wire_orphan_nodes(vis_nodes: dict[str, dict], vis_edges: list[dict]) -> None:
+    """Connect orphan computers/groups so nothing floats in AD MAP."""
+    connected: set[str] = set()
+    for edge in vis_edges:
+        connected.add(str(edge.get("from", "")))
+        connected.add(str(edge.get("to", "")))
+    connected.discard("")
+
+    anchor: str | None = None
+    for nid, node in vis_nodes.items():
+        if nid in connected:
+            anchor = nid
+            if str(node.get("group", "")) in ("user", "gmsa") and (
+                str(node.get("identity_role", "")) in ("pivot", "owned")
+                or str(node.get("label", "")).startswith("★")
+            ):
+                anchor = nid
+                break
+    if not anchor:
+        for nid in connected:
+            anchor = nid
+            break
+    if not anchor:
+        return
+
+    seen_eids = {str(e.get("id", "")) for e in vis_edges}
+    for nid, node in list(vis_nodes.items()):
+        if nid in connected:
+            continue
+        group = str(node.get("group", ""))
+        if group not in ("computer", "group", "gmsa"):
+            continue
+        eid = f"wire:{anchor}->{nid}"
+        if eid in seen_eids:
+            continue
+        vis_edges.append(
+            {
+                "id": eid,
+                "from": anchor,
+                "to": nid,
+                "label": "linked",
+                "arrows": "to",
+                "color": {"color": "#475569"},
+                "width": 1,
+                "dashes": True,
+            }
+        )
+        connected.add(nid)
+        seen_eids.add(eid)
 
 
 def _node_color(node: dict[str, Any], *, pivot: str, owned: set[str]) -> str:
@@ -73,7 +173,9 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
         nid = str(node.get("id", ""))
         label = str(node.get("label", "")).lower()
         group = str(node.get("group", ""))
-        if group in ("gmsa", "dc", "operator", "computer"):
+        if group in ("gmsa", "dc", "operator"):
+            keep.add(nid)
+        if group == "computer" and nid in connected:
             keep.add(nid)
         if label.startswith("★"):
             keep.add(nid)
@@ -138,7 +240,7 @@ def build_graph_payload(
             "group": group,
             "color": color,
             "title": title or label,
-            "font": {"color": "#f8fafc" if color != "#64748b" else "#0f172a"},
+            "font": _node_font(color),
             "username": username,
             "identity_role": identity_role,
         }
@@ -148,6 +250,8 @@ def build_graph_payload(
         if not nid:
             continue
         username = str(node.get("username") or node.get("name") or nid.split(":")[0])
+        if username.lower() in _GRAPH_SKIP_USERS:
+            continue
         label = username
         is_owned = bool(node.get("owned")) or username.lower() in owned
         if is_owned:
@@ -252,6 +356,9 @@ def build_graph_payload(
         )
 
     acl_blocker = _acl_exploit_blocker(ws_path)
+
+    _dedupe_gmsa_nodes(vis_nodes)
+    _wire_orphan_nodes(vis_nodes, vis_edges)
 
     result: dict[str, Any] = {
         "nodes": list(vis_nodes.values()),

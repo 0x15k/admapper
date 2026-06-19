@@ -36,5 +36,6 @@ def test_topology_after_scan(tmp_path: Path) -> None:
     topo = build_network_topology(ws, domain="logging.htb", owned_users=[])
     assert topo["has_scan"] is True
     assert topo["domain_known"] is True
-    assert any("Kerberos" in n.get("label", "") for n in topo["nodes"])
     assert any(n["id"] == "host:10.129.1.1" for n in topo["nodes"])
+    assert topo["targets"][0]["services"]
+    assert any("Kerberos" in d for d in topo["discoveries"])

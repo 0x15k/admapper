@@ -40,8 +40,10 @@ def _open_kerberos_ldap_session(
     *,
     dc_ip: str | None = None,
     ldap_host: str | None = None,
+    ws_path: str | None = None,
 ) -> tuple[LdapSession | None, str | None]:
     from admapper.auth.kerberos_ldap_client import start_kerberos_ldap_repl
+    from admapper.creds.kerberos_skew import load_workspace_clock_skew
 
     try:
         repl = start_kerberos_ldap_repl(
@@ -51,6 +53,7 @@ def _open_kerberos_ldap_session(
             domain,
             dc_ip=dc_ip or host,
             ldap_host=ldap_host or host,
+            clock_skew=load_workspace_clock_skew(ws_path),
         )
         base_dn = repl.base_dn or domain_to_base_dn(domain)
         return (
@@ -98,6 +101,7 @@ def open_ldap_session(
             domain,
             dc_ip=host,
             ldap_host=ldap_host,
+            ws_path=ws_path,
         )
         if session is not None:
             return session, None

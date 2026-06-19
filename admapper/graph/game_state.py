@@ -3,9 +3,12 @@ from __future__ import annotations
 """Objective game state — derived from workspace JSON, not hand-tuned scenarios."""
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
+
+if TYPE_CHECKING:
+    from admapper.graph.game_progress import GameProgress
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
 
@@ -342,22 +345,32 @@ def compute_stage_and_actions(
     dc_ip: str,
     domain: str,
     owned_users: list[str],
+    game_progress: GameProgress | None = None,
 ) -> dict[str, Any]:
     """Strict gating: only actions possible with current workspace facts."""
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
-    valid_users = _valid_cred_users(ws_path)
-    inv = _load_json(ws_path / "auth_inventory.json") or {}
     loot = _load_json(ws_path / "loot_manifest.json") or {}
     acl_n = len(_acl_findings(ws_path))
     owned = _owned_lower(owned_users)
 
-    has_scan = bool(unauth.get("hosts"))
-    users_data = _load_json(ws_path / "users.json") or {}
-    has_users = bool(users_data.get("users"))
-    has_creds = bool(valid_users)
-    has_enum = bool(inv)
-    has_loot = bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
-    has_acls = acl_n > 0
+    if game_progress is not None:
+        valid_users = game_progress.verified_set()
+        has_scan = game_progress.scan
+        has_users = game_progress.enum_users
+        has_creds = bool(valid_users)
+        has_enum = game_progress.enum_users
+        has_loot = game_progress.loot
+        has_acls = game_progress.acls
+    else:
+        valid_users = _valid_cred_users(ws_path)
+        has_scan = bool(unauth.get("hosts"))
+        users_data = _load_json(ws_path / "users.json") or {}
+        has_users = bool(users_data.get("users"))
+        has_creds = bool(valid_users)
+        inv = _load_json(ws_path / "auth_inventory.json") or {}
+        has_enum = bool(inv)
+        has_loot = bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
+        has_acls = acl_n > 0
 
     actions: list[dict[str, Any]] = []
 
@@ -548,13 +561,15 @@ def build_objective_game_state(
     domain: str,
     owned_users: list[str],
     pivot_user: str | None,
+    game_progress: GameProgress | None = None,
 ) -> dict[str, Any]:
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     dc_ip = ""
-    for host in unauth.get("hosts") or []:
-        if host.get("is_domain_controller"):
-            dc_ip = str(host.get("address", ""))
-            break
+    if game_progress is None or game_progress.scan:
+        for host in unauth.get("hosts") or []:
+            if host.get("is_domain_controller"):
+                dc_ip = str(host.get("address", ""))
+                break
 
     stage_info = compute_stage_and_actions(
         ws_path,
@@ -562,6 +577,7 @@ def build_objective_game_state(
         dc_ip=dc_ip,
         domain=domain,
         owned_users=owned_users,
+        game_progress=game_progress,
     )
     identities = collect_identity_capabilities(
         ws_path, domain=domain, owned_users=owned_users
@@ -569,11 +585,23 @@ def build_objective_game_state(
     missions = collect_verified_missions(
         ws_path, workspace=workspace, domain=domain, owned_users=owned_users
     )
+    if game_progress is not None:
+        verified = game_progress.verified_set()
+        missions = [
+            m
+            for m in missions
+            if str(m.get("principal", "")).lower() in verified
+            and (game_progress.acls or str(m.get("action", "")).lower() != "exploit")
+        ]
 
     # Target intel for common gMSA in findings
     targets: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for f in _acl_findings(ws_path):
+    if game_progress is not None and not game_progress.acls:
+        acl_findings_iter: list[dict[str, Any]] = []
+    else:
+        acl_findings_iter = _acl_findings(ws_path)
+    for f in acl_findings_iter:
         t = str(f.get("target_name", ""))
         if t and t not in seen:
             seen.add(t)

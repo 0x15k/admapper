@@ -22,6 +22,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
 from admapper.core.game_mode import enable_game_mode, game_subprocess_env
+from admapper.graph.game_progress import GameProgress
 from admapper.graph.game_ui import build_game_html, build_game_payload
 from admapper.graph.terminal_filter import GameTerminalFilter
 from admapper.intel.user_match import refresh_workspace_intel
@@ -50,19 +51,25 @@ class GameContext:
         self.op_lock = threading.Lock()
         self.running = False
         self.terminal_filter = GameTerminalFilter()
+        self.progress = GameProgress.fresh()
+        self.progress.save(self.ws_path)
 
     def emit(self, line: str, *, kind: str = "log") -> None:
         self.events.put({"type": kind, "line": line, "ts": time.time()})
 
     def refresh_payload(self) -> dict[str, Any]:
         refresh_workspace_intel(self.ws_path)
+        self.progress = GameProgress.load(self.ws_path)
+        self.owned_users = list(self.progress.owned_users)
+        if self.pivot_user and self.pivot_user.lower() not in {
+            u.lower() for u in self.owned_users
+        }:
+            verified = self.progress.verified_set()
+            if self.pivot_user.lower() not in verified:
+                self.pivot_user = self.owned_users[-1] if self.owned_users else None
         state_path = self.ws_path / "state.json"
         if state_path.is_file():
             state = json.loads(state_path.read_text(encoding="utf-8"))
-            if state.get("owned_users"):
-                self.owned_users = list(state["owned_users"])
-            if state.get("pivot_user"):
-                self.pivot_user = str(state["pivot_user"])
             if state.get("domain"):
                 self.domain = str(state["domain"])
         return build_game_payload(
@@ -71,7 +78,22 @@ class GameContext:
             domain=self.domain,
             owned_users=self.owned_users,
             pivot_user=self.pivot_user,
+            game_progress=self.progress,
         )
+
+    def _sync_loot_progress(self) -> None:
+        manifest_path = self.ws_path / "loot_manifest.json"
+        if not manifest_path.is_file():
+            return
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        users = [
+            str(item.get("username", ""))
+            for item in data.get("parsed_credentials") or []
+            if item.get("username")
+        ]
+        if users or data.get("file_count"):
+            self.progress.remember_loot_users(users)
+            self.progress.save(self.ws_path)
 
     def _admapper_cmd(self, *args: str) -> list[str]:
         exe = shutil.which("admapper")
@@ -156,7 +178,10 @@ class GameContext:
             return
         self._persist_target_ip(target)
         cmd = self._admapper_cmd("scan", "-H", target, "-w", self.workspace)
-        self._run_subprocess(cmd)
+        code = self._run_subprocess(cmd)
+        if code == 0:
+            self.progress.scan = True
+            self.progress.save(self.ws_path)
 
     def run_auth(self, username: str, password: str) -> None:
         ip = self._dc_ip()
@@ -166,22 +191,46 @@ class GameContext:
         if not username or not password:
             self.emit("usuario y contraseña requeridos", kind="error")
             return
-        cmd = self._admapper_cmd(
-            "run",
-            "-H",
-            ip,
-            "-u",
-            username,
-            "-p",
-            password,
-            "-w",
-            self.workspace,
-        )
-        if self.domain:
-            cmd.extend(["-d", self.domain])
-        self._run_subprocess(cmd)
+        import base64
 
-    def _run_workspace_script(self, script: str, *, label: str) -> None:
+        user_b64 = base64.b64encode(username.encode()).decode()
+        pw_b64 = base64.b64encode(password.encode()).decode()
+        domain = self.domain or ""
+        domain_b64 = base64.b64encode(domain.encode()).decode()
+        self._run_workspace_script(
+            "import base64\n"
+            "from admapper.graph.game_auth import run_game_credential_auth\n"
+            "from admapper.core.discovery import ensure_domain\n"
+            f"domain = base64.b64decode('{domain_b64}').decode() or None\n"
+            "try:\n"
+            "    ensure_domain(session, announce=False)\n"
+            "except ValueError:\n"
+            "    pass\n"
+            f"run_game_credential_auth(session, username=base64.b64decode('{user_b64}').decode(), "
+            f"password=base64.b64decode('{pw_b64}').decode(), domain=domain)",
+            label=f"autenticar como {username}",
+        )
+        from admapper.creds.kerberos_skew import load_workspace_clock_skew
+
+        cred_path = self.ws_path / "credentials.json"
+        if cred_path.is_file():
+            creds = json.loads(cred_path.read_text(encoding="utf-8")).get("credentials") or []
+            match = next(
+                (
+                    c
+                    for c in creds
+                    if str(c.get("username", "")).lower() == username.lower()
+                    and str(c.get("status")) == "valid"
+                ),
+                None,
+            )
+            if match:
+                self.progress.scan = True
+                self.progress.remember_auth(username)
+                self.pivot_user = username
+                self.progress.save(self.ws_path)
+
+    def _run_workspace_script(self, script: str, *, label: str) -> bool:
         """Run in-process op with stdout routed through the game terminal filter."""
         import io
         from contextlib import redirect_stdout
@@ -202,9 +251,11 @@ class GameContext:
                     kind = "done" if filtered.startswith("✓") else "log"
                     self.emit(filtered, kind=kind)
             self.emit("fin · código 0", kind="done")
+            return True
         except Exception as exc:  # noqa: BLE001
             self.emit(str(exc), kind="error")
             self.emit("fin · código 1", kind="error")
+            return False
 
     def run_enum_users(self) -> None:
         self._run_workspace_script(
@@ -212,6 +263,8 @@ class GameContext:
             "run_user_enumeration(session)",
             label="enum users",
         )
+        self.progress.enum_users = True
+        self.progress.save(self.ws_path)
 
     def run_asreproast(self) -> None:
         self._run_workspace_script(
@@ -242,8 +295,22 @@ class GameContext:
         )
 
     def run_exploit(self) -> None:
-        cmd = self._admapper_cmd("exploit", "-w", self.workspace)
-        self._run_subprocess(cmd)
+        """In-process exploit — loot and ACL only; creds come from the player."""
+        ok = self._run_workspace_script(
+            "from admapper.exploit.engine import run_exploit_engagement\n"
+            "from admapper.core.game_mode import effective_sync_clock\n"
+            "run_exploit_engagement(session, max_rounds=3, sync_clock=effective_sync_clock(True))",
+            label="exploit (loot → ACL/gMSA)",
+        )
+        self._sync_loot_progress()
+        if ok:
+            from admapper.creds.common import collect_gained_hashes
+
+            for account, _ in collect_gained_hashes(self.ws_path):
+                user = account if account.endswith("$") else f"{account}$"
+                self.progress.remember_auth(user)
+            self.progress.exploit = True
+            self.progress.save(self.ws_path)
 
     def run_acls(self) -> None:
         from admapper.acl.analyze import run_acl_analysis
@@ -254,6 +321,8 @@ class GameContext:
         try:
             run_acl_analysis(session)
             session.persist_workspace()
+            self.progress.acls = True
+            self.progress.save(self.ws_path)
             self.emit("ACL analysis complete", kind="done")
         except (ValueError, RuntimeError) as exc:
             self.emit(str(exc), kind="error")
@@ -261,7 +330,7 @@ class GameContext:
     def set_pivot(self, username: str) -> None:
         from admapper.core.session import Session
         from admapper.escalate.analyze import set_pivot_user
-        from admapper.graph.identity_lens import build_selectable_identities
+        from admapper.graph.identity_lens import _machine_hash_row, _normalize_account, build_selectable_identities
 
         session = Session.bootstrap()
         session.select_workspace(self.workspace, create=False)
@@ -269,33 +338,53 @@ class GameContext:
         selectable = build_selectable_identities(
             self.ws_path,
             domain=domain,
-            owned_users=list(session.workspace.owned_users or []),
+            owned_users=list(self.progress.owned_users or []),
+            game_progress=self.progress,
         )
         match = next(
-            (i for i in selectable if str(i.get("username", "")).lower() == username.lower()),
+            (
+                i
+                for i in selectable
+                if _normalize_account(str(i.get("username", "")))
+                == _normalize_account(username)
+            ),
             None,
         )
         if not match:
-            self.emit(
-                f"sin perfil para {username} — enumera o compromete primero",
-                kind="error",
-            )
-            return
+            machine = _machine_hash_row(self.ws_path, username)
+            if machine and self.progress.exploit:
+                match = {
+                    "username": machine["username"],
+                    "selectable": "pivot",
+                    "role": "machine_pth",
+                }
+        if not match:
+            raise ValueError(f"sin perfil para {username} — enumera o compromete primero")
         if match.get("selectable") == "view":
-            self.emit(
-                f"{username} es objetivo enum — perfil lectura en UI, no pivot",
-                kind="error",
-            )
+            raise ValueError(f"{username} es solo lectura — no es pivot operativo")
+        pivot_name = str(match.get("username") or username)
+        set_pivot_user(session, pivot_name)
+        self.pivot_user = pivot_name
+        self.progress.remember_auth(pivot_name)
+        self.progress.save(self.ws_path)
+
+    def run_winrm_pth(self, account: str) -> None:
+        ok = self._run_workspace_script(
+            "from admapper.graph.game_winrm import run_game_winrm_pth\n"
+            f"run_game_winrm_pth(session, {account!r})",
+            label=f"winrm PTH {account}",
+        )
+        if not ok:
             return
-        set_pivot_user(session, username)
-        if match.get("selectable") == "verify":
-            self.emit(
-                f"enfoque → {username} (loot pendiente — verifica credencial)",
-                kind="phase",
-            )
-        else:
-            self.emit(f"perfil activo → {username}", kind="done")
-        self.pivot_user = username
+        from admapper.core.session import Session
+
+        session = Session.bootstrap()
+        session.select_workspace(self.workspace, create=False)
+        pivot = (session.workspace.pivot_user if session.workspace else None) or account
+        self.pivot_user = pivot
+        self.progress.remember_auth(pivot)
+        self.progress.exploit = True
+        self.progress.save(self.ws_path)
 
     def run_brief(self, *, auto: bool = False) -> None:
         from admapper.cli.brief import run_brief
@@ -449,7 +538,21 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
                 if not user:
                     _json_response(self, 400, {"error": "username required"})
                     return
-                self._start_background(lambda: ctx.set_pivot(user))
+                try:
+                    ctx.set_pivot(user)
+                except (ValueError, RuntimeError) as exc:
+                    _json_response(self, 400, {"error": str(exc)})
+                    return
+                payload = ctx.refresh_payload()
+                _json_response(self, 200, {"ok": True, "pivot": user, "state": payload})
+                return
+
+            if path == "/api/winrm":
+                account = str(body.get("account", "")).strip()
+                if not account:
+                    _json_response(self, 400, {"error": "account required"})
+                    return
+                self._start_background(lambda: ctx.run_winrm_pth(account))
                 return
 
             if path == "/api/enum":

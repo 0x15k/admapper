@@ -720,8 +720,8 @@ def game(
         ws_path=ws_path,
         workspace=ws.name,
         domain=ws.domain,
-        owned_users=list(ws.owned_users or []),
-        pivot_user=ws.pivot_user,
+        owned_users=[],
+        pivot_user=None,
         host=ws.hosts,
         port=port,
         open_browser=open_browser,
@@ -896,13 +896,14 @@ def exploit(
         raise typer.Exit(code=1)
 
     apply_clock_skew_option(clock_skew)
-    if clock_skew and session.workspace is not None:
-        from admapper.creds.kerberos_skew import save_workspace_clock_skew
+    if session.workspace is not None:
+        from admapper.creds.kerberos_skew import ensure_workspace_skew, save_workspace_clock_skew
 
-        save_workspace_clock_skew(
-            session.workspaces.path_for(session.workspace.name),
-            clock_skew,
-        )
+        ws_path = session.workspaces.path_for(session.workspace.name)
+        if clock_skew:
+            save_workspace_clock_skew(ws_path, clock_skew)
+        else:
+            ensure_workspace_skew(ws_path)
 
     max_rounds = max(1, min(10, rounds))
     try:

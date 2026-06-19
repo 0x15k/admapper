@@ -1,0 +1,57 @@
+"""Game UI auth — verify one credential only; no start_auth / analyst chain."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from admapper.core.output import print_success
+from admapper.creds.common import pick_dc_ip
+from admapper.creds.time_sync import ensure_dc_clock
+from admapper.creds.verify import run_credential_verify
+from admapper.escalate.analyze import set_pivot_user
+from admapper.models.credential import Credential, CredentialStatus
+
+if TYPE_CHECKING:
+    from admapper.core.session import Session
+
+
+def run_game_credential_auth(
+    session: Session,
+    *,
+    username: str,
+    password: str,
+    domain: str | None = None,
+) -> Credential:
+    """Add (or refresh) and verify exactly the credential the player submitted."""
+    if session.workspace is None:
+        raise RuntimeError("no active workspace")
+
+    from admapper.core.discovery import ensure_domain
+
+    resolved_domain = domain or ensure_domain(session, announce=False)
+    dc_ip = pick_dc_ip(session)
+    if not dc_ip:
+        raise ValueError("sin DC — escanea el objetivo primero")
+
+    store = session.credentials
+    if store is None:
+        raise RuntimeError("credential store unavailable")
+
+    ws_path = session.workspaces.path_for(session.workspace.name)
+    ensure_dc_clock(dc_ip, ws_path=ws_path)
+
+    user_key = username.strip().lower()
+    existing = next((c for c in store.list() if c.username.lower() == user_key), None)
+    if existing is None:
+        cred = store.add(username.strip(), password, domain=resolved_domain, source="game-ui")
+    else:
+        cred = store.add(username.strip(), password, domain=resolved_domain, source="game-ui")
+
+    result = run_credential_verify(session, cred.id)
+    verified = result.credential
+    if verified.status != CredentialStatus.VALID:
+        raise ValueError(f"credencial inválida para {username}")
+
+    set_pivot_user(session, verified.username)
+    print_success(f"Credencial válida: {verified.display_user()}")
+    return verified

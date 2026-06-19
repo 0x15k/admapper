@@ -15,11 +15,13 @@ from admapper.engagement import (
     loot_clue_rows,
     methodology_lines,
 )
+from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth
 from admapper.report.engagement import _load_json
 from admapper.report.engagement_map import _acl_exploit_blocker
 from admapper.report.scenario import _best_cred_per_user
 from admapper.guides.pentest_book import build_pentest_book
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
+from admapper.graph.game_progress import GameProgress, filtered_loot_clues
 from admapper.graph.game_state import build_objective_game_state
 from admapper.graph.identity_lens import (
     build_identity_lens,
@@ -35,6 +37,10 @@ from admapper.graph.web import build_graph_payload
 
 def _esc(text: str) -> str:
     return html.escape(str(text or ""))
+
+
+def _account_base(name: str) -> str:
+    return str(name or "").lower().rstrip("$").split("@")[0]
 
 
 def _phase_status(ws_path: Path) -> list[dict[str, Any]]:
@@ -210,8 +216,12 @@ def build_game_payload(
     domain: str | None,
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
+    game_progress: GameProgress | None = None,
 ) -> dict[str, Any]:
-    owned = list(owned_users or [])
+    if game_progress is not None:
+        owned = list(game_progress.owned_users)
+    else:
+        owned = list(owned_users or [])
     state = _load_json(ws_path / "state.json") or {}
     pivot = (
         pivot_user
@@ -222,6 +232,8 @@ def build_game_payload(
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     has_scan = bool(unauth.get("hosts"))
+    if game_progress is not None:
+        has_scan = game_progress.scan
     discovered_domain = str(unauth.get("domain") or "").strip()
     domain_known = bool(discovered_domain and has_scan)
     domain_s = discovered_domain if domain_known else (domain if domain and has_scan else "???")
@@ -251,6 +263,7 @@ def build_game_payload(
         domain=domain_s,
         owned_users=owned,
         pivot_user=pivot,
+        game_progress=game_progress,
     )
     quests = game_state.get("missions") or []
     mission = game_state.get("mission")
@@ -268,18 +281,29 @@ def build_game_payload(
     _tag_graph_missions(graph, quests)
 
     next_edge_data = game_state.get("next_edge") or {}
+    next_hop_cmd = graph.get("next_hop_cmd")
+    if game_progress is not None and not game_progress.exploit:
+        next_hop_cmd = None
+        graph = {**graph, "gained_hashes": [], "next_hop_cmd": None}
     objective = {
         "headline": graph.get("next_hop") or next_edge_data.get("title") or game_state.get("stage_label", ""),
         "technique": next_edge_data.get("technique", ""),
         "target": next_edge_data.get("target", ""),
-        "command": graph.get("next_hop_cmd") or (mission or {}).get("command", ""),
+        "command": next_hop_cmd or (mission or {}).get("command", ""),
         "blocker": graph.get("acl_blocker") or _acl_exploit_blocker(ws_path),
     }
 
     cred_inventory: list[dict[str, str]] = []
-    for cred in _best_cred_per_user(
-        (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
-    ).values():
+    if game_progress is None:
+        cred_iter = _best_cred_per_user(
+            (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+        ).values()
+    else:
+        cred_iter = [
+            {"username": u, "status": "valid", "source": "game"}
+            for u in game_progress.verified_users
+        ]
+    for cred in cred_iter:
         cred_inventory.append(
             {
                 "user": str(cred.get("username", "")),
@@ -288,30 +312,43 @@ def build_game_payload(
             }
         )
 
-    clues = loot_clue_rows(ws_path)
+    clues = filtered_loot_clues(ws_path, game_progress)
     topology = build_network_topology(
-        ws_path, domain=domain_s if domain_known else None, owned_users=owned
+        ws_path,
+        domain=domain_s if domain_known else None,
+        owned_users=owned,
+        reveal_scan=has_scan,
+        reveal_enum=game_progress is None or game_progress.enum_users,
     )
     inv = _load_json(ws_path / "auth_inventory.json") or {}
-    graph_mode = "network" if not inv else "hybrid"
+    graph_mode = "network"
+    if inv and (game_progress is None or game_progress.enum_users):
+        graph_mode = "hybrid"
     engagement_intel = build_engagement_intel(
         ws_path,
         workspace=workspace,
         domain=domain_s if domain_known else domain,
         owned_users=owned,
+        game_progress=game_progress,
     )
     selectable = build_selectable_identities(
-        ws_path, domain=domain_s if domain_known else (domain or ""), owned_users=owned
+        ws_path,
+        domain=domain_s if domain_known else (domain or ""),
+        owned_users=owned,
+        game_progress=game_progress,
     )
     for row in selectable:
-        if row.get("selectable") == "view" and domain_s and domain_s != "???":
-            row["view_lens"] = build_identity_lens(
+        if domain_s and domain_s != "???" and row.get("username"):
+            row["lens"] = build_identity_lens(
                 ws_path,
                 workspace=workspace,
                 domain=domain_s,
                 pivot_user=str(row["username"]),
                 owned_users=owned,
+                game_progress=game_progress,
             )
+            if row.get("selectable") == "view":
+                row["view_lens"] = row["lens"]
     identity_lens = (
         build_identity_lens(
             ws_path,
@@ -319,6 +356,7 @@ def build_game_payload(
             domain=domain_s,
             pivot_user=pivot,
             owned_users=owned,
+            game_progress=game_progress,
         )
         if pivot and domain_s and domain_s != "???"
         else {}
@@ -351,6 +389,51 @@ def build_game_payload(
     game_state = dict(game_state)
     game_state["actions"] = actions
 
+    if game_progress is not None:
+        progress_flags = {
+            "scan": game_progress.scan,
+            "enum_users": game_progress.enum_users,
+            "loot": game_progress.loot,
+            "acls": game_progress.acls,
+            "exploit": game_progress.exploit,
+        }
+    else:
+        progress_flags = {
+            "scan": True,
+            "enum_users": True,
+            "loot": True,
+            "acls": True,
+            "exploit": True,
+        }
+
+    hashes = graph.get("gained_hashes") or []
+    if game_progress is not None and not game_progress.exploit:
+        hashes = []
+
+    pth_accounts = {_account_base(h.get("account", "")) for h in hashes}
+    pth_sessions: list[dict[str, str]] = []
+    for item in hashes:
+        account = str(item.get("account", ""))
+        nthash = str(item.get("nthash", ""))
+        if not account or not nthash:
+            continue
+        _, winrm_cmd = format_admapper_winrm_pth(
+            account=account,
+            nthash=nthash,
+            domain=domain_s if domain_known else domain,
+            ws_path=ws_path,
+            fallback_ip=dc_ip or None,
+        )
+        pth_sessions.append(
+            {
+                "account": account,
+                "nthash": nthash,
+                "winrm_cmd": winrm_cmd,
+            }
+        )
+
+    cred_inventory = [c for c in cred_inventory if _account_base(c.get("user", "")) not in pth_accounts]
+
     return {
         "meta": {
             "workspace": workspace,
@@ -373,10 +456,12 @@ def build_game_payload(
         "actions": actions,
         "objective": objective,
         "methodology": methodology_lines(ws_path),
-        "highlights": enum_highlights(ws_path),
+        "highlights": enum_highlights(ws_path) if game_progress is None or game_progress.enum_users else [],
         "clues": clues,
         "creds": cred_inventory,
-        "hashes": graph.get("gained_hashes") or [],
+        "hashes": hashes,
+        "pth_sessions": pth_sessions,
+        "progress": progress_flags,
         "graph": graph,
         "engagement_intel": engagement_intel,
         "operator_setup": build_operator_setup(ws_path, dc_ip=dc_ip, dc_host=dc_host),

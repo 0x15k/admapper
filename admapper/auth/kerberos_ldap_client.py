@@ -132,8 +132,11 @@ def start_kerberos_ldap_repl(
     *,
     dc_ip: str | None = None,
     ldap_host: str | None = None,
+    clock_skew: str | None = None,
 ) -> KerberosLdapRepl:
     cmd = [sys.executable, "-m", "admapper.auth.kerberos_ldap_repl"]
+    skew = clock_skew or get_clock_skew()
+    cmd = wrap_command_with_clock_skew(cmd, clock_skew=skew)
     proc = subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE,

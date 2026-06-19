@@ -162,14 +162,17 @@ def ensure_dc_clock(
     Called by scan/run/exploit/verify — operator should not sync the clock manually.
     On failure or unstable VM clocks, Kerberos paths fall back to libfaketime auto-probe.
     """
-    if not enabled or not dc_ip:
-        return False
-
     from admapper.core.output import print_info, print_success, print_warning
     from admapper.core.platform import get_clock_skew, set_clock_skew
     from admapper.creds.kerberos_skew import apply_workspace_clock_skew
 
+    if not dc_ip:
+        return False
+
     cached_skew = apply_workspace_clock_skew(ws_path)
+    if not enabled:
+        return bool(cached_skew)
+
     explicit_skew = get_clock_skew()
     if cached_skew:
         from admapper.core.provenance import Tool, print_step
