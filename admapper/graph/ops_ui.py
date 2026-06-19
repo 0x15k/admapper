@@ -1,6 +1,6 @@
 """AD Ops interactive UI — re-exports for backward compatibility."""
 
-from admapper.graph.game_html import build_game_html, write_game_html
-from admapper.graph.game_payload import build_game_payload
+from admapper.graph.ops_html import build_ops_html, write_ops_html
+from admapper.graph.ops_payload import build_ops_payload
 
-__all__ = ["build_game_html", "build_game_payload", "write_game_html"]
+__all__ = ["build_ops_html", "build_ops_payload", "write_ops_html"]

@@ -4,34 +4,34 @@ from pathlib import Path
 
 import pytest
 
-from admapper.core.game_mode import (
-    GAME_MODE_ENV,
+from admapper.core.dashboard_mode import (
+    DASHBOARD_MODE_ENV,
     effective_sync_clock,
     effective_sync_hosts,
-    enable_game_mode,
-    game_subprocess_env,
-    is_game_mode,
+    enable_dashboard_mode,
+    dashboard_subprocess_env,
+    is_dashboard_mode,
 )
 from admapper.core.operator_setup import build_operator_setup
 
 
 @pytest.fixture(autouse=True)
-def _clear_game_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(GAME_MODE_ENV, raising=False)
+def _clear_dashboard_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(DASHBOARD_MODE_ENV, raising=False)
 
 
-def test_game_mode_env_disables_sync() -> None:
+def test_dashboard_mode_env_disables_sync() -> None:
     assert effective_sync_clock(True) is True
     assert effective_sync_hosts(True) is True
-    enable_game_mode()
-    assert is_game_mode()
+    enable_dashboard_mode()
+    assert is_dashboard_mode()
     assert effective_sync_clock(True) is False
     assert effective_sync_hosts(True) is False
 
 
-def test_game_subprocess_env_sets_flag() -> None:
-    env = game_subprocess_env()
-    assert env.get(GAME_MODE_ENV) == "1"
+def test_dashboard_subprocess_env_sets_flag() -> None:
+    env = dashboard_subprocess_env()
+    assert env.get(DASHBOARD_MODE_ENV) == "1"
 
 
 def test_operator_setup_hints(tmp_path: Path) -> None:

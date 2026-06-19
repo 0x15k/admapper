@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Objective game state — derived from workspace JSON, not hand-tuned scenarios."""
+"""Objective ops state — derived from workspace JSON, not hand-tuned scenarios."""
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 
 if TYPE_CHECKING:
-    from admapper.graph.game_progress import GameProgress
+    from admapper.graph.ops_progress import OpsProgress
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
 
@@ -345,7 +345,7 @@ def compute_stage_and_actions(
     dc_ip: str,
     domain: str,
     owned_users: list[str],
-    game_progress: GameProgress | None = None,
+    ops_progress: OpsProgress | None = None,
 ) -> dict[str, Any]:
     """Strict gating: only actions possible with current workspace facts."""
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
@@ -353,14 +353,14 @@ def compute_stage_and_actions(
     acl_n = len(_acl_findings(ws_path))
     owned = _owned_lower(owned_users)
 
-    if game_progress is not None:
-        valid_users = game_progress.verified_set()
-        has_scan = game_progress.scan
-        has_users = game_progress.enum_users
+    if ops_progress is not None:
+        valid_users = ops_progress.verified_set()
+        has_scan = ops_progress.scan
+        has_users = ops_progress.enum_users
         has_creds = bool(valid_users)
-        has_enum = game_progress.enum_users
-        has_loot = game_progress.loot
-        has_acls = game_progress.acls
+        has_enum = ops_progress.enum_users
+        has_loot = ops_progress.loot
+        has_acls = ops_progress.acls
     else:
         valid_users = _valid_cred_users(ws_path)
         has_scan = bool(unauth.get("hosts"))
@@ -388,7 +388,7 @@ def compute_stage_and_actions(
         return {
             "stage": "recon",
             "stage_label": "Sin recon — empieza aquí",
-            "game_over": False,
+            "engagement_over": False,
             "actions": actions,
         }
 
@@ -448,8 +448,8 @@ def compute_stage_and_actions(
         return {
             "stage": "need_creds",
             "stage_label": "Recon OK — necesitas credenciales",
-            "game_over": True,
-            "game_over_message": "Sin credenciales válidas el dominio no es accesible.",
+            "engagement_over": True,
+            "engagement_over_message": "Sin credenciales válidas el dominio no es accesible.",
             "actions": actions,
         }
 
@@ -549,23 +549,23 @@ def compute_stage_and_actions(
     return {
         "stage": stage,
         "stage_label": stage_label,
-        "game_over": False,
+        "engagement_over": False,
         "actions": actions,
     }
 
 
-def build_objective_game_state(
+def build_objective_ops_state(
     ws_path: Path,
     *,
     workspace: str,
     domain: str,
     owned_users: list[str],
     pivot_user: str | None,
-    game_progress: GameProgress | None = None,
+    ops_progress: OpsProgress | None = None,
 ) -> dict[str, Any]:
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     dc_ip = ""
-    if game_progress is None or game_progress.scan:
+    if ops_progress is None or ops_progress.scan:
         for host in unauth.get("hosts") or []:
             if host.get("is_domain_controller"):
                 dc_ip = str(host.get("address", ""))
@@ -577,7 +577,7 @@ def build_objective_game_state(
         dc_ip=dc_ip,
         domain=domain,
         owned_users=owned_users,
-        game_progress=game_progress,
+        ops_progress=ops_progress,
     )
     identities = collect_identity_capabilities(
         ws_path, domain=domain, owned_users=owned_users
@@ -585,19 +585,19 @@ def build_objective_game_state(
     missions = collect_verified_missions(
         ws_path, workspace=workspace, domain=domain, owned_users=owned_users
     )
-    if game_progress is not None:
-        verified = game_progress.verified_set()
+    if ops_progress is not None:
+        verified = ops_progress.verified_set()
         missions = [
             m
             for m in missions
             if str(m.get("principal", "")).lower() in verified
-            and (game_progress.acls or str(m.get("action", "")).lower() != "exploit")
+            and (ops_progress.acls or str(m.get("action", "")).lower() != "exploit")
         ]
 
     # Target intel for common gMSA in findings
     targets: list[dict[str, Any]] = []
     seen: set[str] = set()
-    if game_progress is not None and not game_progress.acls:
+    if ops_progress is not None and not ops_progress.acls:
         acl_findings_iter: list[dict[str, Any]] = []
     else:
         acl_findings_iter = _acl_findings(ws_path)

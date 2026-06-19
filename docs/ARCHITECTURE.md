@@ -13,7 +13,7 @@ admapper/
   enum_pkg/       User enumeration (SAMR, LDAP) — rename candidate: enumeration/
   creds/          Roast, spray, verify, Kerberos skew
   auth/           Authenticated LDAP/SMB enum, BloodHound export
-  graph/          Attack graph + game UI (game_payload, game_html, game_server)
+  graph/          Attack graph + dashboard UI (ops_payload, ops_html, dashboard_server)
   exploit/        Automated exploit chain
   escalate/       Pivot and next-hop edges
   guides/         Manual technique catalog and pentest book
@@ -31,15 +31,15 @@ Each technique package typically provides:
 
 1. **Workspace** (`~/.admapper/workspaces/<name>/`) holds JSON artifacts only — never commit workspaces.
 2. **Scan / run** write `unauth_scan.json`, `credentials.json`, `auth_inventory.json`, …
-3. **Analysis** builds `engagement_intel`, attack vectors, and game payload from artifacts.
-4. **Game** (`admapper game`) serves UI from `game_server` + `game_payload`; ops spawn CLI subprocesses.
+3. **Analysis** builds `engagement_intel`, attack vectors, and ops payload from artifacts.
+4. **Dashboard** (`admapper dashboard`) serves UI from `dashboard_server` + `ops_payload`; ops spawn CLI subprocesses.
 
 ## Phases
 
-Single canonical model: `methodology/unified.py` (P1–P12). Game bar shows 9 learner-facing steps mapped to P1–P12.
+Single canonical model: `methodology/unified.py` (P1–P12). Ops bar shows 9 steps mapped to P1–P12.
 
 ## Security
 
 - Secrets live in workspace `credentials.json` (plaintext by design — local operator machine).
 - Generated HTML (`ad_ops.html`, `attack_graph.html`) must stay under the workspace directory.
-- Game mode masks passwords in terminal output; do not embed secrets in game JSON payloads.
+- Dashboard mode masks passwords in terminal output; do not embed secrets in dashboard JSON payloads.

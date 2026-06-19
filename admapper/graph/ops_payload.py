@@ -1,4 +1,4 @@
-"""AD Ops game — workspace payload and graph enrichment for the web UI."""
+"""AD Ops dashboard — workspace payload and graph enrichment for the web UI."""
 
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ from admapper.report.engagement_map import _acl_exploit_blocker
 from admapper.report.scenario import _best_cred_per_user
 from admapper.guides.pentest_book import build_pentest_book
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
-from admapper.graph.game_progress import GameProgress, filtered_loot_clues
-from admapper.graph.game_state import build_objective_game_state
+from admapper.graph.ops_progress import OpsProgress, filtered_loot_clues
+from admapper.graph.ops_state import build_objective_ops_state
 from admapper.graph.identity_lens import (
     build_identity_lens,
     build_selectable_identities,
@@ -43,10 +43,10 @@ def _account_base(name: str) -> str:
 
 
 def _phase_status(ws_path: Path) -> list[dict[str, Any]]:
-    """Unified AD chain (CRTP core) — shortened game bar."""
-    from admapper.methodology.unified import game_phase_status
+    """Unified AD chain (CRTP core) — shortened ops bar."""
+    from admapper.methodology.unified import ops_phase_status
 
-    return game_phase_status(ws_path)
+    return ops_phase_status(ws_path)
 
 
 _EXPLOIT_TECHNIQUES = frozenset(
@@ -208,17 +208,17 @@ def _enrich_graph_for_recon(graph: dict[str, Any], unauth: dict[str, Any]) -> No
     ]
 
 
-def build_game_payload(
+def build_ops_payload(
     ws_path: Path,
     *,
     workspace: str,
     domain: str | None,
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
-    game_progress: GameProgress | None = None,
+    ops_progress: OpsProgress | None = None,
 ) -> dict[str, Any]:
-    if game_progress is not None:
-        owned = list(game_progress.owned_users)
+    if ops_progress is not None:
+        owned = list(ops_progress.owned_users)
     else:
         owned = list(owned_users or [])
     state = _load_json(ws_path / "state.json") or {}
@@ -231,8 +231,8 @@ def build_game_payload(
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     has_scan = bool(unauth.get("hosts"))
-    if game_progress is not None:
-        has_scan = game_progress.scan
+    if ops_progress is not None:
+        has_scan = ops_progress.scan
     discovered_domain = str(unauth.get("domain") or "").strip()
     domain_known = bool(discovered_domain and has_scan)
     domain_s = discovered_domain if domain_known else (domain if domain and has_scan else "???")
@@ -256,17 +256,17 @@ def build_game_payload(
     )
     _enrich_graph_for_recon(graph, unauth)
 
-    game_state = build_objective_game_state(
+    ops_state = build_objective_ops_state(
         ws_path,
         workspace=workspace,
         domain=domain_s,
         owned_users=owned,
         pivot_user=pivot,
-        game_progress=game_progress,
+        ops_progress=ops_progress,
     )
-    quests = game_state.get("missions") or []
-    mission = game_state.get("mission")
-    actions = game_state.get("actions") or []
+    quests = ops_state.get("missions") or []
+    mission = ops_state.get("mission")
+    actions = ops_state.get("actions") or []
     if not mission and actions:
         primary = next((a for a in actions if a.get("required")), actions[0])
         mission = {
@@ -279,13 +279,13 @@ def build_game_payload(
 
     _tag_graph_missions(graph, quests)
 
-    next_edge_data = game_state.get("next_edge") or {}
+    next_edge_data = ops_state.get("next_edge") or {}
     next_hop_cmd = graph.get("next_hop_cmd")
-    if game_progress is not None and not game_progress.exploit:
+    if ops_progress is not None and not ops_progress.exploit:
         next_hop_cmd = None
         graph = {**graph, "gained_hashes": [], "next_hop_cmd": None}
     objective = {
-        "headline": graph.get("next_hop") or next_edge_data.get("title") or game_state.get("stage_label", ""),
+        "headline": graph.get("next_hop") or next_edge_data.get("title") or ops_state.get("stage_label", ""),
         "technique": next_edge_data.get("technique", ""),
         "target": next_edge_data.get("target", ""),
         "command": next_hop_cmd or (mission or {}).get("command", ""),
@@ -293,14 +293,14 @@ def build_game_payload(
     }
 
     cred_inventory: list[dict[str, str]] = []
-    if game_progress is None:
+    if ops_progress is None:
         cred_iter = _best_cred_per_user(
             (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
         ).values()
     else:
         cred_iter = [
-            {"username": u, "status": "valid", "source": "game"}
-            for u in game_progress.verified_users
+            {"username": u, "status": "valid", "source": "dashboard"}
+            for u in ops_progress.verified_users
         ]
     for cred in cred_iter:
         cred_inventory.append(
@@ -311,30 +311,30 @@ def build_game_payload(
             }
         )
 
-    clues = filtered_loot_clues(ws_path, game_progress)
+    clues = filtered_loot_clues(ws_path, ops_progress)
     topology = build_network_topology(
         ws_path,
         domain=domain_s if domain_known else None,
         owned_users=owned,
         reveal_scan=has_scan,
-        reveal_enum=game_progress is None or game_progress.enum_users,
+        reveal_enum=ops_progress is None or ops_progress.enum_users,
     )
     inv = _load_json(ws_path / "auth_inventory.json") or {}
     graph_mode = "network"
-    if inv and (game_progress is None or game_progress.enum_users):
+    if inv and (ops_progress is None or ops_progress.enum_users):
         graph_mode = "hybrid"
     engagement_intel = build_engagement_intel(
         ws_path,
         workspace=workspace,
         domain=domain_s if domain_known else domain,
         owned_users=owned,
-        game_progress=game_progress,
+        ops_progress=ops_progress,
     )
     selectable = build_selectable_identities(
         ws_path,
         domain=domain_s if domain_known else (domain or ""),
         owned_users=owned,
-        game_progress=game_progress,
+        ops_progress=ops_progress,
     )
     for row in selectable:
         if domain_s and domain_s != "???" and row.get("username"):
@@ -344,7 +344,7 @@ def build_game_payload(
                 domain=domain_s,
                 pivot_user=str(row["username"]),
                 owned_users=owned,
-                game_progress=game_progress,
+                ops_progress=ops_progress,
             )
             if row.get("selectable") == "view":
                 row["view_lens"] = row["lens"]
@@ -355,7 +355,7 @@ def build_game_payload(
             domain=domain_s,
             pivot_user=pivot,
             owned_users=owned,
-            game_progress=game_progress,
+            ops_progress=ops_progress,
         )
         if pivot and domain_s and domain_s != "???"
         else {}
@@ -373,10 +373,10 @@ def build_game_payload(
         pm = identity_lens.get("primary_mission")
         if pm:
             mission = pm
-        pivot_targets = filter_targets_for_pivot(game_state.get("targets") or [], pivot=pivot)
+        pivot_targets = filter_targets_for_pivot(ops_state.get("targets") or [], pivot=pivot)
         if pivot_targets:
-            game_state = dict(game_state)
-            game_state["targets"] = pivot_targets
+            ops_state = dict(ops_state)
+            ops_state["targets"] = pivot_targets
         ne = identity_lens.get("next_edge")
         if ne:
             objective = {
@@ -385,16 +385,16 @@ def build_game_payload(
                 "technique": ne.get("technique") or objective.get("technique", ""),
                 "target": ne.get("target") or objective.get("target", ""),
             }
-    game_state = dict(game_state)
-    game_state["actions"] = actions
+    ops_state = dict(ops_state)
+    ops_state["actions"] = actions
 
-    if game_progress is not None:
+    if ops_progress is not None:
         progress_flags = {
-            "scan": game_progress.scan,
-            "enum_users": game_progress.enum_users,
-            "loot": game_progress.loot,
-            "acls": game_progress.acls,
-            "exploit": game_progress.exploit,
+            "scan": ops_progress.scan,
+            "enum_users": ops_progress.enum_users,
+            "loot": ops_progress.loot,
+            "acls": ops_progress.acls,
+            "exploit": ops_progress.exploit,
         }
     else:
         progress_flags = {
@@ -406,7 +406,7 @@ def build_game_payload(
         }
 
     hashes = graph.get("gained_hashes") or []
-    if game_progress is not None and not game_progress.exploit:
+    if ops_progress is not None and not ops_progress.exploit:
         hashes = []
 
     pth_accounts = {_account_base(h.get("account", "")) for h in hashes}
@@ -449,13 +449,13 @@ def build_game_payload(
         "selectable_identities": selectable,
         "identity_lens": identity_lens,
         "phases": _phase_status(ws_path),
-        "game": game_state,
+        "dashboard": ops_state,
         "mission": mission,
         "quests": quests,
         "actions": actions,
         "objective": objective,
         "methodology": methodology_lines(ws_path),
-        "highlights": enum_highlights(ws_path) if game_progress is None or game_progress.enum_users else [],
+        "highlights": enum_highlights(ws_path) if ops_progress is None or ops_progress.enum_users else [],
         "clues": clues,
         "creds": cred_inventory,
         "hashes": hashes,

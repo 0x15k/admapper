@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.graph.game_state import (
-    build_objective_game_state,
+from admapper.graph.ops_state import (
+    build_objective_ops_state,
     explain_target_access,
 )
 
@@ -15,11 +15,11 @@ def test_need_creds_stage(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps({"hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]})
     )
-    state = build_objective_game_state(
+    state = build_objective_ops_state(
         ws, workspace="ws", domain="lab.htb", owned_users=[], pivot_user=None
     )
     assert state["stage"] == "need_creds"
-    assert state["game_over"] is True
+    assert state["engagement_over"] is True
     action_ids = {a["action"] for a in state["actions"]}
     assert "enum" in action_ids
     assert "run" in action_ids

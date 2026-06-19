@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.graph.game_payload import build_game_payload
-from admapper.graph.game_progress import GameProgress
+from admapper.graph.ops_payload import build_ops_payload
+from admapper.graph.ops_progress import OpsProgress
 
 
 def _polluted_workspace(tmp_path: Path) -> Path:
@@ -63,14 +63,14 @@ def _polluted_workspace(tmp_path: Path) -> Path:
     return ws
 
 
-def test_fresh_game_progress_hides_cli_spoilers(tmp_path: Path) -> None:
+def test_fresh_ops_progress_hides_cli_spoilers(tmp_path: Path) -> None:
     ws = _polluted_workspace(tmp_path)
-    progress = GameProgress.fresh()
-    data = build_game_payload(
+    progress = OpsProgress.fresh()
+    data = build_ops_payload(
         ws,
         workspace="ws",
         domain="lab.htb",
-        game_progress=progress,
+        ops_progress=progress,
     )
     assert data["meta"]["blackbox"] is True
     assert data["creds"] == []
@@ -81,14 +81,14 @@ def test_fresh_game_progress_hides_cli_spoilers(tmp_path: Path) -> None:
 
 def test_progress_after_auth_shows_only_player_cred(tmp_path: Path) -> None:
     ws = _polluted_workspace(tmp_path)
-    progress = GameProgress.fresh()
+    progress = OpsProgress.fresh()
     progress.scan = True
     progress.remember_auth("wallace.everette")
-    data = build_game_payload(
+    data = build_ops_payload(
         ws,
         workspace="ws",
         domain="lab.htb",
-        game_progress=progress,
+        ops_progress=progress,
         pivot_user="wallace.everette",
     )
     assert len(data["creds"]) == 1
@@ -115,26 +115,26 @@ def test_progress_hides_hashes_until_exploit(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    progress = GameProgress.fresh()
+    progress = OpsProgress.fresh()
     progress.scan = True
     progress.remember_auth("svc_recovery")
     progress.acls = True
-    data = build_game_payload(
+    data = build_ops_payload(
         ws,
         workspace="ws",
         domain="lab.htb",
-        game_progress=progress,
+        ops_progress=progress,
         pivot_user="svc_recovery",
     )
     assert data["hashes"] == []
     assert data["progress"]["exploit"] is False
 
     progress.exploit = True
-    data = build_game_payload(
+    data = build_ops_payload(
         ws,
         workspace="ws",
         domain="lab.htb",
-        game_progress=progress,
+        ops_progress=progress,
         pivot_user="svc_recovery",
     )
     assert len(data["hashes"]) >= 1

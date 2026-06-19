@@ -84,7 +84,7 @@ def run_brief(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.game_mode import effective_sync_clock
+    from admapper.core.dashboard_mode import effective_sync_clock
 
     apply_clock_skew_option(clock_skew)
     sync_clock = effective_sync_clock(sync_clock)

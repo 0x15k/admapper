@@ -1,13 +1,13 @@
-"""AD Ops game — HTML shell, CSS, and client-side JavaScript."""
+"""AD Ops dashboard — HTML shell, CSS, and client-side JavaScript."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from admapper.graph.game_payload import _esc, build_game_payload
+from admapper.graph.ops_payload import _esc, build_ops_payload
 
-def build_game_html(
+def build_ops_html(
     ws_path: Path,
     *,
     workspace: str,
@@ -16,7 +16,7 @@ def build_game_html(
     pivot_user: str | None = None,
     api_mode: bool = False,
 ) -> str:
-    data = build_game_payload(
+    data = build_ops_payload(
         ws_path,
         workspace=workspace,
         domain=domain,
@@ -680,7 +680,7 @@ def build_game_html(
 
   <script>
     const API_MODE = {api_flag};
-    let GAME = {payload_json};
+    let OPS = {payload_json};
     let network = null;
     let nodeData = null;
     let edgeData = null;
@@ -750,16 +750,16 @@ def build_game_html(
     const $ = (id) => document.getElementById(id);
 
     function activePivot() {{
-      return ((GAME.player || {{}}).pivot || '').toLowerCase();
+      return ((OPS.player || {{}}).pivot || '').toLowerCase();
     }}
 
     function lensForUser(username) {{
       if (!username) return {{}};
-      const ident = (GAME.selectable_identities || []).find(
+      const ident = (OPS.selectable_identities || []).find(
         i => i.username.toLowerCase() === username.toLowerCase()
       );
       if (ident && (ident.lens || ident.view_lens)) return ident.lens || ident.view_lens;
-      const pth = (GAME.pth_sessions || []).find(
+      const pth = (OPS.pth_sessions || []).find(
         p => p.account.toLowerCase() === username.toLowerCase()
       );
       if (pth) {{
@@ -774,12 +774,12 @@ def build_game_html(
           access_matrix: [pth.account, 'skip', 'skip', 'skip', 'sí*', 'hash gMSA — WinRM PTH'],
         }};
       }}
-      if (username.toLowerCase() === activePivot()) return GAME.identity_lens || {{}};
+      if (username.toLowerCase() === activePivot()) return OPS.identity_lens || {{}};
       return {{}};
     }}
 
     function getDisplayLens() {{
-      const u = graphFocus || (GAME.player || {{}}).pivot;
+      const u = graphFocus || (OPS.player || {{}}).pivot;
       return lensForUser(u);
     }}
 
@@ -789,7 +789,7 @@ def build_game_html(
     }}
 
     function getDisplayActions() {{
-      let actions = (GAME.actions || []).filter(a => a.enabled !== false);
+      let actions = (OPS.actions || []).filter(a => a.enabled !== false);
       if (isInspectingOther()) {{
         const globalIds = new Set(['scan', 'cred', 'enum', 'loot', 'acls']);
         actions = actions.filter(a => globalIds.has(a.id));
@@ -799,7 +799,7 @@ def build_game_html(
 
     function getDisplayQuests() {{
       if (isInspectingOther()) return [];
-      return (GAME.quests || []).filter(q => q.verified);
+      return (OPS.quests || []).filter(q => q.verified);
     }}
 
     function showUiToast(msg, ok) {{
@@ -813,7 +813,7 @@ def build_game_html(
 
     function focusIdentity(username) {{
       if (!username) return;
-      const ident = (GAME.selectable_identities || []).find(
+      const ident = (OPS.selectable_identities || []).find(
         i => i.username.toLowerCase() === username.toLowerCase()
       );
       if (!ident) return;
@@ -837,14 +837,14 @@ def build_game_html(
 
     async function operarComo(username) {{
       if (!username) return;
-      const pth = (GAME.pth_sessions || []).find(
+      const pth = (OPS.pth_sessions || []).find(
         p => p.account.toLowerCase() === username.toLowerCase()
       );
       if (pth) {{
         await runWinrmPth(pth.account);
         return;
       }}
-      const ident = (GAME.selectable_identities || []).find(
+      const ident = (OPS.selectable_identities || []).find(
         i => i.username.toLowerCase() === username.toLowerCase()
       );
       if (!ident) {{
@@ -868,7 +868,7 @@ def build_game_html(
 
     async function runWinrmPth(account) {{
       if (!API_MODE || !account || opRunning) return;
-      const pth = (GAME.pth_sessions || []).find(
+      const pth = (OPS.pth_sessions || []).find(
         p => p.account.toLowerCase() === account.toLowerCase()
       );
       if (!pth) {{
@@ -894,7 +894,7 @@ def build_game_html(
     }}
 
     function activePhase() {{
-      return (GAME.phases || []).find(p => p.status === 'active') || null;
+      return (OPS.phases || []).find(p => p.status === 'active') || null;
     }}
 
     function termLine(text, cls) {{
@@ -945,15 +945,15 @@ def build_game_html(
       if (!API_MODE) return;
       try {{
         const r = await fetch('/api/state');
-        if (r.ok) GAME = await r.json();
+        if (r.ok) OPS = await r.json();
       }} catch (e) {{ /* offline */ }}
     }}
 
     function renderPhases() {{
       const fb = $('framework-bar');
-      if (fb) fb.textContent = GAME.engagement_framework || '';
+      if (fb) fb.textContent = OPS.engagement_framework || '';
       const el = $('phases');
-      el.innerHTML = (GAME.phases || []).map(p => {{
+      el.innerHTML = (OPS.phases || []).map(p => {{
         const fw = p.framework || {{}};
         const refs = [fw.crtp, (fw.mitre || []).join('/')].filter(Boolean).join(' · ');
         const tip = [p.detail, fw.crtp, fw.crte, fw.crto, (fw.mitre || []).join(', ')].filter(Boolean).join('\\n');
@@ -985,7 +985,7 @@ def build_game_html(
       bootLine('Introduce la IP del objetivo y pulsa Enter.');
       bootLine('Se ejecutará: admapper scan -H <IP>');
       bootLine('');
-      const m = GAME.meta || {{}};
+      const m = OPS.meta || {{}};
       const tip = m.target_ip || m.dc_ip;
       if (tip) {{
         bootLine('IP configurada: ' + tip + ' — Enter para escanear', 'line-phase');
@@ -1004,7 +1004,7 @@ def build_game_html(
         return;
       }}
       if (!API_MODE) {{
-        bootLine('Inicia el servidor: admapper game -H ' + ip, 'line-error');
+        bootLine('Inicia el servidor: admapper dashboard -H ' + ip, 'line-error');
         return;
       }}
       bootLine('> scan -H ' + ip, 'line-cmd');
@@ -1025,7 +1025,7 @@ def build_game_html(
           if (opRunning) return;
           clearInterval(poll);
           await fetchState();
-          if ((GAME.topology || {{}}).has_scan) {{
+          if ((OPS.topology || {{}}).has_scan) {{
             bootLine('Recon completo — desplegando mapa…', 'line-phase');
             setTimeout(() => enterHQ(), 600);
           }}
@@ -1315,7 +1315,7 @@ def build_game_html(
         hqResetDialog();
       }}
       if (!opts.preserve) {{
-        const hasSession = (GAME.topology || {{}}).has_scan || (GAME.meta || {{}}).blackbox === false;
+        const hasSession = (OPS.topology || {{}}).has_scan || (OPS.meta || {{}}).blackbox === false;
         const sp = hasSession ? HQ.spawnDesk : HQ.spawnDefault;
         hqPlayer.tx = sp.tx;
         hqPlayer.ty = sp.ty;
@@ -1430,15 +1430,15 @@ def build_game_html(
       hqCloseUi();
       renderAll();
       showScreen('play');
-      termLine('workspace ' + ((GAME.meta || {{}}).workspace || ''));
-      const scanned = (GAME.topology || {{}}).has_scan;
+      termLine('workspace ' + ((OPS.meta || {{}}).workspace || ''));
+      const scanned = (OPS.topology || {{}}).has_scan;
       termLine(scanned
         ? 'Mapa NETWORK activo — clic en DC para servicios; AD MAP tras enum'
         : 'Sin escaneo en esta partida — ▶ ESCANEAR o autentica con IP conocida');
     }}
 
     function renderHudMeta() {{
-      const m = GAME.meta || {{}};
+      const m = OPS.meta || {{}};
       const dom = m.domain_known ? m.domain : '???';
       const dc = m.dc_ip || '—';
       const host = m.dc_host || '';
@@ -1447,8 +1447,8 @@ def build_game_html(
         `<div>target ${{dc}} ${{host}}</div>`;
     }}
 
-    function gameProgress() {{
-      return GAME.progress || {{
+    function opsProgress() {{
+      return OPS.progress || {{
         scan: true, enum_users: true, loot: true, acls: true, exploit: true,
       }};
     }}
@@ -1479,22 +1479,22 @@ def build_game_html(
     }}
 
     function activeGraphData() {{
-      if (viewMode === 'ad') return GAME.graph || {{ nodes: [], edges: [] }};
-      return GAME.topology || GAME.graph || {{ nodes: [], edges: [] }};
+      if (viewMode === 'ad') return OPS.graph || {{ nodes: [], edges: [] }};
+      return OPS.topology || OPS.graph || {{ nodes: [], edges: [] }};
     }}
 
     function currentMission() {{
-      const quests = GAME.quests || [];
+      const quests = OPS.quests || [];
       if (selectedMissionId) {{
         const picked = quests.find(q => q.id === selectedMissionId);
         if (picked) return picked;
       }}
-      return GAME.mission || null;
+      return OPS.mission || null;
     }}
 
     function renderLeft() {{
-      const p = GAME.player || {{}};
-      const g = GAME.game || {{}};
+      const p = OPS.player || {{}};
+      const g = OPS.ops || {{}};
       let html = '';
 
       if (viewMode === 'network') {{
@@ -1520,8 +1520,8 @@ def build_game_html(
         html += '<p class="hl">Nada habilitado — completa el paso anterior (ver NOTAS →)</p>';
       }}
 
-      if (g.stage === 'need_creds' && g.game_over) {{
-        html += `<p class="hl" style="color:var(--danger)">${{g.game_over_message || 'Sin credenciales no hay juego.'}}</p>`;
+      if (g.stage === 'need_creds' && g.engagement_over) {{
+        html += `<p class="hl" style="color:var(--danger)">${{g.engagement_over_message || 'Sin credenciales no hay juego.'}}</p>`;
       }}
 
       const lens = getDisplayLens();
@@ -1552,7 +1552,7 @@ def build_game_html(
         html += '</div>';
       }}
 
-      const identities = GAME.selectable_identities || [];
+      const identities = OPS.selectable_identities || [];
       if (identities.length) {{
         html += '<h3>Identidades</h3><p class="sub">Clic = inspeccionar · Operar como = pivot (naranja)</p><p>';
         identities.forEach(id => {{
@@ -1565,8 +1565,8 @@ def build_game_html(
         html += '</p>';
       }}
 
-      const creds = GAME.creds || [];
-      const pthSessions = GAME.pth_sessions || [];
+      const creds = OPS.creds || [];
+      const pthSessions = OPS.pth_sessions || [];
       if (creds.length) {{
         html += '<h3>Credenciales (password)</h3><ul class="list">';
         creds.forEach(c => {{
@@ -1600,7 +1600,7 @@ def build_game_html(
 
       document.querySelectorAll('[data-aid]').forEach(btn => {{
         btn.onclick = () => {{
-          const act = (GAME.actions || []).find(a => a.id === btn.dataset.aid);
+          const act = (OPS.actions || []).find(a => a.id === btn.dataset.aid);
           if (act) runAction(act);
         }};
       }});
@@ -1696,8 +1696,8 @@ def build_game_html(
     function highlightIdentityGraph() {{
       if (!nodeData || !edgeData) return;
       const pivot = activePivot();
-      const focus = (graphFocus || (GAME.player || {{}}).pivot || '').toLowerCase();
-      const domain = ((GAME.meta || {{}}).domain || '').toLowerCase();
+      const focus = (graphFocus || (OPS.player || {{}}).pivot || '').toLowerCase();
+      const domain = ((OPS.meta || {{}}).domain || '').toLowerCase();
       const pivotBase = pivot.replace(/\\$$/, '');
       const pivotId = pivot && domain ? ('user:' + pivot + '@' + domain) : '';
       const focusId = focus && domain ? ('user:' + focus + '@' + domain) : '';
@@ -1747,7 +1747,7 @@ def build_game_html(
           showUiToast(data.error || ('error pivot HTTP ' + r.status));
           return;
         }}
-        if (data.state) GAME = data.state;
+        if (data.state) OPS = data.state;
         graphFocus = null;
         infraFocus = null;
         renderAll();
@@ -1770,8 +1770,8 @@ def build_game_html(
     }}
 
     function primaryTarget() {{
-      const m = GAME.meta || {{}};
-      const topo = GAME.topology || {{}};
+      const m = OPS.meta || {{}};
+      const topo = OPS.topology || {{}};
       const targets = topo.targets || [];
       const dc = targets.find(t => t.is_dc) || targets[0] || {{}};
       return {{
@@ -1796,7 +1796,7 @@ def build_game_html(
     }}
 
     function renderTargetBlock() {{
-      const prog = gameProgress();
+      const prog = opsProgress();
       const t = primaryTarget();
       if (!prog.scan && t.ip === '???') {{
         return noteKv('Target', 'sin escanear', 'dim') + noteKv('TODO', 'scan -H &lt;IP&gt;', 'warn');
@@ -1808,11 +1808,11 @@ def build_game_html(
       const ports = formatPorts(t.services);
       if (ports) html += noteKv('Ports', ports);
       if (t.role) html += noteKv('Role', t.role);
-      const p = GAME.player || {{}};
+      const p = OPS.player || {{}};
       if (p.pivot) html += noteKv('Pivot', p.pivot, 'ok');
       const owned = (p.owned || []).filter(Boolean);
       if (owned.length) html += noteKv('Owned', owned.join(', '));
-      const g = GAME.game || {{}};
+      const g = OPS.ops || {{}};
       if (g.stage_label) html += noteKv('Fase', g.stage_label, 'dim');
       return html;
     }}
@@ -1824,7 +1824,7 @@ def build_game_html(
     function renderInfraFocusNote() {{
       if (!infraFocus || viewMode !== 'network') return '';
       const node = infraFocus;
-      const targets = (GAME.topology || {{}}).targets || [];
+      const targets = (OPS.topology || {{}}).targets || [];
       const match = targets.find(t => t.id === node.id);
       let html = '<div class="note-callout focus"><div class="note-block-label">Nodo seleccionado</div>';
       if (match) {{
@@ -1895,10 +1895,10 @@ def build_game_html(
     }}
 
     function renderSessionNotes() {{
-      const prog = gameProgress();
-      const creds = GAME.creds || [];
-      const clues = GAME.clues || [];
-      const hashes = GAME.hashes || [];
+      const prog = opsProgress();
+      const creds = OPS.creds || [];
+      const clues = OPS.clues || [];
+      const hashes = OPS.hashes || [];
       const quests = getDisplayQuests();
       let html = '';
       if (creds.length) {{
@@ -1926,7 +1926,7 @@ def build_game_html(
         html += '<div class="note-block-label">Hashes / PTH</div>';
         hashes.forEach(h => {{
           html += noteKv(h.account, h.nthash, 'ok');
-          const pth = (GAME.pth_sessions || []).find(p => p.account === h.account);
+          const pth = (OPS.pth_sessions || []).find(p => p.account === h.account);
           if (pth && pth.winrm_cmd) html += noteKvIndent('winrm', pth.winrm_cmd, 'dim');
         }});
       }}
@@ -2041,7 +2041,7 @@ def build_game_html(
     }}
 
     function renderStudyMapReference() {{
-      const rows = GAME.study_map || [];
+      const rows = OPS.study_map || [];
       if (!rows.length) return '';
       let body = '';
       rows.forEach(r => {{
@@ -2055,7 +2055,7 @@ def build_game_html(
     }}
 
     function renderReferenceDetails(intel) {{
-      const prog = gameProgress();
+      const prog = opsProgress();
       let html = '<div class="note-section"><div class="note-block-label">Referencia</div>';
       html += '<details><summary>Mapa de estudio (CRTP · CRTE · CRTO)</summary>';
       html += renderStudyMapReference();
@@ -2081,7 +2081,7 @@ def build_game_html(
     }}
 
     function renderNotesDoc() {{
-      const intel = GAME.engagement_intel || {{}};
+      const intel = OPS.engagement_intel || {{}};
       let html = '<div class="notes-doc"><div class="notes-title">NOTAS</div>';
       html += renderNotesHeader();
       html += '<div class="note-section">';
@@ -2091,7 +2091,7 @@ def build_game_html(
       html += renderTargetBlock();
       html += renderSessionNotes();
       html += '</div>';
-      html += renderOperatorSetupNote(GAME.operator_setup);
+      html += renderOperatorSetupNote(OPS.operator_setup);
       html += renderReferenceDetails(intel);
       html += '</div>';
       return html;
@@ -2125,7 +2125,7 @@ def build_game_html(
     }}
 
     function renderBookPage(idx) {{
-      const book = GAME.pentest_book || {{}};
+      const book = OPS.pentest_book || {{}};
       const pages = book.pages || [];
       if (!pages.length) return;
       bookPageIdx = Math.max(0, Math.min(idx, pages.length - 1));
@@ -2341,7 +2341,7 @@ def build_game_html(
     async function refreshAfterOp(ok) {{
       await fetchState();
       if (graphFocus) {{
-        const still = (GAME.selectable_identities || []).some(
+        const still = (OPS.selectable_identities || []).some(
           i => i.username.toLowerCase() === graphFocus.toLowerCase()
         );
         if (!still) graphFocus = null;
@@ -2388,7 +2388,7 @@ def build_game_html(
     async function runAction(act) {{
       if (!act || opRunning) return;
       if (!API_MODE) {{
-        termLine('Modo estático — inicia: admapper game -w <workspace>', 'line-error');
+        termLine('Modo estático — inicia: admapper dashboard -w <workspace>', 'line-error');
         return;
       }}
       const action = act.action || 'exploit';
@@ -2488,7 +2488,7 @@ def build_game_html(
 
     (function bootOrPlay() {{
       initBoot();
-      if ((GAME.meta || {{}}).blackbox === false && (GAME.topology || {{}}).has_scan) {{
+      if ((OPS.meta || {{}}).blackbox === false && (OPS.topology || {{}}).has_scan) {{
         enterHQ();
       }} else {{
         showScreen('boot');
@@ -2500,7 +2500,7 @@ def build_game_html(
 </html>"""
 
 
-def write_game_html(
+def write_ops_html(
     ws_path: Path,
     *,
     workspace: str,
@@ -2510,7 +2510,7 @@ def write_game_html(
 ) -> Path:
     out = ws_path / "ad_ops.html"
     out.write_text(
-        build_game_html(
+        build_ops_html(
             ws_path,
             workspace=workspace,
             domain=domain,

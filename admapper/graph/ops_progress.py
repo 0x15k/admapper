@@ -7,12 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-_PROGRESS_FILE = "game_progress.json"
+_PROGRESS_FILE = "ops_progress.json"
 
 
 @dataclass
-class GameProgress:
-    """Facts the operator earned in this game session (not analyst CLI leftovers)."""
+class OpsProgress:
+    """Facts the operator earned in this ops session (not analyst CLI leftovers)."""
 
     scan: bool = False
     enum_users: bool = False
@@ -25,14 +25,18 @@ class GameProgress:
     loot_users: list[str] = field(default_factory=list)
 
     @classmethod
-    def fresh(cls) -> GameProgress:
+    def fresh(cls) -> OpsProgress:
         return cls()
 
     @classmethod
-    def load(cls, ws_path: Path) -> GameProgress:
+    def load(cls, ws_path: Path) -> OpsProgress:
         path = Path(ws_path) / _PROGRESS_FILE
         if not path.is_file():
-            return cls.fresh()
+            legacy = Path(ws_path) / "game_progress.json"
+            if legacy.is_file():
+                path = legacy
+            else:
+                return cls.fresh()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -87,8 +91,8 @@ class GameProgress:
         return {u.lower().rstrip("$") for u in self.owned_users}
 
 
-def filtered_loot_clues(ws_path: Path, progress: GameProgress | None) -> list[dict[str, str]]:
-    """Loot strings only after the player ran loot in this game session."""
+def filtered_loot_clues(ws_path: Path, progress: OpsProgress | None) -> list[dict[str, str]]:
+    """Loot strings only after the operator ran loot in this ops session."""
     from admapper.report.engagement_map import loot_clue_rows
 
     if progress is None:

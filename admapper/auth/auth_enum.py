@@ -42,9 +42,35 @@ def _merge_graph_inventory(
     nodes = list(graph.get("nodes", []))
     edges = list(graph.get("edges", []))
     existing_ids = {n.get("id") for n in nodes}
+    existing_edges = {(e.get("source"), e.get("target"), e.get("type")) for e in edges}
+    domain_lc = domain.lower()
+
+    dn_to_node_id: dict[str, str] = {}
+
+    for user in ldap.users[:200]:
+        node_id = f"user:{user.username.lower()}@{domain_lc}"
+        if user.dn:
+            dn_to_node_id[user.dn.lower()] = node_id
+        if node_id in existing_ids:
+            continue
+        nodes.append(
+            {
+                "id": node_id,
+                "type": "user",
+                "name": user.username,
+                "domain": domain_lc,
+                "owned": False,
+                "enabled": user.enabled,
+                "kerberoastable": user.kerberoastable,
+                "asrep_roastable": user.asrep_roastable,
+            }
+        )
+        existing_ids.add(node_id)
 
     for group in ldap.groups[:200]:
-        node_id = f"group:{group.name.lower()}@{domain.lower()}"
+        node_id = f"group:{group.name.lower()}@{domain_lc}"
+        if group.dn:
+            dn_to_node_id[group.dn.lower()] = node_id
         if node_id in existing_ids:
             continue
         nodes.append(
@@ -52,14 +78,14 @@ def _merge_graph_inventory(
                 "id": node_id,
                 "type": "group",
                 "name": group.name,
-                "domain": domain.lower(),
+                "domain": domain_lc,
                 "owned": False,
             }
         )
         existing_ids.add(node_id)
 
     for computer in ldap.computers[:200]:
-        node_id = f"computer:{computer.name.lower()}.{domain.lower()}"
+        node_id = f"computer:{computer.name.lower()}.{domain_lc}"
         if node_id in existing_ids:
             continue
         nodes.append(
@@ -67,12 +93,31 @@ def _merge_graph_inventory(
                 "id": node_id,
                 "type": "computer",
                 "name": computer.name,
-                "domain": domain.lower(),
+                "domain": domain_lc,
                 "owned": False,
                 "unconstrained_delegation": computer.unconstrained_delegation,
             }
         )
         existing_ids.add(node_id)
+
+    for group in ldap.groups[:200]:
+        group_id = f"group:{group.name.lower()}@{domain_lc}"
+        for member_dn in group.members[:500]:
+            member_id = dn_to_node_id.get(member_dn.lower(), "")
+            if not member_id:
+                cn = member_dn.split(",")[0]
+                if cn.upper().startswith("CN="):
+                    cn = cn[3:]
+                member_id = f"user:{cn.lower()}@{domain_lc}"
+            if member_id not in existing_ids:
+                continue
+            edge_key = (member_id, group_id, "MemberOf")
+            if edge_key in existing_edges:
+                continue
+            edges.append(
+                {"source": member_id, "target": group_id, "type": "MemberOf"}
+            )
+            existing_edges.add(edge_key)
 
     graph["nodes"] = nodes
     graph["edges"] = edges

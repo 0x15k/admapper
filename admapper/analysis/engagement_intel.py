@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
-from admapper.graph.game_state import collect_identity_capabilities
+from admapper.graph.ops_state import collect_identity_capabilities
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
-from admapper.graph.game_progress import filtered_loot_clues
+from admapper.graph.ops_progress import filtered_loot_clues
 
 from admapper.analysis.attack_readiness import build_attack_readiness
 from admapper.analysis.password_rules import analyze_password_clues
@@ -181,7 +181,7 @@ def build_engagement_intel(
     workspace: str = "",
     domain: str | None = None,
     owned_users: list[str] | None = None,
-    game_progress: object | None = None,
+    ops_progress: object | None = None,
 ) -> dict[str, Any]:
     """Aggregate domain users, lockout/GPO, spray safety, and password rule analysis."""
     ws_path = Path(ws_path)
@@ -195,13 +195,13 @@ def build_engagement_intel(
     humans = _human_users(users)
 
     eligible, skipped = filter_spray_targets(humans, policy)
-    clues = filtered_loot_clues(ws_path, game_progress)  # type: ignore[arg-type]
+    clues = filtered_loot_clues(ws_path, ops_progress)  # type: ignore[arg-type]
     password_analysis = analyze_password_clues(clues) if clues else {
         "rules": [],
         "inferences": [],
         "transforms": [],
     }
-    if game_progress is not None and not getattr(game_progress, "enum_users", False):
+    if ops_progress is not None and not getattr(ops_progress, "enum_users", False):
         humans = []
         eligible, skipped = [], []
 

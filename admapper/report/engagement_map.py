@@ -466,7 +466,7 @@ def build_engagement_summary(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
 ) -> dict[str, object]:
-    """Structured rollup for game UI / compact terminal (learner-friendly)."""
+    """Structured rollup for dashboard UI / compact terminal (learner-friendly)."""
     owned = list(owned_users or [])
     pivot = pivot_user or (owned[-1] if owned else "")
     domain_s = domain or "(sin dominio)"

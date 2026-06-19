@@ -5,8 +5,8 @@ import threading
 from http.client import HTTPConnection
 from pathlib import Path
 
-from admapper.graph.game_server import GameContext, make_handler
-from admapper.graph.game_ui import build_game_html, build_game_payload, write_game_html
+from admapper.graph.dashboard_server import DashboardContext, make_handler
+from admapper.graph.ops_ui import build_ops_html, build_ops_payload, write_ops_html
 from admapper.graph.web import filter_tactical_graph
 from http.server import ThreadingHTTPServer
 
@@ -45,9 +45,9 @@ def _minimal_ws(tmp_path: Path) -> Path:
     return ws
 
 
-def test_build_game_payload_phases(tmp_path: Path) -> None:
+def test_build_ops_payload_phases(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    data = build_game_payload(ws, workspace="ws", domain="lab.htb", owned_users=["alice"])
+    data = build_ops_payload(ws, workspace="ws", domain="lab.htb", owned_users=["alice"])
     assert data["meta"]["dc_ip"] == "10.0.0.1"
     assert len(data["phases"]) == 9
     assert "study_map" in data
@@ -69,21 +69,21 @@ def test_build_game_payload_phases(tmp_path: Path) -> None:
     assert "operator_setup" in data
 
 
-def test_build_game_payload_recon_placeholder_nodes(tmp_path: Path) -> None:
+def test_build_ops_payload_recon_placeholder_nodes(tmp_path: Path) -> None:
     ws = tmp_path / "empty"
     ws.mkdir()
     (ws / "unauth_scan.json").write_text(
         json.dumps({"hosts": [{"address": "10.9.9.9", "is_domain_controller": True}]})
     )
-    data = build_game_payload(ws, workspace="empty", domain="lab.local")
+    data = build_ops_payload(ws, workspace="empty", domain="lab.local")
     nodes = data["graph"]["nodes"]
     assert any("OPERATOR" in str(n.get("label", "")) for n in nodes)
     assert any("10.9.9.9" in str(n.get("title", "")) for n in nodes)
 
 
-def test_build_game_html_real_terms(tmp_path: Path) -> None:
+def test_build_ops_html_real_terms(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    html = build_game_html(ws, workspace="ws", domain="lab.htb", pivot_user="alice", api_mode=True)
+    html = build_ops_html(ws, workspace="ws", domain="lab.htb", pivot_user="alice", api_mode=True)
     assert "AD OPS" in html
     assert "Kerberos" in html
     assert "GenericWrite" in html
@@ -112,14 +112,14 @@ def test_build_game_html_real_terms(tmp_path: Path) -> None:
     assert "Análisis de pista" in html
 
 
-def test_write_game_html(tmp_path: Path) -> None:
+def test_write_ops_html(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    out = write_game_html(ws, workspace="ws", domain="lab.htb")
+    out = write_ops_html(ws, workspace="ws", domain="lab.htb")
     assert out.name == "ad_ops.html"
     assert out.exists()
 
 
-def test_build_game_payload_includes_mission(tmp_path: Path) -> None:
+def test_build_ops_payload_includes_mission(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
     (ws / "acl_findings.json").write_text(
         json.dumps(
@@ -137,7 +137,7 @@ def test_build_game_payload_includes_mission(tmp_path: Path) -> None:
             }
         )
     )
-    data = build_game_payload(
+    data = build_ops_payload(
         ws, workspace="ws", domain="lab.htb", owned_users=["alice"], pivot_user="alice"
     )
     assert data["mission"] is not None
@@ -162,7 +162,7 @@ def test_filter_tactical_graph_hides_orphan_groups() -> None:
     assert any(n["id"] == "a" for n in out["nodes"])
 
 
-def test_build_game_payload_filters_actions_by_pivot(tmp_path: Path) -> None:
+def test_build_ops_payload_filters_actions_by_pivot(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
     (ws / "auth_inventory.json").write_text(
         json.dumps(
@@ -198,7 +198,7 @@ def test_build_game_payload_filters_actions_by_pivot(tmp_path: Path) -> None:
             }
         )
     )
-    data = build_game_payload(
+    data = build_ops_payload(
         ws,
         workspace="ws",
         domain="lab.htb",
@@ -214,7 +214,7 @@ def test_build_game_payload_filters_actions_by_pivot(tmp_path: Path) -> None:
     assert all(q.get("principal") == "alice" for q in data["quests"] if q.get("principal"))
 
 
-def test_build_game_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
+def test_build_ops_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
     (ws / "auth_inventory.json").write_text(
         json.dumps(
@@ -226,7 +226,7 @@ def test_build_game_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
             }
         )
     )
-    data = build_game_payload(
+    data = build_ops_payload(
         ws, workspace="ws", domain="lab.htb", owned_users=["alice"], pivot_user="alice"
     )
     carol = next(r for r in data["selectable_identities"] if r["username"] == "carol")
@@ -235,16 +235,16 @@ def test_build_game_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
     assert carol["view_lens"]["read_only"] is True
 
 
-def test_build_game_payload_includes_operator_setup(tmp_path: Path) -> None:
+def test_build_ops_payload_includes_operator_setup(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    data = build_game_payload(ws, workspace="ws", domain="lab.htb", owned_users=[])
+    data = build_ops_payload(ws, workspace="ws", domain="lab.htb", owned_users=[])
     assert "operator_setup" in data
     assert data["operator_setup"]["sync_dc_cmd"] is None or "sync-dc" in data["operator_setup"]["sync_dc_cmd"]
 
 
-def test_game_server_state_endpoint(tmp_path: Path) -> None:
+def test_dashboard_server_state_endpoint(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    ctx = GameContext(
+    ctx = DashboardContext(
         ws_path=ws,
         workspace="ws",
         domain="lab.htb",

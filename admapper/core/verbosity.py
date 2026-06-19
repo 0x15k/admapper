@@ -14,9 +14,9 @@ def is_verbose() -> bool:
 
 def is_compact() -> bool:
     """Game UI / learner mode — short structured output, no raw CLI dumps."""
-    from admapper.core.game_mode import is_game_mode
+    from admapper.core.dashboard_mode import is_dashboard_mode
 
-    return is_game_mode()
+    return is_dashboard_mode()
 
 
 def print_phase(message: str) -> None:

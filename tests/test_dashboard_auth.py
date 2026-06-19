@@ -1,4 +1,4 @@
-"""Tests for game-only credential auth (no start_auth chain)."""
+"""Tests for dashboard credential auth (no start_auth chain)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from admapper.core.session import Session
-from admapper.graph.game_auth import run_game_credential_auth
+from admapper.graph.dashboard_auth import run_dashboard_credential_auth
 from admapper.models.credential import Credential, CredentialStatus
 
 
@@ -58,7 +58,7 @@ def _session(tmp_path: Path) -> Session:
     return session
 
 
-def test_game_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) -> None:
+def test_dashboard_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) -> None:
     session = _session(tmp_path)
     verified = Credential(
         id="new-svc",
@@ -69,14 +69,14 @@ def test_game_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) -> No
     )
 
     with (
-        patch("admapper.graph.game_auth.pick_dc_ip", return_value="10.0.0.1"),
-        patch("admapper.graph.game_auth.ensure_dc_clock"),
-        patch("admapper.graph.game_auth.run_credential_verify") as mock_verify,
-        patch("admapper.graph.game_auth.set_pivot_user") as mock_pivot,
+        patch("admapper.graph.dashboard_auth.pick_dc_ip", return_value="10.0.0.1"),
+        patch("admapper.graph.dashboard_auth.ensure_dc_clock"),
+        patch("admapper.graph.dashboard_auth.run_credential_verify") as mock_verify,
+        patch("admapper.graph.dashboard_auth.set_pivot_user") as mock_pivot,
     ):
         mock_verify.return_value.credential = verified
 
-        result = run_game_credential_auth(
+        result = run_dashboard_credential_auth(
             session,
             username="svc_recovery",
             password="Em3rg3ncyPa$$2026",

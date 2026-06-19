@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
-from admapper.graph.game_state import (
+from admapper.graph.ops_state import (
     _valid_cred_users,
     collect_identity_capabilities,
     collect_verified_missions,
 )
 from admapper.report.engagement import _load_json
-from admapper.graph.game_progress import GameProgress, filtered_loot_clues
+from admapper.graph.ops_progress import OpsProgress, filtered_loot_clues
 from admapper.report.scenario import _access_matrix_rows
 
 
@@ -81,13 +81,13 @@ def build_selectable_identities(
     *,
     domain: str,
     owned_users: list[str],
-    game_progress: GameProgress | None = None,
+    ops_progress: OpsProgress | None = None,
 ) -> list[dict[str, Any]]:
     """Humans the operator can focus on — owned, cred-valid, or loot-pending."""
     ws_path = Path(ws_path)
     owned = _owned_lower(owned_users)
-    if game_progress is not None:
-        valid = game_progress.verified_set()
+    if ops_progress is not None:
+        valid = ops_progress.verified_set()
     else:
         valid = _valid_cred_users(ws_path)
     seen: set[str] = set()
@@ -139,7 +139,7 @@ def build_selectable_identities(
             detail="credencial válida — no marcado owned",
         )
 
-    for clue in filtered_loot_clues(ws_path, game_progress):
+    for clue in filtered_loot_clues(ws_path, ops_progress):
         user = str(clue.get("user", ""))
         if not user or user.lower() in seen:
             continue
@@ -153,7 +153,7 @@ def build_selectable_identities(
             detail=f"pista en {str(clue.get('source', ''))[:40]}",
         )
 
-    if game_progress is not None and game_progress.exploit:
+    if ops_progress is not None and ops_progress.exploit:
         from admapper.creds.common import collect_gained_hashes
 
         for account, nthash in collect_gained_hashes(ws_path):
@@ -168,7 +168,7 @@ def build_selectable_identities(
                 detail="NTLM hash — WinRM Pass-the-Hash (no LDAP password)",
             )
 
-    if game_progress is not None and not game_progress.enum_users:
+    if ops_progress is not None and not ops_progress.enum_users:
         return rows
 
     inv = _load_json(ws_path / "auth_inventory.json") or {}
@@ -203,14 +203,14 @@ def build_identity_lens(
     domain: str,
     pivot_user: str,
     owned_users: list[str],
-    game_progress: GameProgress | None = None,
+    ops_progress: OpsProgress | None = None,
 ) -> dict[str, Any]:
     """Everything the UI should show for the active identity (pivot)."""
     ws_path = Path(ws_path)
     pivot = pivot_user.strip()
     owned = _owned_lower(owned_users)
-    if game_progress is not None:
-        valid = game_progress.verified_set()
+    if ops_progress is not None:
+        valid = ops_progress.verified_set()
     else:
         valid = _valid_cred_users(ws_path)
     pl = pivot.lower().rstrip("$")
@@ -296,13 +296,13 @@ def build_identity_lens(
             )
 
     loot_clue = next(
-        (c for c in filtered_loot_clues(ws_path, game_progress) if str(c.get("user", "")).lower() == pl),
+        (c for c in filtered_loot_clues(ws_path, ops_progress) if str(c.get("user", "")).lower() == pl),
         None,
     )
 
-    inv_user = _lookup_inventory_user(ws_path, pivot) if game_progress is None or game_progress.enum_users else None
+    inv_user = _lookup_inventory_user(ws_path, pivot) if ops_progress is None or ops_progress.enum_users else None
     enum_flags = _enum_flags(inv_user)
-    if game_progress is not None and not game_progress.acls:
+    if ops_progress is not None and not ops_progress.acls:
         capabilities = []
         missions = []
         enabled_missions = []

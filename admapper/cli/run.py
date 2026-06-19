@@ -35,7 +35,7 @@ def run_engagement(
     auto: bool = False,
 ) -> None:
     """Non-interactive engagement — con creds ejecuta analyst por defecto."""
-    from admapper.core.game_mode import effective_sync_clock, effective_sync_hosts
+    from admapper.core.dashboard_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.kerberos_skew import apply_clock_skew_option
     from admapper.creds.time_sync import ensure_dc_clock
 

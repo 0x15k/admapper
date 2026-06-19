@@ -33,17 +33,14 @@ dependencies = [
     "dnspython>=2.7,<3.0",
     "ldap3>=2.9,<3.0",
     "networkx>=3.0",
+    "impacket>=0.12,<0.14",
 ]
 
 [project.optional-dependencies]
-recon = [
-    "impacket>=0.12,<0.14",
-]
-# Full engagement tier (Impacket + WinRM + Kerberos).
+# Full engagement tier (WinRM + Kerberos).
 # certipy-ad and pywhisker are standalone CLIs — install them
 # separately:  pipx install certipy-ad  /  pipx install pywhisker
 full = [
-    "impacket>=0.12,<0.14",
     "pypsrp>=0.8,<0.9",
     "gssapi>=1.8",
     "krb5>=0.5",
@@ -52,7 +49,6 @@ dev = [
     "pytest>=8.0,<9.0",
     "ruff>=0.9,<1.0",
     "bandit>=1.8,<2.0",
-    "impacket>=0.12,<0.14",
 ]
 
 [project.urls]

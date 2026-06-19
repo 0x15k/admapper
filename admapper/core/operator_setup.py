@@ -1,4 +1,4 @@
-"""Local operator prep hints — clock, hosts, libfaketime (no sudo from game UI)."""
+"""Local operator prep hints — clock, hosts, libfaketime (no sudo from dashboard UI)."""
 
 from __future__ import annotations
 

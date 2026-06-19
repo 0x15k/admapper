@@ -435,7 +435,7 @@ def sync_dc(
         ),
     ] = False,
 ) -> None:
-    """Sync local clock (and /etc/hosts) to the DC — run once with sudo, outside the game UI."""
+    """Sync local clock (and /etc/hosts) to the DC — run once with sudo, outside the dashboard UI."""
     from admapper.cli.scan import sync_dc_engagement
     from admapper.core.output import print_error
 
@@ -692,7 +692,7 @@ def web(
     from admapper.core.discovery import default_workspace_name
     from admapper.core.output import print_error, print_info
     from admapper.core.session import Session
-    from admapper.graph.game_server import run_game_server
+    from admapper.graph.dashboard_server import run_dashboard_server
 
     session = Session.bootstrap()
     if host:
@@ -708,7 +708,7 @@ def web(
         raise typer.Exit(1)
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
-    run_game_server(
+    run_dashboard_server(
         ws_path=ws_path,
         workspace=ws.name,
         domain=ws.domain,
@@ -721,7 +721,7 @@ def web(
 
 
 @app.command()
-def game(
+def dashboard(
     host: Annotated[
         str | None,
         typer.Option(
@@ -737,20 +737,20 @@ def game(
     ] = None,
     port: Annotated[
         int,
-        typer.Option("--port", help="Game server port (default 8766)"),
+        typer.Option("--port", help="Dashboard server port (default 8766)"),
     ] = 8766,
     open_browser: Annotated[
         bool,
-        typer.Option("--open/--no-open", help="Open game in browser"),
+        typer.Option("--open/--no-open", help="Open dashboard in browser"),
     ] = True,
 ) -> None:
-    """AD Ops — blackbox AD engagement game (IP → scan → topology → escalate)."""
+    """AD Ops — blackbox AD engagement dashboard (IP -> scan -> topology -> escalate)."""
     from admapper.cli.commands import dispatch
     from admapper.core.discovery import default_workspace_name
     from admapper.core.output import print_error, print_info
     from admapper.core.session import Session
-    from admapper.graph.game_server import run_game_server
-    from admapper.graph.game_ui import write_game_html
+    from admapper.graph.dashboard_server import run_dashboard_server
+    from admapper.graph.ops_ui import write_ops_html
 
     session = Session.bootstrap()
     if host:
@@ -762,18 +762,18 @@ def game(
     elif workspace:
         session.select_workspace(workspace, create=False)
     elif session.workspace is None:
-        print_error("blackbox: admapper game -H <IP>   o   admapper game -w <workspace>")
+        print_error("blackbox: admapper dashboard -H <IP>   o   admapper dashboard -w <workspace>")
         raise typer.Exit(1)
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
-    write_game_html(
+    write_ops_html(
         ws_path,
         workspace=ws.name,
         domain=ws.domain,
         pivot_user=ws.pivot_user,
         owned_users=list(ws.owned_users or []),
     )
-    run_game_server(
+    run_dashboard_server(
         ws_path=ws_path,
         workspace=ws.name,
         domain=ws.domain,

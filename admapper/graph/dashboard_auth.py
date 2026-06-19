@@ -15,14 +15,14 @@ if TYPE_CHECKING:
     from admapper.core.session import Session
 
 
-def run_game_credential_auth(
+def run_dashboard_credential_auth(
     session: Session,
     *,
     username: str,
     password: str,
     domain: str | None = None,
 ) -> Credential:
-    """Add (or refresh) and verify exactly the credential the player submitted."""
+    """Add (or refresh) and verify exactly the credential the operator submitted."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -43,9 +43,9 @@ def run_game_credential_auth(
     user_key = username.strip().lower()
     existing = next((c for c in store.list() if c.username.lower() == user_key), None)
     if existing is None:
-        cred = store.add(username.strip(), password, domain=resolved_domain, source="game-ui")
+        cred = store.add(username.strip(), password, domain=resolved_domain, source="dashboard")
     else:
-        cred = store.add(username.strip(), password, domain=resolved_domain, source="game-ui")
+        cred = store.add(username.strip(), password, domain=resolved_domain, source="dashboard")
 
     result = run_credential_verify(session, cred.id)
     verified = result.credential

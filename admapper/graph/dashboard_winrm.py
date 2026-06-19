@@ -1,4 +1,4 @@
-"""In-game WinRM Pass-the-Hash — verify shell and set machine pivot."""
+"""Dashboard WinRM Pass-the-Hash — verify shell and set machine pivot."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def lookup_machine_hash(ws_path, account: str) -> tuple[str, str] | None:
     return None
 
 
-def run_game_winrm_pth(session: Session, account: str) -> str:
+def run_dashboard_winrm_pth(session: Session, account: str) -> str:
     """Run whoami over WinRM PTH; return stdout on success."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")

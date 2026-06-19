@@ -1,7 +1,7 @@
-"""Interactive AD Ops game HTTP server (stdlib only).
+"""Interactive AD Ops dashboard HTTP server (stdlib only).
 
-Serves the game SPA and drives real admapper CLI phases from the browser.
-Patterns implemented (see game_ui.py header comment): mission briefing, animated
+Serves the dashboard SPA and drives real admapper CLI phases from the browser.
+Patterns implemented (see ops_ui.py header comment): mission briefing, animated
 terminal via SSE, phase-gated actions, live graph refresh after each op.
 """
 
@@ -21,11 +21,11 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
-from admapper.core.game_mode import enable_game_mode, game_subprocess_env
-from admapper.graph.game_progress import GameProgress
+from admapper.core.dashboard_mode import enable_dashboard_mode, dashboard_subprocess_env
+from admapper.graph.ops_progress import OpsProgress
 from admapper.graph.dashboard_html import build_dashboard_html
-from admapper.graph.game_ui import build_game_html, build_game_payload
-from admapper.graph.terminal_filter import GameTerminalFilter
+from admapper.graph.ops_ui import build_ops_html, build_ops_payload
+from admapper.graph.terminal_filter import TerminalFilter
 from admapper.analysis.user_match import refresh_workspace_intel
 
 
@@ -39,7 +39,7 @@ def _load_json_safe(path: Path) -> dict[str, Any]:
     return {}
 
 
-class GameContext:
+class DashboardContext:
     """Per-server workspace state, event bus, and op lock."""
 
     def __init__(
@@ -61,12 +61,12 @@ class GameContext:
         self.events: queue.Queue[dict[str, Any]] = queue.Queue()
         self.op_lock = threading.Lock()
         self.running = False
-        self.terminal_filter = GameTerminalFilter()
-        saved = GameProgress.load(self.ws_path)
+        self.terminal_filter = TerminalFilter()
+        saved = OpsProgress.load(self.ws_path)
         if saved.scan or saved.enum_users:
             self.progress = saved
         else:
-            self.progress = GameProgress.fresh()
+            self.progress = OpsProgress.fresh()
             self.progress.save(self.ws_path)
 
     def emit(self, line: str, *, kind: str = "log") -> None:
@@ -74,7 +74,7 @@ class GameContext:
 
     def refresh_payload(self) -> dict[str, Any]:
         refresh_workspace_intel(self.ws_path)
-        self.progress = GameProgress.load(self.ws_path)
+        self.progress = OpsProgress.load(self.ws_path)
         self.owned_users = list(self.progress.owned_users)
         if self.pivot_user and self.pivot_user.lower() not in {
             u.lower() for u in self.owned_users
@@ -87,13 +87,13 @@ class GameContext:
             state = json.loads(state_path.read_text(encoding="utf-8"))
             if state.get("domain"):
                 self.domain = str(state["domain"])
-        return build_game_payload(
+        return build_ops_payload(
             self.ws_path,
             workspace=self.workspace,
             domain=self.domain,
             owned_users=self.owned_users,
             pivot_user=self.pivot_user,
-            game_progress=self.progress,
+            ops_progress=self.progress,
         )
 
     def _sync_loot_progress(self) -> None:
@@ -131,7 +131,7 @@ class GameContext:
         return ""
 
     def _compact_cmd(self, cmd: list[str]) -> str:
-        """Hide full local paths and passwords from the game terminal."""
+        """Hide full local paths and passwords from the dashboard terminal."""
         shown: list[str] = []
         skip_next = False
         for i, part in enumerate(cmd):
@@ -158,7 +158,7 @@ class GameContext:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=game_subprocess_env(),
+            env=dashboard_subprocess_env(),
         )
         assert proc.stdout is not None
         for line in proc.stdout:
@@ -214,14 +214,14 @@ class GameContext:
         domain_b64 = base64.b64encode(domain.encode()).decode()
         self._run_workspace_script(
             "import base64\n"
-            "from admapper.graph.game_auth import run_game_credential_auth\n"
+            "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
             "from admapper.core.discovery import ensure_domain\n"
             f"domain = base64.b64decode('{domain_b64}').decode() or None\n"
             "try:\n"
             "    ensure_domain(session, announce=False)\n"
             "except ValueError:\n"
             "    pass\n"
-            f"run_game_credential_auth(session, username=base64.b64decode('{user_b64}').decode(), "
+            f"run_dashboard_credential_auth(session, username=base64.b64decode('{user_b64}').decode(), "
             f"password=base64.b64decode('{pw_b64}').decode(), domain=domain)",
             label=f"autenticar como {username}",
         )
@@ -246,13 +246,14 @@ class GameContext:
                 self.progress.save(self.ws_path)
 
     def _run_workspace_script(self, script: str, *, label: str) -> bool:
-        """Run in-process op with stdout routed through the game terminal filter."""
+        """Run in-process op with stdout routed through the dashboard terminal filter."""
         import io
         from contextlib import redirect_stdout
 
         from admapper.core.session import Session
 
         self.emit(label, kind="cmd")
+        self.terminal_filter.reset()
         session = Session.bootstrap()
         session.select_workspace(self.workspace, create=False)
         buf = io.StringIO()
@@ -357,10 +358,10 @@ class GameContext:
         )
 
     def run_exploit(self) -> None:
-        """In-process exploit — loot and ACL only; creds come from the player."""
+        """In-process exploit — loot and ACL only; creds come from the operator."""
         ok = self._run_workspace_script(
             "from admapper.exploit.engine import run_exploit_engagement\n"
-            "from admapper.core.game_mode import effective_sync_clock\n"
+            "from admapper.core.dashboard_mode import effective_sync_clock\n"
             "run_exploit_engagement(session, max_rounds=3, sync_clock=effective_sync_clock(True))",
             label="exploit (loot → ACL/gMSA)",
         )
@@ -401,7 +402,7 @@ class GameContext:
             self.ws_path,
             domain=domain,
             owned_users=list(self.progress.owned_users or []),
-            game_progress=self.progress,
+            ops_progress=self.progress,
         )
         match = next(
             (
@@ -432,8 +433,8 @@ class GameContext:
 
     def run_winrm_pth(self, account: str) -> None:
         ok = self._run_workspace_script(
-            "from admapper.graph.game_winrm import run_game_winrm_pth\n"
-            f"run_game_winrm_pth(session, {account!r})",
+            "from admapper.graph.dashboard_winrm import run_dashboard_winrm_pth\n"
+            f"run_dashboard_winrm_pth(session, {account!r})",
             label=f"winrm PTH {account}",
         )
         if not ok:
@@ -482,9 +483,9 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
         return {}
 
 
-def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
-    class GameHandler(BaseHTTPRequestHandler):
-        server_version = "ADOpsGame/1.0"
+def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
+    class DashboardHandler(BaseHTTPRequestHandler):
+        server_version = "ADMapper/1.0"
 
         def log_message(self, fmt: str, *args: Any) -> None:
             return
@@ -533,8 +534,8 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
                 self.wfile.write(body)
                 return
 
-            if path == "/game":
-                html_content = build_game_html(
+            if path == "/legacy":
+                html_content = build_ops_html(
                     ctx.ws_path,
                     workspace=ctx.workspace,
                     domain=ctx.domain,
@@ -656,10 +657,10 @@ def make_handler(ctx: GameContext) -> type[BaseHTTPRequestHandler]:
 
             self.send_error(404)
 
-    return GameHandler
+    return DashboardHandler
 
 
-def run_game_server(
+def run_dashboard_server(
     *,
     ws_path: Path,
     workspace: str,
@@ -670,12 +671,12 @@ def run_game_server(
     port: int = 8766,
     open_browser: bool = True,
 ) -> None:
-    """Start blocking game server until KeyboardInterrupt."""
+    """Start blocking dashboard server until KeyboardInterrupt."""
     import webbrowser
 
-    enable_game_mode()
+    enable_dashboard_mode()
     refresh_workspace_intel(ws_path)
-    ctx = GameContext(
+    ctx = DashboardContext(
         ws_path=ws_path,
         workspace=workspace,
         domain=domain,
@@ -699,14 +700,14 @@ def run_game_server(
             if exc.errno not in {errno.EADDRINUSE, 48}:
                 raise
     if httpd is None:
-        raise OSError(f"puertos {port}–{port + 9} ocupados — cierra otra instancia de admapper game")
+        raise OSError(f"puertos {port}–{port + 9} ocupados — cierra otra instancia de admapper dashboard")
 
     url = f"http://127.0.0.1:{bound_port}/"
     from admapper.core.output import print_info, print_success
 
     print_success(f"ADMapper dashboard → {url}")
     print_info("Ctrl+C para detener el servidor")
-    print_info("game UI legacy disponible en /game")
+    print_info("legacy UI disponible en /legacy")
     if open_browser:
         try:
             webbrowser.open(url)

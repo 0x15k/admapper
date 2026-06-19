@@ -1,4 +1,4 @@
-"""Normalize admapper CLI output for the game terminal (learner-friendly)."""
+"""Normalize admapper CLI output for the dashboard terminal (learner-friendly)."""
 
 from __future__ import annotations
 
@@ -49,9 +49,6 @@ _SUPPRESS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"^→ Credentials:",
         r"^→ workspace:",
         r"^✓  owned marcado:",
-        r"^✓  LDAP:",
-        r"^✓  SMB shares:",
-        r"^!  SMB parcial:",
         r"^✓ pivot →",
         r"^→ grafo → file://",
         r"^✓  log exploit →",
@@ -96,7 +93,7 @@ _DEDUPE_WINDOW = 12
 
 
 @dataclass
-class GameTerminalFilter:
+class TerminalFilter:
     """Stream filter: strip noise, dedupe, fold auth-verify retries."""
 
     _recent: list[str] = field(default_factory=list)

@@ -6,7 +6,7 @@ Canonical AD pentest phase model — merges the best of:
 - **CRTO** (Zero-Point): operator loop recon → pivot → execute → repeat
 - **MITRE ATT&CK**: tactic/technique tags per phase (not the primary spine)
 
-Game UI exposes a shortened GAME_PHASES view; CLI/reporting use UNIFIED_PHASES (P1–P12).
+Game UI exposes a shortened OPS_PHASES view; CLI/reporting use UNIFIED_PHASES (P1–P12).
 """
 
 from __future__ import annotations
@@ -187,8 +187,8 @@ UNIFIED_PHASES: tuple[PhaseDef, ...] = (
 
 
 @dataclass(frozen=True)
-class GamePhaseDef:
-    """Shortened bar for the game UI (learner-friendly)."""
+class PhaseDef:
+    """Shortened bar for the dashboard UI (learner-friendly)."""
 
     id: str
     code: str
@@ -200,8 +200,8 @@ class GamePhaseDef:
     detail: str
 
 
-GAME_PHASES: tuple[GamePhaseDef, ...] = (
-    GamePhaseDef(
+OPS_PHASES: tuple[PhaseDef, ...] = (
+    PhaseDef(
         "g02",
         "RECON",
         "Perímetro",
@@ -211,7 +211,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "ESCANEAR",
         "admapper scan -H <DC>",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g03",
         "IDENT",
         "Superficie de identidades",
@@ -221,7 +221,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "ENUM USUARIOS",
         "enum users (tras scan)",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g04",
         "CREDS",
         "Acceso a credenciales",
@@ -231,7 +231,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "VECTORES CREDS",
         "asreproast · kerberoast · spray",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g05",
         "FOOTHOLD",
         "Foothold",
@@ -241,7 +241,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "AUTENTICAR",
         "admapper run -u … -p …",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g06",
         "ENUM",
         "Enum de dominio",
@@ -251,7 +251,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "ENUMERAR",
         "start_auth",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g07",
         "PATHS",
         "Rutas de ataque",
@@ -261,7 +261,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "MAPEAR RUTAS",
         "paths · acls",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g08",
         "PRIVESC",
         "Escalada de privilegios",
@@ -271,7 +271,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "ESCALAR",
         "admapper exploit",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g09",
         "MOVE",
         "Lateral & coerción",
@@ -281,7 +281,7 @@ GAME_PHASES: tuple[GamePhaseDef, ...] = (
         "LATERAL",
         "postex · coerce",
     ),
-    GamePhaseDef(
+    PhaseDef(
         "g11",
         "DOMINATE",
         "Dominio",
@@ -364,11 +364,11 @@ def phase_status_from_workspace(ws_path: Path) -> dict[str, PhaseStatus]:
     }
 
 
-def game_phase_status(ws_path: Path) -> list[dict[str, Any]]:
-    """Build game UI phase bar from GAME_PHASES + workspace."""
+def ops_phase_status(ws_path: Path) -> list[dict[str, Any]]:
+    """Build dashboard UI phase bar from OPS_PHASES + workspace."""
     unified = phase_status_from_workspace(ws_path)
 
-    def game_st(gp: GamePhaseDef) -> PhaseStatus:
+    def phase_st(gp: PhaseDef) -> PhaseStatus:
         statuses = [unified.get(uid, "locked") for uid in gp.unified_ids]
         if all(s == "done" for s in statuses):
             return "done"
@@ -380,8 +380,8 @@ def game_phase_status(ws_path: Path) -> list[dict[str, Any]]:
 
     by_id = {p.id: p for p in UNIFIED_PHASES}
     out: list[dict[str, Any]] = []
-    for gp in GAME_PHASES:
-        st = game_st(gp)
+    for gp in OPS_PHASES:
+        st = phase_st(gp)
         primary = by_id[gp.unified_ids[0]]
         out.append(
             {
@@ -405,7 +405,7 @@ def game_phase_status(ws_path: Path) -> list[dict[str, Any]]:
 
 
 def build_study_map() -> list[dict[str, Any]]:
-    """CRTP / CRTE / CRTO cross-reference for the manual and game panel."""
+    """CRTP / CRTE / CRTO cross-reference for the manual and dashboard panel."""
     rows: list[dict[str, Any]] = []
     for ph in UNIFIED_PHASES:
         rows.append(
