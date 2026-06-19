@@ -127,7 +127,7 @@ def sync_time_to_dc(dc_ip: str, *, timeout: int = 30) -> tuple[bool, str]:
             if ok:
                 return True, detail
 
-    sntp_bin = _sntp_binary()
+    sntp_bin = _sntp_binary() if _sntp_available() else None
     if sntp_bin:
         ok, detail = _run_sync_command(
             ["sudo", sntp_bin, "-sS", dc_ip],
@@ -139,6 +139,7 @@ def sync_time_to_dc(dc_ip: str, *, timeout: int = 30) -> tuple[bool, str]:
             if offset:
                 detail += f" (offset {offset})"
             return True, detail
+        return False, f"sudo {sntp_bin} -sS {dc_ip} failed: {detail}"
 
     if is_macos():
         return False, "sntp not found — brew install does not apply; use system sntp"

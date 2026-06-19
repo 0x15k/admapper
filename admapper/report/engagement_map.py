@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from admapper.core.output import print_success, print_warning
+from admapper.core.output import print_info, print_success, print_warning
 from admapper.creds.auth_checks import load_protected_users
 from admapper.creds.common import (
     collect_gained_hashes,
@@ -544,8 +544,6 @@ def print_engagement_map(
             owned_users=owned_users,
             pivot_user=pivot_user,
         )
-        from admapper.core.output import print_info, print_success, print_warning
-
         for line in format_engagement_summary_lines(summary):
             if line.startswith("⚠"):
                 print_warning(line.removeprefix("⚠ ").strip())
