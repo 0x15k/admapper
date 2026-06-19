@@ -126,7 +126,7 @@ def run_auth_enumeration(
     users_store = UsersStore(session.workspaces, ws_name)
     if result.ldap.users:
         users_store.merge(result.ldap.users)
-    from admapper.intel.user_match import refresh_workspace_intel
+    from admapper.analysis.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(ws_path, users_store=users_store)
 

@@ -8,6 +8,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.worktrees/
 workspaces/
 *.local.json
 .DS_Store

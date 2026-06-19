@@ -8,13 +8,12 @@ from typing import Any
 
 from admapper.analysis.engagement_intel import build_engagement_intel
 from admapper.core.operator_setup import build_operator_setup
-from admapper.engagement import (
+from admapper.methodology.unified import (
     ENGAGEMENT_FRAMEWORK,
     build_study_map,
-    enum_highlights,
-    loot_clue_rows,
-    methodology_lines,
 )
+from admapper.report.engagement_map import loot_clue_rows
+from admapper.report.methodology import enum_highlights, methodology_lines
 from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth
 from admapper.report.engagement import _load_json
 from admapper.report.engagement_map import _acl_exploit_blocker
@@ -45,7 +44,7 @@ def _account_base(name: str) -> str:
 
 def _phase_status(ws_path: Path) -> list[dict[str, Any]]:
     """Unified AD chain (CRTP core) — shortened game bar."""
-    from admapper.engagement import game_phase_status
+    from admapper.methodology.unified import game_phase_status
 
     return game_phase_status(ws_path)
 

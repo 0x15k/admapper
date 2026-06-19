@@ -25,7 +25,7 @@ from admapper.core.game_mode import enable_game_mode, game_subprocess_env
 from admapper.graph.game_progress import GameProgress
 from admapper.graph.game_ui import build_game_html, build_game_payload
 from admapper.graph.terminal_filter import GameTerminalFilter
-from admapper.intel.user_match import refresh_workspace_intel
+from admapper.analysis.user_match import refresh_workspace_intel
 
 
 class GameContext:

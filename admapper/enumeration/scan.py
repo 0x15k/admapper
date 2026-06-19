@@ -124,7 +124,7 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
             )
 
     result.users = merged
-    from admapper.intel.user_match import refresh_workspace_intel
+    from admapper.analysis.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(session.workspaces.path_for(ws_name))
     asrep = [u for u in human_users if u.asrep_roastable]

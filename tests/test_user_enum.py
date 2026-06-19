@@ -5,9 +5,9 @@ from admapper.core.config import GlobalConfig
 from admapper.core.hosts import HostsStore
 from admapper.core.session import Session
 from admapper.core.workspace import WorkspaceManager
-from admapper.enum_pkg.ldap_users import LdapUserEnumResult
-from admapper.enum_pkg.samr import SamrEnumResult
-from admapper.enum_pkg.scan import run_user_enumeration
+from admapper.enumeration.ldap_users import LdapUserEnumResult
+from admapper.enumeration.samr import SamrEnumResult
+from admapper.enumeration.scan import run_user_enumeration
 from admapper.models.host import HostRecord
 from admapper.models.user import UserRecord, apply_uac_flags
 

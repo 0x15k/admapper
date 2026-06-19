@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from admapper.intel.user_match import build_user_intel
+from admapper.analysis.user_match import build_user_intel
 
 
 def test_user_match_loot_with_ldap(tmp_path: Path) -> None:

@@ -132,7 +132,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
     if cmd == "export":
         if not require_workspace(session):
             return True
-        from admapper.engagement import run_export
+        from admapper.report.export import run_export
 
         kind = args[0].lower() if args else "all"
         try:
