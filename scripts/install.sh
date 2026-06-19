@@ -179,11 +179,21 @@ _refresh_path() {
 install_pipx() {
     ensure_pipx
 
-    local args=(install --editable ".[${EXTRA}]")
-    [[ "$FORCE" -eq 1 ]] && args+=(--force)
+    # Auto-detect if already installed → upgrade instead of failing
+    local already_installed=0
+    if pipx list --short 2>/dev/null | grep -q '^admapper '; then
+        already_installed=1
+    fi
 
-    info "pipx ${args[*]}"
-    pipx "${args[@]}"
+    if [[ "$already_installed" -eq 1 ]] && [[ "$FORCE" -eq 0 ]]; then
+        info "admapper already installed via pipx — upgrading..."
+        pipx install --editable ".[${EXTRA}]" --force
+    else
+        local args=(install --editable ".[${EXTRA}]")
+        [[ "$FORCE" -eq 1 ]] && args+=(--force)
+        info "pipx ${args[*]}"
+        pipx "${args[@]}"
+    fi
 
     pipx ensurepath 2>/dev/null || true
     _refresh_path

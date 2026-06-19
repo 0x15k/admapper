@@ -37,10 +37,10 @@ dependencies = [
 
 [project.optional-dependencies]
 recon = [
-    "impacket>=0.12,<0.13",
+    "impacket>=0.12,<0.14",
 ]
 full = [
-    "impacket>=0.12,<0.13",
+    "impacket>=0.12,<0.14",
     "pypsrp>=0.8,<0.9",
     "gssapi>=1.8",
     "krb5>=0.5",
@@ -51,7 +51,7 @@ dev = [
     "pytest>=8.0,<9.0",
     "ruff>=0.9,<1.0",
     "bandit>=1.8,<2.0",
-    "impacket>=0.12,<0.13",
+    "impacket>=0.12,<0.14",
 ]
 
 [project.urls]
