@@ -60,9 +60,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 ::-webkit-scrollbar-thumb{{background:var(--border-light);border-radius:3px}}
 
 /* ── Layout ───────────────────────────────────────────────── */
-.app{{display:grid;grid-template-rows:auto 1fr auto;height:100vh}}
+.app{{display:flex;flex-direction:column;height:100vh;overflow:hidden}}
 .header{{
-  display:flex;align-items:center;gap:1rem;
+  display:flex;align-items:center;gap:1rem;flex-shrink:0;
   padding:0.5rem 1rem;background:var(--bg-panel);border-bottom:1px solid var(--border);
   z-index:10;
 }}
@@ -77,9 +77,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .status-idle{{background:#14532d;color:#86efac}}
 .status-running{{background:#713f12;color:#fde68a}}
 
-.main{{display:grid;grid-template-columns:1fr 320px;overflow:hidden}}
-.graph-area{{position:relative;background:var(--bg-dark)}}
-#graph-canvas{{width:100%;height:100%}}
+.main{{display:grid;grid-template-columns:1fr 320px;flex:1;min-height:0;overflow:hidden}}
+.graph-area{{position:relative;background:var(--bg-dark);overflow:hidden}}
+#graph-canvas{{position:absolute;top:0;left:0;right:0;bottom:0}}
 .graph-controls{{
   position:absolute;top:0.75rem;left:0.75rem;display:flex;gap:0.4rem;z-index:5;
 }}
@@ -219,8 +219,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media(max-width:900px){{
-  .main{{grid-template-columns:1fr}}
-  .sidebar{{max-height:40vh;border-left:none;border-top:1px solid var(--border)}}
+  .main{{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+  .graph-area{{min-height:300px}}
+  .sidebar{{max-height:40vh;border-left:none;border-top:1px solid var(--border);overflow-y:auto}}
 }}
 </style>
 </head>
@@ -630,13 +631,24 @@ function renderGraph(graphData) {{
       nodes: new vis.DataSet(nodes),
       edges: new vis.DataSet(edges),
     }});
+    network.fit();
     return;
   }}
+
+  /* Force container to have a concrete pixel size for vis-network */
+  const graphArea = container.parentElement;
+  const w = graphArea.clientWidth;
+  const h = graphArea.clientHeight;
+  container.style.width = w + 'px';
+  container.style.height = h + 'px';
 
   network = new vis.Network(container, {{
     nodes: new vis.DataSet(nodes),
     edges: new vis.DataSet(edges),
   }}, {{
+    width: w + 'px',
+    height: h + 'px',
+    autoResize: false,
     physics: {{
       stabilization: {{ iterations: 150 }},
       barnesHut: {{ gravitationalConstant: -6000, springLength: 180 }},
@@ -663,7 +675,21 @@ function renderGraph(graphData) {{
     network.setOptions({{ physics: false }});
     physicsOn = false;
     document.getElementById('btn-physics').textContent = 'Physics: Off';
+    network.fit();
   }});
+
+  /* Resize observer — keeps graph fitted when window resizes */
+  const ro = new ResizeObserver(() => {{
+    if (!network) return;
+    const rw = graphArea.clientWidth;
+    const rh = graphArea.clientHeight;
+    container.style.width = rw + 'px';
+    container.style.height = rh + 'px';
+    network.setSize(rw + 'px', rh + 'px');
+    network.redraw();
+    network.fit();
+  }});
+  ro.observe(graphArea);
 
   // Click node to pivot
   network.on('click', (params) => {{
