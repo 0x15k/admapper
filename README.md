@@ -1,173 +1,158 @@
 # ADMapper
 
-Herramienta CLI de pentesting Active Directory — **paquete Python** multiplataforma (macOS, Linux, Windows). Inspirada en [ADScan](https://github.com/ADScanPro/adscan), reconstruida con arquitectura modular.
+**All-in-one Active Directory pentesting toolkit.** Enumerate, attack, and own AD environments from a single CLI. Built for OSCP, HTB, and real engagements.
 
-No es un binario nativo: `pip install` + comando `admapper`. El núcleo (LDAP, DNS, spray, workspaces) es Python puro; Impacket y hashcat son capas opcionales. Ver **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)**.
+> Python 3.11+ | macOS, Linux, Windows | No GUI required
 
-## Estado
+## Features
 
-✅ **Fase 14 completada** — Fase 15 (MSSQL) en curso
+- **Full AD enumeration** — users, groups, computers, GPOs, trusts, ACLs, SPNs, LAPS
+- **Kerberos attacks** — AS-REP roasting, Kerberoasting, delegation abuse, Golden/Silver tickets
+- **AD CS exploitation** — ESC1-ESC14 detection and exploitation
+- **Credential attacks** — password spraying, DCSync, LAPS dump, shadow credentials
+- **Lateral movement** — WMI, PSExec, SMB, DCOM, AT exec, NTLM relay
+- **Privilege escalation** — RBCD, GPO abuse, trust exploitation, persistence
+- **Automated pipeline** — `admapper run` chains recon + attack + escalation in one command
+- **Guided exploitation** — each finding includes step-by-step exploitation guides
+- **OSCP-ready** — works offline, exports to JSON/Navigator/HTML
 
-## Documentación
-
-El plan completo del proyecto, fases, técnicas y backlog está en:
-
-**[docs/PROJECT.md](docs/PROJECT.md)**
-
-## Plataformas soportadas
-
-| SO | Estado | Notas |
-|---|---|---|
-| **macOS** | ✅ soportado | Desarrollo principal; Homebrew + venv; busca `/opt/homebrew/bin` |
-| **Linux** | ✅ soportado | Kali/Parrot/Debian — rutas estándar de wordlists |
-| **Windows** | ✅ soportado | PowerShell + venv; resuelve `.venv\Scripts\` y `Program Files` |
-
-Requisitos: **Python 3.11+**. Config: `~/.admapper/` (macOS/Linux) o `%USERPROFILE%\.admapper\` (Windows).
-
-- **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** — qué funciona en cada SO y por qué  
-- **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — instalación paso a paso
-
-## Instalación
-
-El CLI se registra en `pyproject.toml` → `[project.scripts] admapper` (equivalente moderno a `setup.py` entry_points). **No hace falta `setup.py`.**
-
-### Instalación recomendada (comando global, sin venv)
-
-Una vez, desde la raíz del repo:
+## Quick Start
 
 ```bash
-cd admapper
+# Install (macOS / Linux / Kali)
+git clone https://github.com/0x15k/admapper.git && cd admapper
 ./scripts/install.sh
-# o: make install
+
+# Or one-liner:
+curl -sSL https://raw.githubusercontent.com/0x15k/admapper/main/scripts/install.sh | bash
+
+# Windows (PowerShell)
+.\scripts\install.ps1
 ```
 
-Eso usa **pipx**: `admapper` queda en PATH en **todas** las terminales — sin `source .venv/bin/activate`.
-
-Si `pipx` no está instalado, el script lo instala (Homebrew en macOS). Tras instalar, reinicia la terminal o `source ~/.zshrc`.
+After install, `admapper` is available globally (via pipx):
 
 ```bash
-admapper version
-admapper run -H 10.129.245.130 -u user -p 'pass' --full
+# Full automated engagement — just IP + creds
+admapper run -H 10.10.10.100 -u john -p 'Password1!'
+
+# Check installation health
+admapper doctor
 ```
 
-Herramientas externas (opcionales, aparte):
+## Usage
+
+### Automated Mode (recommended)
 
 ```bash
-# macOS (Rust required — see NetExec wiki)
-brew install rust
-# pipx usa Python 3.14 por defecto; aardwolf/PyO3 solo soporta hasta 3.13:
-brew install python@3.13
-pipx install --python python3.13 git+https://github.com/Pennyw0rth/NetExec
-# alternativa si quieres quedarte en 3.14:
-# PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 pipx install git+https://github.com/Pennyw0rth/NetExec
+# Full pipeline: recon → attack → escalation
+admapper run -H <DC_IP> -u <user> -p '<pass>'
 
-# Linux / fallback
-pipx install netexec
-
-brew install hashcat john-jumbo   # macOS
+# Specify domain explicitly (optional — auto-detected)
+admapper run -H 10.10.10.100 -u admin -p 'P@ss' -d corp.local
 ```
 
-NetExec en macOS: [installation-for-mac](https://www.netexec.wiki/getting-started/installation/installation-for-mac)
-
-### Instalación desarrollo (venv)
-
-```bash
-./scripts/install.sh --venv
-# o: make install-venv
-source .venv/bin/activate
-```
-
-Con extras de test/lint: `./scripts/install.sh --dev` o `make install-dev`.
-
-**Windows:** `.\scripts\install.ps1` (venv) o `pipx install --editable ".[full]"` para global.
-
-No ejecutes `python3 admapper/cli/run.py` — módulo interno. Usa `admapper` o `python3 -m admapper`.
-
-Engagement sin shell — **solo IP + credenciales** (dominio y DC se infieren en `start_unauth`):
-
-```bash
-admapper run -H 10.129.245.130 -u wallace.everette -p 'Welcome2026@' --full
-```
-
-El dominio se deduce de LDAP RootDSE (`DC=…`), PTR o DNS. `-w` y `-d` son opcionales (override).
-
-Dependencias: **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)**
-
-**macOS (Homebrew):**
-
-```bash
-brew install hashcat john-jumbo
-pip install -e ".[recon]"    # impacket
-mkdir -p ~/.admapper/wordlists && cp rockyou.txt ~/.admapper/wordlists/
-```
-
-**Windows (PowerShell):**
-
-```powershell
-.\.venv\Scripts\activate
-pip install -e ".[dev,recon]"
-mkdir $env:USERPROFILE\.admapper\wordlists
-```
-
-Dentro del shell: `platform` — muestra SO, rutas y herramientas detectadas.
-
-## Uso rápido
+### Interactive Mode
 
 ```
+admapper
 (admapper)> set workspace lab
-(admapper:lab)> set domain forest.htb
-(admapper:lab:forest.htb)> set hosts 10.10.10.0/24
-(admapper:lab:forest.htb)> show
-(admapper:lab:forest.htb)> creds add alice Secret123!
-(admapper:lab:forest.htb)> start_unauth
-(admapper:lab:forest.htb)> enum users
-(admapper:lab:forest.htb)> asreproast
-(admapper:lab:forest.htb)> kerberoast
-(admapper:lab:forest.htb)> spray 'Winter2026!'
-(admapper:lab:forest.htb)> spray variations
-(admapper:lab:forest.htb)> creds verify <id>
-(admapper:lab:forest.htb)> start_auth
-(admapper:lab:forest.htb)> enum auth
-(admapper:lab:forest.htb)> paths
-(admapper:lab:forest.htb)> paths show path-001
-(admapper:lab:forest.htb)> acls
-(admapper:lab:forest.htb)> acls show acl-001
-(admapper:lab:forest.htb)> guide acl_abuse
-(admapper:lab:forest.htb)> kerberos
-(admapper:lab:forest.htb)> kerberos show krb-001
-(admapper:lab:forest.htb)> timeroast
-(admapper:lab:forest.htb)> guide kerberos_adv
-(admapper:lab:forest.htb)> adcs
-(admapper:lab:forest.htb)> adcs show adcs-001
-(admapper:lab:forest.htb)> guide adcs_esc
-(admapper:lab:forest.htb)> coerce
-(admapper:lab:forest.htb)> coerce show coerce-001
-(admapper:lab:forest.htb)> guide ntlm_relay
-(admapper:lab:forest.htb)> postex
-(admapper:lab:forest.htb)> postex show postex-001
-(admapper:lab:forest.htb)> guide postex_local
-(admapper:lab:forest.htb)> mssql
-(admapper:lab:forest.htb)> mssql show mssql-001
-(admapper:lab:forest.htb)> guide mssql_lateral
-(admapper:lab:forest.htb)> cves
-(admapper:lab:forest.htb)> cves show cve-001
-(admapper:lab:forest.htb)> cves exploit nopac
-(admapper:lab:forest.htb)> guide cves_exploit
-(admapper:lab:forest.htb)> export
-(admapper:lab:forest.htb)> export json
-(admapper:lab:forest.htb)> export navigator
+(admapper:lab)> set domain corp.local
+(admapper:lab:corp.local)> set hosts 10.10.10.100
+
+(admapper:lab:corp.local)> creds add john Password1!
+(admapper:lab:corp.local)> start_unauth         # DNS, null LDAP, AS-REP
+(admapper:lab:corp.local)> enum users            # LDAP user enumeration
+(admapper:lab:corp.local)> kerberoast            # Kerberoasting
+(admapper:lab:corp.local)> asreproast            # AS-REP roast
+(admapper:lab:corp.local)> spray 'Winter2026!'   # password spray
+
+(admapper:lab:corp.local)> start_auth            # authenticated enumeration
+(admapper:lab:corp.local)> enum auth             # full LDAP dump
+(admapper:lab:corp.local)> acls                  # dangerous ACLs
+(admapper:lab:corp.local)> paths                 # attack paths to DA
+(admapper:lab:corp.local)> adcs                  # AD CS vulnerabilities
+(admapper:lab:corp.local)> coerce                # NTLM coercion checks
+(admapper:lab:corp.local)> postex                # post-exploitation
+(admapper:lab:corp.local)> export                # export all findings
 ```
 
-Cada técnica muestra **guía de explotación manual** (prerequisitos, pasos, comandos) al final del scan — estilo BloodHound.
+## Installation Details
 
-Roast / SMB / GPP requieren: `pip install -e ".[recon]"` o `.[full]` (ver DEPENDENCIES.md)
+### Requirements
 
-## Estructura
+- **Python 3.11+**
+- **pipx** (installed automatically by the installer)
+
+### Dependency Tiers
+
+| Tier | What's included | Install |
+|------|----------------|---------|
+| **core** | LDAP, DNS, CLI (no Impacket) | `pip install .` |
+| **recon** | + Impacket (SMB, Kerberos, SAMR) | `pip install ".[recon]"` |
+| **full** | + certipy, pywhisker, WinRM, GSSAPI | `pip install ".[full]"` (default) |
+| **dev** | + pytest, ruff, bandit | `pip install ".[dev]"` |
+
+### Platform Support
+
+| OS | Status | Notes |
+|----|--------|-------|
+| **macOS** | Supported | Homebrew + pipx; primary dev platform |
+| **Linux** | Supported | Kali/Parrot/Debian — auto-handles PEP 668 |
+| **Windows** | Supported | PowerShell + pipx or venv |
+
+### Optional External Tools
+
+```bash
+# macOS
+brew install hashcat john-jumbo libfaketime
+pipx install netexec certipy-ad
+
+# Linux / Kali
+sudo apt install -y hashcat john
+pipx install netexec certipy-ad
+```
+
+## Make Targets
+
+```bash
+make help           # show all targets
+make install        # pipx global install
+make install-dev    # dev install with pytest/ruff
+make test           # run tests
+make lint           # ruff linter
+make format         # auto-format code
+make security       # bandit security scan
+make clean          # remove build artifacts
+make doctor         # check installation health
+```
+
+## Project Structure
 
 ```
 admapper/
-├── admapper/      # código fuente
-├── docs/          # documentación
-├── tests/         # tests
-└── workspaces/    # datos de engagement (gitignored)
+├── admapper/           # source code
+│   ├── cli/            # CLI entry point (typer)
+│   ├── recon/          # DNS, LDAP, SMB enumeration
+│   ├── analysis/       # attack path analysis
+│   ├── adcs/           # AD CS detection (ESC1-14)
+│   ├── exploit/        # exploitation engine
+│   ├── escalate/       # privilege escalation
+│   ├── graph/          # attack graph visualization
+│   └── report/         # export (JSON, Navigator, HTML)
+├── scripts/            # installers (sh, ps1)
+├── tests/              # test suite
+├── docs/               # documentation
+└── workspaces/         # engagement data (gitignored)
 ```
+
+## Documentation
+
+- **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** — platform-specific details
+- **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — step-by-step installation
+- **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** — dependency breakdown
+- **[docs/PROJECT.md](docs/PROJECT.md)** — project roadmap and phases
+
+## License
+
+Apache-2.0

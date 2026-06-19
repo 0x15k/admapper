@@ -1,3 +1,3 @@
-"""ADMapper — Active Directory mapping and pentesting."""
+"""ADMapper — all-in-one Active Directory pentesting toolkit."""
 
-__version__ = "0.1.32"
+__version__ = "0.2.0"

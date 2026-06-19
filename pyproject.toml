@@ -4,17 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "admapper"
-version = "0.1.32"
-description = "ADMapper — cross-platform Active Directory pentesting CLI (Python)"
+version = "0.2.0"
+description = "ADMapper — all-in-one Active Directory pentesting toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-authors = [{ name = "ADMapper Contributors" }]
-keywords = ["active-directory", "pentesting", "enumeration", "kerberoasting"]
+authors = [{ name = "0x15k" }]
+keywords = [
+    "active-directory", "pentesting", "red-team", "kerberoasting",
+    "dcsync", "bloodhound", "adcs", "lateral-movement", "oscp",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Environment :: Console",
     "Topic :: Security",
     "Operating System :: OS Independent",
@@ -23,27 +27,26 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    # CORE tier — LDAP/DNS/CLI without Impacket (see docs/COMPATIBILITY.md)
     "typer>=0.15,<1.0",
     "rich>=13.0,<14.0",
     "prompt-toolkit>=3.0,<4.0",
     "dnspython>=2.7,<3.0",
     "ldap3>=2.9,<3.0",
+    "networkx>=3.0",
 ]
 
 [project.optional-dependencies]
-# RECON tier — SMB/Kerberos/SAMR/GPP via Impacket (pip; same API on macOS/Linux/Windows)
 recon = [
     "impacket>=0.12,<0.13",
 ]
-# Recommended install for real engagements (alias of recon today)
 full = [
     "impacket>=0.12,<0.13",
     "pypsrp>=0.8,<0.9",
     "gssapi>=1.8",
     "krb5>=0.5",
+    "certipy-ad>=4.8",
+    "pywhisker>=0.1",
 ]
-# Developers: tests, lint, and recon extras together
 dev = [
     "pytest>=8.0,<9.0",
     "ruff>=0.9,<1.0",
@@ -51,9 +54,11 @@ dev = [
     "impacket>=0.12,<0.13",
 ]
 
+[project.urls]
+Homepage = "https://github.com/0x15k/admapper"
+Issues = "https://github.com/0x15k/admapper/issues"
+
 [project.scripts]
-# Registra el comando global `admapper` (pipx / pip install).
-# Instalación oficial: ./scripts/install.sh  (pipx, sin venv)
 admapper = "admapper.cli.main:main"
 
 [tool.hatch.build.targets.wheel]

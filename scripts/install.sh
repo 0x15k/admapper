@@ -1,219 +1,293 @@
 #!/usr/bin/env bash
-# ADMapper — instalación oficial (pipx = comando global sin activar venv)
+# ──────────────────────────────────────────────────────────────
+# ADMapper installer — macOS / Linux / Kali / WSL
+#
+# Usage:
+#   ./scripts/install.sh              pipx global install (recommended)
+#   ./scripts/install.sh --venv       local .venv install
+#   ./scripts/install.sh --dev        venv + dev extras (pytest/ruff)
+#   ./scripts/install.sh --force      force reinstall
+#   ./scripts/install.sh --uninstall  remove admapper
+#
+# One-liner (from GitHub):
+#   curl -sSL https://raw.githubusercontent.com/0x15k/admapper/main/scripts/install.sh | bash
+# ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+# ── Colors ──────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+ok()   { printf "${GREEN}[+]${NC} %s\n" "$*"; }
+info() { printf "${CYAN}[*]${NC} %s\n" "$*"; }
+warn() { printf "${YELLOW}[!]${NC} %s\n" "$*"; }
+err()  { printf "${RED}[x]${NC} %s\n" "$*" >&2; }
+die()  { err "$@"; exit 1; }
 
-validate_repo_layout() {
-  local missing=()
-  [[ -f "$ROOT/pyproject.toml" ]] || missing+=("pyproject.toml")
-  [[ -f "$ROOT/admapper/__init__.py" ]] || missing+=("admapper/__init__.py")
-  [[ -f "$ROOT/admapper/cli/main.py" ]] || missing+=("admapper/cli/main.py")
-  [[ -f "$ROOT/scripts/install.sh" ]] || missing+=("scripts/install.sh")
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "✗ Raíz de repo incompleta en: $ROOT" >&2
-    echo "  Faltan: ${missing[*]}" >&2
-    if [[ -f "$ROOT/../pyproject.toml" && -d "$ROOT/../admapper" ]]; then
-      echo "" >&2
-      echo "  Parece que estás dentro del paquete Python, no en la raíz del repo." >&2
-      echo "  Ejecuta desde:  cd $(cd "$ROOT/.." && pwd)" >&2
-      echo "  Luego:          ./scripts/install.sh" >&2
-    fi
-    exit 1
-  fi
-  mkdir -p "$ROOT/workspaces"
-}
+# ── Resolve repo root ──────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../pyproject.toml" ]]; then
+    ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+elif [[ -f "$(pwd)/pyproject.toml" ]]; then
+    ROOT="$(pwd)"
+else
+    ROOT=""
+fi
 
-validate_repo_layout
-
+# ── Parse args ──────────────────────────────────────────────────
 EXTRA="full"
 FORCE=0
 USE_VENV=0
+UNINSTALL=0
 
 usage() {
-  cat <<'EOF'
-ADMapper installer
+    printf "${BOLD}ADMapper Installer${NC}\n"
+    cat <<'EOF'
 
-Uso:
-  ./scripts/install.sh              Instala admapper globalmente con pipx ([full])
-  ./scripts/install.sh --dev        Incluye pytest/ruff ([dev])
-  ./scripts/install.sh --venv       Instala en .venv/ (desarrollo clásico)
-  ./scripts/install.sh --force      Reinstala si ya existe en pipx
-  ./scripts/install.sh --help
+Usage:
+  ./scripts/install.sh              Global install via pipx (recommended)
+  ./scripts/install.sh --venv       Local .venv install (development)
+  ./scripts/install.sh --dev        Dev mode (.venv + pytest + ruff)
+  ./scripts/install.sh --force      Force reinstall over existing
+  ./scripts/install.sh --uninstall  Remove admapper completely
 
-Tras pipx: source ~/.zprofile  (o terminal nueva)
-El comando queda en PATH:  admapper run -H <ip> -u <user> -p '<pass>' --full
+After install:
+  admapper --help
+  admapper run -H <DC_IP> -u <user> -p '<pass>'
+  admapper doctor
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dev) EXTRA="dev" ;;
-    --venv) USE_VENV=1 ;;
-    --force) FORCE=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Opción desconocida: $1" >&2; usage >&2; exit 1 ;;
-  esac
-  shift
+    case "$1" in
+        --dev)       EXTRA="dev"; USE_VENV=1 ;;
+        --venv)      USE_VENV=1 ;;
+        --force)     FORCE=1 ;;
+        --uninstall) UNINSTALL=1 ;;
+        -h|--help)   usage; exit 0 ;;
+        *)           die "Unknown option: $1  (use --help)" ;;
+    esac
+    shift
 done
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "✗ python3 no encontrado (requiere Python 3.11+)" >&2
-  exit 1
-fi
+# ── Python detection ───────────────────────────────────────────
+find_python() {
+    local py=""
+    for candidate in python3.13 python3.12 python3.11 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            py="$candidate"
+            break
+        fi
+    done
+    [[ -n "$py" ]] || die "Python 3.11+ not found. Install from https://python.org/downloads"
 
-PY_VER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-PY_MAJOR="${PY_VER%%.*}"
-PY_MINOR="${PY_VER#*.}"
-if [[ "$PY_MAJOR" -lt 3 ]] || [[ "$PY_MAJOR" -eq 3 && "$PY_MINOR" -lt 11 ]]; then
-  echo "✗ Python $PY_VER — se requiere 3.11+" >&2
-  exit 1
-fi
+    local ver major minor
+    ver="$($py -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    major="${ver%%.*}"
+    minor="${ver#*.}"
+    if [[ "$major" -lt 3 ]] || { [[ "$major" -eq 3 ]] && [[ "$minor" -lt 11 ]]; }; then
+        die "Python $ver found but 3.11+ is required"
+    fi
+    PYTHON="$py"
+    PYTHON_VER="$ver"
+    ok "Python $ver  ($PYTHON)"
+}
 
+# ── OS detection ────────────────────────────────────────────────
+detect_os() {
+    case "$(uname -s)" in
+        Darwin)              OS="macos" ;;
+        Linux)               OS="linux" ;;
+        MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
+        *)                   OS="linux" ;;
+    esac
+    # Detect Kali/Parrot specifically (PEP 668 workaround)
+    IS_KALI=0
+    if [[ "$OS" == "linux" ]] && [[ -f /etc/os-release ]]; then
+        if grep -qiE 'kali|parrot' /etc/os-release 2>/dev/null; then
+            IS_KALI=1
+        fi
+    fi
+    local detail="$(uname -m)"
+    [[ "$IS_KALI" -eq 1 ]] && detail="$detail, Kali/Parrot"
+    ok "Platform: $OS  ($detail)"
+}
+
+# ── Repo validation ────────────────────────────────────────────
+ensure_repo() {
+    if [[ -z "$ROOT" ]]; then
+        # One-liner mode: try to clone
+        if command -v git >/dev/null 2>&1; then
+            info "Not in repo — cloning from GitHub..."
+            local tmp="/tmp/admapper-install-$$"
+            git clone --depth 1 https://github.com/0x15k/admapper.git "$tmp"
+            ROOT="$tmp"
+        else
+            die "Not in admapper repo and git is not available"
+        fi
+    fi
+
+    cd "$ROOT"
+
+    # Validate layout
+    local missing=()
+    [[ -f pyproject.toml ]]          || missing+=("pyproject.toml")
+    [[ -d admapper ]]                || missing+=("admapper/")
+    [[ -f admapper/cli/main.py ]]    || missing+=("admapper/cli/main.py")
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        die "Incomplete repo at $ROOT — missing: ${missing[*]}"
+    fi
+
+    mkdir -p workspaces
+    ok "Repo: $ROOT"
+}
+
+# ── pipx management ────────────────────────────────────────────
 ensure_pipx() {
-  if command -v pipx >/dev/null 2>&1; then
-    return 0
-  fi
-  echo "→ pipx no encontrado — instalando…"
-  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-    brew install pipx
-    pipx ensurepath
-  else
-    python3 -m pip install --user pipx
-    python3 -m pipx ensurepath
-  fi
-  if ! command -v pipx >/dev/null 2>&1; then
-    echo "✗ pipx instalado pero no está en PATH." >&2
-    echo "  Ejecuta:  source ~/.zshrc   (o reinicia la terminal)" >&2
-    exit 1
-  fi
+    if command -v pipx >/dev/null 2>&1; then
+        ok "pipx found"
+        return 0
+    fi
+
+    info "Installing pipx..."
+    if [[ "$OS" == "macos" ]] && command -v brew >/dev/null 2>&1; then
+        brew install pipx 2>/dev/null || $PYTHON -m pip install --user --break-system-packages pipx 2>/dev/null || $PYTHON -m pip install --user pipx
+    elif [[ "$IS_KALI" -eq 1 ]]; then
+        sudo apt install -y pipx 2>/dev/null || $PYTHON -m pip install --user --break-system-packages pipx 2>/dev/null || $PYTHON -m pip install --user pipx
+    else
+        $PYTHON -m pip install --user pipx 2>/dev/null || $PYTHON -m pip install --user --break-system-packages pipx
+    fi
+
+    # Ensure PATH includes pipx bin dir
+    _refresh_path
+    pipx ensurepath 2>/dev/null || true
+    _refresh_path
+
+    command -v pipx >/dev/null 2>&1 || die "pipx installed but not in PATH. Restart terminal and retry."
+    ok "pipx ready"
 }
 
-install_venv() {
-  echo "→ Instalación en .venv/ (desarrollo)"
-  VENV="$ROOT/.venv"
-  if ! python3 -m venv "$VENV"; then
-    echo "✗ no se pudo crear venv — en Kali: sudo apt install -y python3-venv" >&2
-    exit 1
-  fi
-  VENV_PIP="$VENV/bin/pip"
-  VENV_ADMAPPER="$VENV/bin/admapper"
-  if [[ ! -x "$VENV_PIP" ]]; then
-    echo "✗ venv incompleto: falta $VENV_PIP" >&2
-    exit 1
-  fi
-  # Never use system pip on Kali (PEP 668) — always the venv binary.
-  "$VENV_PIP" install -U pip
-  "$VENV_PIP" install -e ".[${EXTRA}]"
-  echo ""
-  echo "✓ ADMapper en $VENV"
-  echo "  Activa en cada terminal:"
-  echo "    source $VENV/bin/activate"
-  echo "  Verifica que pip sea del venv (no debe fallar PEP 668):"
-  echo "    which pip    # → $VENV/bin/pip"
-  echo "    admapper scan --ip-dc <DC_IP>"
-  echo ""
-  "$VENV_ADMAPPER" doctor || true
+_refresh_path() {
+    export PATH="$HOME/.local/bin:$PATH"
+    if [[ "$OS" == "macos" ]]; then
+        local user_base
+        user_base="$($PYTHON -m site --user-base 2>/dev/null || true)"
+        [[ -n "$user_base" && -d "$user_base/bin" ]] && export PATH="$user_base/bin:$PATH"
+    fi
 }
 
-pipx_bin_dir() {
-  python3 -m site --user-base 2>/dev/null | awk '{print $0 "/bin"}'
-}
-
-ensure_path() {
-  # pipx ensurepath writes to ~/.zprofile (macOS zsh) or ~/.bashrc
-  pipx ensurepath >/dev/null 2>&1 || true
-  local bindir
-  bindir="$(pipx_bin_dir)"
-  if [[ -d "$bindir" ]]; then
-    export PATH="$bindir:$PATH"
-  fi
-}
-
-resolve_admapper_bin() {
-  if command -v admapper >/dev/null 2>&1; then
-    command -v admapper
-    return 0
-  fi
-  local bindir candidate
-  bindir="$(pipx_bin_dir)"
-  candidate="$bindir/admapper"
-  if [[ -x "$candidate" ]]; then
-    echo "$candidate"
-    return 0
-  fi
-  return 1
-}
-
+# ── Install: pipx (global) ─────────────────────────────────────
 install_pipx() {
-  ensure_pipx
-  ensure_path
+    ensure_pipx
 
-  local args=(install --editable ".[${EXTRA}]")
-  if [[ "$FORCE" -eq 1 ]]; then
-    args+=(--force)
-  fi
-  echo "→ pipx ${args[*]}"
-  pipx "${args[@]}"
+    local args=(install --editable ".[${EXTRA}]")
+    [[ "$FORCE" -eq 1 ]] && args+=(--force)
 
-  ensure_path
-  local admapper_bin bindir
-  admapper_bin="$(resolve_admapper_bin || true)"
-  bindir="$(pipx_bin_dir)"
+    info "pipx ${args[*]}"
+    pipx "${args[@]}"
 
-  echo ""
-  echo "✓ ADMapper instalado globalmente"
-  if [[ -n "$admapper_bin" ]]; then
-    echo "  Binario: $admapper_bin"
-    "$admapper_bin" version
-  fi
+    pipx ensurepath 2>/dev/null || true
+    _refresh_path
 
-  if ! command -v admapper >/dev/null 2>&1; then
     echo ""
-    echo "! El comando 'admapper' no está en PATH de esta terminal."
-    echo "  Ejecuta UNA de estas opciones:"
-    echo ""
-    echo "  1) Cargar PATH de pipx (recomendado):"
-    echo "       source ~/.zprofile"
-    echo "     o abre una terminal nueva."
-    echo ""
-    echo "  2) Añadir permanentemente a ~/.zshrc:"
-    echo "       echo 'export PATH=\"$bindir:\$PATH\"' >> ~/.zshrc"
-    echo "       source ~/.zshrc"
-    echo ""
-    echo "  3) Usar ruta completa ahora:"
-    echo "       $admapper_bin version"
-  fi
-
-  echo ""
-  echo "Herramientas externas recomendadas (no incluidas en pipx):"
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "  brew install rust               # requerido por NetExec en macOS"
-    echo "  # Python 3.14: usar 3.13 o forzar build PyO3 (aardwolf):"
-    echo "  brew install python@3.13"
-    echo "  pipx install --python python3.13 git+https://github.com/Pennyw0rth/NetExec"
-    echo "  # alternativa 3.14:"
-    echo "  PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 pipx install git+https://github.com/Pennyw0rth/NetExec"
-    echo "  # guía: https://www.netexec.wiki/getting-started/installation/installation-for-mac"
-  else
-    echo "  pipx install netexec          # nxc"
-  fi
-  echo "  brew install hashcat john-jumbo   # macOS"
-  echo "  brew install libfaketime          # macOS — Kerberos clock offset sin root"
-  echo ""
-  echo "Kerberos (cualquier engagement AD):"
-  echo "  admapper creds verify <id>        # detecta skew y sugiere sync con el DC"
-  echo "  admapper run ... --clock-skew '+7h'   # offset vía libfaketime si no puedes usar sudo"
-  echo ""
-  echo "Validar instalación:     admapper doctor"
-  if [[ -n "$admapper_bin" ]]; then
-    "$admapper_bin" doctor || true
-  fi
+    if command -v admapper >/dev/null 2>&1; then
+        ok "admapper installed globally!"
+        printf "  ${DIM}$(command -v admapper)${NC}\n"
+        admapper version 2>/dev/null || true
+    else
+        ok "admapper installed — restart your terminal or run:"
+        echo "  source ~/.zshrc   # zsh"
+        echo "  source ~/.bashrc  # bash"
+    fi
 }
 
-if [[ "$USE_VENV" -eq 1 ]]; then
-  install_venv
-else
-  install_pipx
-fi
+# ── Install: venv (local) ──────────────────────────────────────
+install_venv() {
+    local venv="$ROOT/.venv"
+    info "Creating venv at $venv"
+
+    if ! $PYTHON -m venv "$venv"; then
+        if [[ "$IS_KALI" -eq 1 ]]; then
+            warn "venv failed — trying: sudo apt install python3-venv"
+            sudo apt install -y python3-venv
+            $PYTHON -m venv "$venv" || die "venv creation failed"
+        else
+            die "venv creation failed"
+        fi
+    fi
+
+    "$venv/bin/pip" install -U pip -q
+    "$venv/bin/pip" install -e ".[${EXTRA}]"
+
+    echo ""
+    ok "admapper installed in $venv"
+    echo ""
+    echo "  Activate:  source $venv/bin/activate"
+    echo "  Then run:  admapper --help"
+}
+
+# ── Uninstall ───────────────────────────────────────────────────
+do_uninstall() {
+    info "Removing admapper..."
+    if command -v pipx >/dev/null 2>&1; then
+        pipx uninstall admapper 2>/dev/null && ok "Removed from pipx" || true
+    fi
+    if [[ -n "$ROOT" && -d "$ROOT/.venv" ]]; then
+        rm -rf "$ROOT/.venv"
+        ok "Removed .venv"
+    fi
+    ok "Uninstall complete"
+}
+
+# ── Post-install doctor + tips ──────────────────────────────────
+post_install() {
+    echo ""
+    printf "${BOLD}Recommended external tools:${NC}\n"
+    if [[ "$OS" == "macos" ]]; then
+        echo "  brew install hashcat john-jumbo libfaketime"
+        echo "  pipx install netexec certipy-ad"
+    else
+        echo "  sudo apt install -y hashcat john   # Kali/Debian"
+        echo "  pipx install netexec certipy-ad"
+    fi
+
+    echo ""
+    printf "${BOLD}Quick start:${NC}\n"
+    echo "  admapper run -H <DC_IP> -u <user> -p '<pass>'"
+    echo "  admapper doctor    # verify installation health"
+    echo ""
+
+    # Run doctor if available
+    if command -v admapper >/dev/null 2>&1; then
+        info "Running admapper doctor..."
+        admapper doctor 2>/dev/null || true
+    fi
+}
+
+# ── Main ───────────────────────────────────────────────────────
+main() {
+    echo ""
+    printf "${BOLD}  ADMapper Installer v0.2.0${NC}\n"
+    printf "${DIM}  All-in-one Active Directory pentesting toolkit${NC}\n"
+    echo "  ─────────────────────────────────────────────"
+    echo ""
+
+    if [[ "$UNINSTALL" -eq 1 ]]; then
+        do_uninstall
+        exit 0
+    fi
+
+    find_python
+    detect_os
+    ensure_repo
+    echo ""
+
+    if [[ "$USE_VENV" -eq 1 ]]; then
+        install_venv
+    else
+        install_pipx
+    fi
+
+    post_install
+}
+
+main
