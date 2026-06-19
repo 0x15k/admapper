@@ -3,9 +3,11 @@ from __future__ import annotations
 from admapper.adcs.catalog import esc_meta
 from admapper.adcs.constants import (
     AUTH_EKUS,
+    CT_FLAG_NO_SECURITY_EXTENSION,
     EDITF_ATTRIBUTESUBJECTALTNAME2,
     EKU_ANY_PURPOSE,
     EKU_CERT_REQUEST_AGENT,
+    IF_ENFORCEENCRYPTICERTREQUEST,
 )
 from admapper.models.adcs import AdcsFinding, CertificateTemplateRecord, EnrollmentServiceRecord
 
@@ -104,6 +106,35 @@ def detect_esc_vulnerabilities(
                 )
             )
 
+        # ESC9 — CT_FLAG_NO_SECURITY_EXTENSION + auth EKU
+        enrollment_flags = getattr(template, "enrollment_flags", 0) or 0
+        if (
+            enrollment_flags & CT_FLAG_NO_SECURITY_EXTENSION
+            and _has_auth_eku(template)
+        ):
+            findings.append(
+                _finding(
+                    "esc9",
+                    template=name,
+                    ca_name=default_ca,
+                    detail="CT_FLAG_NO_SECURITY_EXTENSION set + client auth EKU — "
+                           "exploitable with GenericWrite + weak StrongCertificateBindingEnforcement",
+                )
+            )
+
+        # ESC13 — issuance policy OID linked to group
+        issuance_policies = getattr(template, "issuance_policies", None) or []
+        if issuance_policies and _has_auth_eku(template):
+            findings.append(
+                _finding(
+                    "esc13",
+                    template=name,
+                    ca_name=default_ca,
+                    detail=f"issuance policy OID(s) present: {issuance_policies[:3]} — "
+                           "check msDS-OIDToGroupLink for effective group membership",
+                )
+            )
+
     # ESC3 chain hint
     if agent_templates and auth_templates:
         findings.append(
@@ -131,6 +162,16 @@ def detect_esc_vulnerabilities(
                     "esc6",
                     ca_name=service.name,
                     detail="CA policy EDITF_ATTRIBUTESUBJECTALTNAME2 enabled",
+                )
+            )
+        # ESC11 — RPC enrollment without encryption enforcement
+        if not (flags & IF_ENFORCEENCRYPTICERTREQUEST):
+            findings.append(
+                _finding(
+                    "esc11",
+                    ca_name=service.name,
+                    detail=f"IF_ENFORCEENCRYPTICERTREQUEST not set on {service.dns_host} — "
+                           "NTLM relay to MS-ICPR RPC interface possible",
                 )
             )
 

