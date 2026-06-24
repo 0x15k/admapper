@@ -77,6 +77,40 @@ admapper
 (admapper:lab:corp.local)> export                # export all findings
 ```
 
+### Operational Methodology
+
+ADMapper follows a dependency-driven pipeline so every step has context before moving on:
+
+1. **Discovery** — `set hosts` → `start_unauth`
+2. **Inventory** — `enum users`
+3. **Credential validation** — `creds add` → `creds verify`
+4. **Auth collection** — `start_auth` → `enum auth` → `acls` → `adcs` → `coerce` → `mssql`
+5. **Attack execution** — `asreproast`, `kerberoast`, `spray`, `exploit`
+6. **Pivoting / post-exploitation** — `pivot`, `winrm`, `postex`
+7. **Synthesis** — `paths`, `brief`, `export`
+
+### Web UI parity
+
+The web dashboard is a frontend for the CLI engine. Each GUI control maps to the same CLI command:
+
+| GUI | CLI |
+|---|---|
+| Scan | `set hosts` + `start_unauth` |
+| Authenticate | `creds add` + `creds verify` + `start_auth` |
+| Enum Users | `enum users` |
+| AS-REP Roast | `asreproast` |
+| Kerberoast | `kerberoast` |
+| Spray | `spray <password>` |
+| ACLs | `acls` |
+| ADCS | `adcs` |
+| Coerce | `coerce` |
+| Exploit | `exploit` |
+| Pivot | `pivot <user>` |
+| WinRM | `winrm <account>` |
+| Brief | `brief` |
+
+If a GUI action does not map to an existing CLI command, it should not exist as a separate implementation.
+
 ## Installation Details
 
 ### Requirements

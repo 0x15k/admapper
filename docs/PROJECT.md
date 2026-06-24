@@ -24,6 +24,67 @@ DNS/SRV → recon sin creds → inventario de usuarios → roast/spray →
 auth → colección LDAP/SMB → grafo → rutas de ataque → explotación guiada
 ```
 
+### Metodología operativa real
+
+La herramienta sigue un orden de dependencias pensado para no saltarse contexto:
+
+1. **Bootstrap / discovery**
+   - `set hosts <dc>`
+   - `start_unauth`
+   - Descubre dominio, DC, puertos, LDAP anónimo, SMB, SPNs, GMSA y señales iniciales.
+2. **Recon de usuarios**
+   - `enum users`
+   - Consolida inventario humano + cuentas de servicio + señales de roast.
+3. **Credenciales**
+   - `creds add`
+   - `creds verify`
+   - `asreproast`, `kerberoast`, `spray`
+4. **Autenticación / colección ampliada**
+   - `start_auth`
+   - `enum auth`
+   - `acls`
+   - `adcs`
+   - `coerce`
+   - `mssql`
+5. **Pivot / post-exploitation**
+   - `exploit`
+   - `pivot`
+   - `winrm`
+   - `postex`
+6. **Síntesis**
+   - `paths`
+   - `brief`
+   - `export`
+
+### Mapeo CLI ↔ GUI
+
+La web es solo frontend del motor CLI. Debe reflejar el mismo orden:
+
+| GUI | CLI real |
+|---|---|
+| `Scan` | `set hosts` + `start_unauth` |
+| `Authenticate` | `creds add` + `creds verify` + `start_auth` |
+| `Enum Users` | `enum users` |
+| `AS-REP Roast` | `asreproast` |
+| `Kerberoast` | `kerberoast` |
+| `Spray` | `spray <password>` |
+| `ACLs` | `acls` |
+| `ADCS` | `adcs` |
+| `Coerce` | `coerce` |
+| `Exploit` | `exploit` |
+| `Pivot` | `pivot <user>` |
+| `WinRM` | `winrm <account>` |
+| `Brief` | `brief` |
+
+### Criterio de coherencia
+
+Para considerar que CLI y GUI están alineados, cada acción web debe:
+
+- invocar el mismo comando del CLI;
+- persistir el mismo workspace;
+- producir los mismos artefactos (`users.json`, `credentials.json`, `graph.json`, `paths.json`, `findings.json`);
+- reflejar el mismo progreso visual sin re-implementar la técnica en la web.
+
 ---
 
 ## 2. Decisión de lenguaje
