@@ -1,4 +1,4 @@
-"""Game UI auth — verify one credential only; no start_auth / analyst chain."""
+"""Dashboard UI credential verification."""
 
 from __future__ import annotations
 

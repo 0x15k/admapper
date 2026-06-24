@@ -56,6 +56,7 @@ class DashboardContext:
         self.workspace = workspace
         self.domain = domain
         self.owned_users = list(owned_users)
+        self._initial_owned_users = list(owned_users)
         self.pivot_user = pivot_user
         self.host = host
         self.events: queue.Queue[dict[str, Any]] = queue.Queue()
@@ -75,7 +76,11 @@ class DashboardContext:
     def refresh_payload(self) -> dict[str, Any]:
         refresh_workspace_intel(self.ws_path)
         self.progress = OpsProgress.load(self.ws_path)
-        self.owned_users = list(self.progress.owned_users)
+        # Keep initial owned/pivot context even if ops_progress file is empty.
+        file_owned = set(self.progress.owned_users)
+        initial_owned = {u.lower() for u in (self._initial_owned_users or [])}
+        merged_owned = sorted(file_owned | initial_owned, key=str.lower)
+        self.owned_users = list(merged_owned)
         if self.pivot_user and self.pivot_user.lower() not in {
             u.lower() for u in self.owned_users
         }:

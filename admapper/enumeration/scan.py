@@ -5,6 +5,9 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from admapper.auth.ldap_enum import enumerate_ldap_authenticated
+from admapper.auth.ldap_session import open_ldap_session
+from admapper.core.credentials import CredentialStore
 from admapper.core.findings import FindingsStore
 from admapper.core.hosts import HostsStore
 from admapper.core.output import print_info, print_success, print_table, print_warning
@@ -13,6 +16,7 @@ from admapper.enumeration.ldap_users import enumerate_users_ldap
 from admapper.enumeration.rid_cycle import cycle_rids
 from admapper.enumeration.samr import enumerate_users_samr
 from admapper.guides.render import print_manual_guides_for_keys
+from admapper.models.credential import CredentialStatus
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.user import UserRecord
 
@@ -56,6 +60,44 @@ def _sensitive_descriptions(users: list[UserRecord]) -> list[UserRecord]:
     return flagged
 
 
+def _valid_domain_credential(session: Session) -> tuple[str | None, str | None]:
+    """Return (domain, credential_id) for the first valid credential if any."""
+    if session.workspace is None:
+        return None, None
+    cred_store = CredentialStore(session.workspaces, session.workspace.name)
+    for cred in cred_store.list():
+        if cred.status == CredentialStatus.VALID and cred.secret:
+            return cred.domain or session.workspace.domain, cred.id
+    return None, None
+
+
+def _enumerate_with_auth(session: Session, host: str) -> list[UserRecord] | None:
+    domain, cred_id = _valid_domain_credential(session)
+    if not domain or not cred_id:
+        return None
+    cred_store = CredentialStore(session.workspaces, session.workspace.name)
+    cred = next((c for c in cred_store.list() if c.id == cred_id), None)
+    if cred is None:
+        return None
+    session_obj, err = open_ldap_session(
+        host,
+        cred,
+        domain,
+        ws_path=str(session.workspaces.path_for(session.workspace.name)),
+    )
+    if session_obj is None or err:
+        print_warning(f"authenticated LDAP enum failed on {host}: {err}")
+        return None
+    try:
+        result = enumerate_ldap_authenticated(session_obj)
+        if result.errors:
+            for e in result.errors:
+                print_warning(f"auth enum: {e}")
+        return result.users
+    finally:
+        session_obj.close()
+
+
 def run_user_enumeration(session: Session) -> UserEnumResult:
     """P03 Identity surface — enumerate AD users from SAMR, LDAP, and RID cycling."""
     if session.workspace is None:
@@ -79,15 +121,22 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
 
     for host in targets:
         print_info(f"LDAP user enum: {host}")
-        ldap_result = enumerate_users_ldap(host)
-        if ldap_result.error:
-            result.errors.append(f"ldap:{host}: {ldap_result.error}")
-            print_warning(f"LDAP enum failed on {host}: {ldap_result.error}")
-        elif ldap_result.users:
-            result.sources_used.append("ldap")
+        auth_users = _enumerate_with_auth(session, host)
+        if auth_users is not None:
+            result.sources_used.append("ldap_auth")
             guides_to_show.append("ldap_user_enum")
-            collected.extend(ldap_result.users)
-            print_success(f"LDAP: {len(ldap_result.users)} user(s) from {host}")
+            collected.extend(auth_users)
+            print_success(f"LDAP auth: {len(auth_users)} user(s) from {host}")
+        else:
+            ldap_result = enumerate_users_ldap(host)
+            if ldap_result.error:
+                result.errors.append(f"ldap:{host}: {ldap_result.error}")
+                print_warning(f"LDAP enum failed on {host}: {ldap_result.error}")
+            elif ldap_result.users:
+                result.sources_used.append("ldap")
+                guides_to_show.append("ldap_user_enum")
+                collected.extend(ldap_result.users)
+                print_success(f"LDAP: {len(ldap_result.users)} user(s) from {host}")
 
         print_info(f"SAMR user enum: {host}")
         samr_result = enumerate_users_samr(host)
@@ -129,6 +178,7 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
     refresh_workspace_intel(session.workspaces.path_for(ws_name))
     asrep = [u for u in human_users if u.asrep_roastable]
     kerb = [u for u in human_users if u.kerberoastable]
+    gmsa = [u for u in merged if u.is_machine_account and "msa" in (u.sources or [])]
     sensitive = _sensitive_descriptions(human_users)
 
     findings: list[Finding] = [
@@ -141,6 +191,17 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
             mitre_id="T1087.002",
         )
     ]
+    if gmsa:
+        findings.append(
+            Finding(
+                key="managed_service_accounts",
+                title=f"Managed service accounts ({len(gmsa)})",
+                severity=FindingSeverity.INFO,
+                source="enum_users",
+                detail=", ".join(u.username for u in gmsa),
+                mitre_id="T1078",
+            )
+        )
     if asrep:
         findings.append(
             Finding(
@@ -204,6 +265,8 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
                 "sources_used": sorted(set(result.sources_used)),
                 "human_count": len(human_users),
                 "total_count": len(merged),
+                "gmsa_count": len(gmsa),
+                "gmsa_accounts": [u.username for u in gmsa],
                 "asrep_roastable": [u.username for u in asrep],
                 "kerberoastable": [u.username for u in kerb],
                 "errors": result.errors,

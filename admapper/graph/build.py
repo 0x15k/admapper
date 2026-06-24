@@ -52,6 +52,9 @@ def _ensure_user_nodes_from_inventory(
                 "dn": user.get("dn"),
                 "owned": username.lower() in owned_users,
                 "labels": ["owned"] if username.lower() in owned_users else [],
+                "kerberoastable": user.get("kerberoastable"),
+                "asrep_roastable": user.get("asrep_roastable"),
+                "enabled": user.get("enabled"),
             }
         )
         existing.add(node_id)
@@ -111,6 +114,28 @@ def enrich_graph_from_inventory(
                 {
                     "id": edge_id,
                     "source": member_id,
+                    "target": group_id,
+                    "type": "member_of",
+                }
+            )
+            edge_ids.add(edge_id)
+
+    for user in inventory.get("users", []):
+        username = str(user.get("username", ""))
+        if not username:
+            continue
+        user_id = f"user:{username.lower()}@{domain.lower()}"
+        for group_dn in user.get("member_of") or []:
+            group_id = dn_map.get(str(group_dn).lower())
+            if not group_id:
+                continue
+            edge_id = f"{user_id}->member_of->{group_id}"
+            if edge_id in edge_ids:
+                continue
+            edges.append(
+                {
+                    "id": edge_id,
+                    "source": user_id,
                     "target": group_id,
                     "type": "member_of",
                 }

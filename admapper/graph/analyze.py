@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from admapper.core.graph import GraphStore
 from admapper.core.output import print_info, print_success, print_table, print_warning
 from admapper.graph.build import enrich_graph_from_inventory, node_display_name
+from admapper.graph.opportunity_paths import build_opportunity_paths
 from admapper.graph.paths import AttackPath, find_attack_paths
 from admapper.graph.quick_wins import QuickWin, collect_quick_wins
 from admapper.guides.render import print_manual_guide
@@ -73,6 +74,10 @@ def run_graph_analysis(session: Session) -> GraphAnalysisResult:
 
     nodes_by_id = {str(n["id"]): n for n in graph.get("nodes", [])}
     paths = find_attack_paths(graph)
+    opp_paths = build_opportunity_paths(
+        graph, ws_path, domain=domain, path_offset=len(paths)
+    )
+    paths = paths + [p.to_attack_path() for p in opp_paths]
     quick_wins = collect_quick_wins(session.workspaces, ws_name)
 
     paths_file = ws_path / "paths.json"

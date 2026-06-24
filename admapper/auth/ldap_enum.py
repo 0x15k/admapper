@@ -55,6 +55,27 @@ def _search(session: LdapSession, filter_query: str, attributes: list[str]) -> l
     return list(session.conn.entries)
 
 
+def _user_from_entry(entry, sources: list[str]) -> UserRecord | None:
+    username = _attr_str(entry, "sAMAccountName") or ""
+    if not username:
+        return None
+    uac_raw = entry.userAccountControl.value if entry.userAccountControl else None
+    uac = int(uac_raw) if uac_raw is not None else None
+    spns = _attr_list(entry, "servicePrincipalName")
+    user = apply_uac_flags(
+        UserRecord(
+            username=username,
+            sources=list(sources),
+            description=_attr_str(entry, "description"),
+            dn=_attr_str(entry, "distinguishedName"),
+            uac=uac,
+            spns=spns,
+            member_of=_attr_list(entry, "memberOf"),
+        )
+    )
+    return user
+
+
 def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
     """Phase 8.1–8.2, 8.6, 8.7 — authenticated LDAP inventory."""
     result = LdapAuthEnumResult()
@@ -73,26 +94,35 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 "adminCount",
             ],
         ):
-            username = _attr_str(entry, "sAMAccountName") or ""
-            if not username:
+            user = _user_from_entry(entry, ["ldap_auth"])
+            if not user:
                 continue
-            uac_raw = entry.userAccountControl.value if entry.userAccountControl else None
-            uac = int(uac_raw) if uac_raw is not None else None
-            spns = _attr_list(entry, "servicePrincipalName")
-            user = apply_uac_flags(
-                UserRecord(
-                    username=username,
-                    sources=["ldap_auth"],
-                    description=_attr_str(entry, "description"),
-                    dn=_attr_str(entry, "distinguishedName"),
-                    uac=uac,
-                    spns=spns,
-                )
-            )
             result.users.append(user)
-            _collect_delegation_user(entry, username, "user", result)
+            _collect_delegation_user(entry, user.username, "user", result)
     except Exception as exc:
         result.errors.append(f"users: {exc}")
+
+    try:
+        for entry in _search(
+            session,
+            "(|(objectClass=msDS-GroupManagedServiceAccount)(objectClass=msDS-ManagedServiceAccount))",
+            [
+                "sAMAccountName",
+                "userAccountControl",
+                "servicePrincipalName",
+                "description",
+                "distinguishedName",
+                "memberOf",
+                "adminCount",
+            ],
+        ):
+            user = _user_from_entry(entry, ["ldap_auth", "msa"])
+            if not user:
+                continue
+            result.users.append(user)
+            _collect_delegation_user(entry, user.username, "user", result)
+    except Exception as exc:
+        result.errors.append(f"msa: {exc}")
 
     try:
         for entry in _search(

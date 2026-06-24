@@ -530,7 +530,7 @@ def build_ops_html(
     .mission-card h2 {{ font-size: 0.7rem; letter-spacing: 0.14em; color: var(--warn); margin-bottom: 0.4rem; }}
     .mission-card .mission-title {{ font-size: 0.95rem; font-weight: 700; margin-bottom: 0.35rem; }}
     .mission-card .mission-reward {{ font-size: 0.72rem; color: var(--owned); margin-top: 0.5rem; }}
-    .mission-card .mission-reward::before {{ content: 'RECOMPENSA: '; color: var(--muted); }}
+    .mission-card .mission-reward::before {{ content: 'IMPACTO: '; color: var(--muted); }}
     .mission-btn {{
       border-color: var(--warn);
       color: var(--warn);
@@ -800,6 +800,11 @@ def build_ops_html(
     function getDisplayQuests() {{
       if (isInspectingOther()) return [];
       return (OPS.quests || []).filter(q => q.verified);
+    }}
+
+    function getDisplayAttackPaths() {{
+      if (isInspectingOther()) return [];
+      return OPS.attack_paths || [];
     }}
 
     function showUiToast(msg, ok) {{
@@ -1521,7 +1526,7 @@ def build_ops_html(
       }}
 
       if (g.stage === 'need_creds' && g.engagement_over) {{
-        html += `<p class="hl" style="color:var(--danger)">${{g.engagement_over_message || 'Sin credenciales no hay juego.'}}</p>`;
+        html += `<p class="hl" style="color:var(--danger)">${{g.engagement_over_message || 'No credentials available. Add a valid credential to continue the engagement.'}}</p>`;
       }}
 
       const lens = getDisplayLens();
@@ -1920,6 +1925,17 @@ def build_ops_html(
         quests.forEach(q => {{
           const st = q.enabled ? 'verificado' : 'bloqueado';
           html += noteKv(`${{q.principal}}`, `${{q.technique}} → ${{q.target}} (${{st}})`, q.enabled ? 'ok' : 'warn');
+        }});
+      }}
+      const attackPaths = getDisplayAttackPaths();
+      if (attackPaths.length && !isInspectingOther()) {{
+        html += '<div class="note-block-label">Caminos de ataque</div>';
+        attackPaths.slice(0, 10).forEach(p => {{
+          const sev = (p.impact === 'critical' ? 'danger' : (p.impact === 'high' ? 'warn' : ''));
+          html += noteKv(p.source_label || p.source, `${{p.target_label || p.target}} · ${{p.impact}}`, sev);
+          p.steps && p.steps.forEach(s => {{
+            html += noteKvIndent(s.edge_type, s.narrative || '', 'dim');
+          }});
         }});
       }}
       if (prog.exploit && hashes.length) {{

@@ -124,6 +124,10 @@ def _node_color(node: dict[str, Any], *, pivot: str, owned: set[str]) -> str:
         return "#f97316"
     if node.get("high_value"):
         return "#ef4444"
+    if node.get("kerberoastable"):
+        return "#ec4899"
+    if node.get("asrep_roastable"):
+        return "#a855f7"
     ntype = str(node.get("type", ""))
     if ntype == "computer":
         return "#6366f1"

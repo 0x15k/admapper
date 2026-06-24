@@ -301,6 +301,8 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div class="legend-item"><span class="legend-dot" style="background:var(--orange);border-radius:50%"></span>Pivot</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Owned</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>High-Value</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#ec4899"></span>Kerberoastable</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#a855f7"></span>AS-REP Roastable</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Group</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--indigo)"></span>Computer</div>
         <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span>gMSA</div>
@@ -536,7 +538,7 @@ function renderState(s) {{
   renderCredentials(s.creds || [], s.pth_sessions || []);
   renderHashes(s.pth_sessions || []);
   renderPaths(s.quests || [], s.objective || {{}});
-  renderFindings(s.highlights || [], s.engagement_intel || {{}});
+  renderFindings(s.findings || {{}}, s.highlights || [], s.engagement_intel || {{}});
   renderGraph(s.graph || {{}});
 }}
 
@@ -791,10 +793,19 @@ function renderPaths(quests, objective) {{
 }}
 
 /* ── Findings ─────────────────────────────────────────────── */
-function renderFindings(highlights, intel) {{
+function renderFindings(findingsData, highlights, intel) {{
   const el = document.getElementById('finding-list');
   el.innerHTML = '';
   const items = [];
+
+  const rawFindings = (findingsData.findings || findingsData.finding || []);
+  rawFindings.forEach(f => {{
+    const title = f.title || f.highlight || f.key || '';
+    if (!title) return;
+    let severity = (f.severity || 'medium').toLowerCase();
+    items.push({{title: title + (f.detail ? ' — ' + f.detail : ''), severity: severity}});
+  }});
+
   highlights.forEach(h => items.push({{title: h, severity: 'medium'}}));
   const sections = intel.sections || [];
   sections.forEach(sec => {{
@@ -802,8 +813,9 @@ function renderFindings(highlights, intel) {{
       if (item.highlight) items.push({{title: item.label || item.highlight, severity: item.severity || 'medium'}});
     }});
   }});
+
   document.getElementById('finding-count').textContent = items.length;
-  items.slice(0, 20).forEach(f => {{
+  items.slice(0, 30).forEach(f => {{
     const d = document.createElement('div');
     d.className = 'finding ' + (f.severity || 'medium');
     d.innerHTML = '<div class="title">' + escHtml(f.title) + '</div>';
@@ -827,12 +839,14 @@ function renderGraph(graphData) {{
     const isHV = n.group === 'highvalue';
     const isGroup = n.group === 'group';
     const isComputer = n.group === 'computer';
-    const isGmsa = n.group === 'gmsa';
+    const isKerberoastable = n.kerberoastable || n.group === 'kerberoastable';
+    const isAsrep = n.asrep_roastable || n.group === 'asrep';
+    const isUser = n.group === 'user' || (!isPivot && !isDC && !isOwned && !isHV && !isGroup && !isComputer && !isGmsa);
 
     /* Size by importance */
     let size = 12;
     if (isPivot) size = 26;
-    else if (isDC) size = 22;
+    else if (isDC || isKerberoastable || isAsrep) size = 20;
     else if (isHV) size = 18;
     else if (isOwned) size = 18;
     else if (isGroup) size = 14;
@@ -845,17 +859,23 @@ function renderGraph(graphData) {{
     else if (isGroup) shape = 'diamond';
     else if (isComputer) shape = 'square';
     else if (isGmsa) shape = 'triangle';
+    else if (isKerberoastable || isAsrep) shape = 'hexagon';
 
-    /* Colors - override backend colors for consistency */
-    let color = n.color || {{}};
+    /* Colors - honor backend first, then fallback */
+    const backendColor = n.color && (typeof n.color === 'string' ? n.color : n.color.background);
+    let color;
     if (isPivot) {{
       color = {{ background: '#f97316', border: '#fb923c', highlight: {{ background: '#fb923c', border: '#fdba74' }} }};
-    }} else if (isDC) {{
-      color = {{ background: '#22c55e', border: '#4ade80', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
     }} else if (isOwned) {{
       color = {{ background: '#22c55e', border: '#16a34a', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
+    }} else if (isDC) {{
+      color = {{ background: '#22c55e', border: '#4ade80', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
     }} else if (isHV) {{
       color = {{ background: '#ef4444', border: '#f87171', highlight: {{ background: '#f87171', border: '#fca5a5' }} }};
+    }} else if (backendColor === '#ec4899' || isKerberoastable) {{
+      color = {{ background: '#ec4899', border: '#f472b6', highlight: {{ background: '#f472b6', border: '#fbcfe8' }} }};
+    }} else if (backendColor === '#a855f7' || isAsrep) {{
+      color = {{ background: '#a855f7', border: '#c084fc', highlight: {{ background: '#c084fc', border: '#e9d5ff' }} }};
     }} else if (isGroup) {{
       color = {{ background: '#8b5cf6', border: '#a78bfa', highlight: {{ background: '#a78bfa', border: '#c4b5fd' }} }};
     }} else if (isComputer) {{

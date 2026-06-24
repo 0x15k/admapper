@@ -125,27 +125,29 @@ def _mission_from_edge(edge: EscalationEdge, *, workspace: str, pivot: str) -> d
     }
 
 
-def _tag_graph_missions(graph: dict[str, Any], quests: list[dict[str, Any]]) -> None:
-    """Link vis-network edges to verified missions for click-to-exploit."""
-    by_key = {
-        (q["technique"].lower(), q["target"].lower().rstrip("$"), str(q.get("principal", "")).lower()): q["id"]
-        for q in quests
-        if q.get("technique") and q.get("target") and q.get("verified")
-    }
+def _tag_graph_paths(graph: dict[str, Any], paths: list[dict[str, Any]]) -> None:
+    """Highlight vis-network edges that belong to computed attack paths."""
+    path_edges: set[tuple[str, str, str]] = set()
+    for path in paths:
+        for step in path.get("steps") or []:
+            src = str(step.get("source", ""))
+            tgt = str(step.get("target", ""))
+            etype = str(step.get("edge_type", "")).lower()
+            if src and tgt and etype:
+                path_edges.add((src, tgt, etype))
+
     for edge in graph.get("edges") or []:
-        label = str(edge.get("label", "")).lower().replace(" ", "")
-        for (tech, tgt, _principal), mid in by_key.items():
-            if (label == tech or tech in label) and tgt in str(edge.get("to", "")).lower():
-                edge["mission_id"] = mid
-                edge["width"] = 4
-                edge["color"] = {"color": "#f59e0b", "highlight": "#3dffcf"}
-                break
-        if edge.get("mission_id"):
-            continue
-        if label and label not in {"member_of", "member_of_domain"}:
+        src = str(edge.get("source", edge.get("from", "")))
+        tgt = str(edge.get("target", edge.get("to", "")))
+        etype = str(edge.get("type", edge.get("label", ""))).lower().replace(" ", "")
+        if (src, tgt, etype) in path_edges:
+            edge["path_id"] = True
+            edge["width"] = 4
+            edge["color"] = {"color": "#f59e0b", "highlight": "#3dffcf"}
+        elif etype not in {"member_of", "member_of_domain", "owns"}:
             edge["dashes"] = True
             edge["color"] = {"color": "#6b7280"}
-            edge["title"] = (edge.get("title") or label) + " (no verificado — ejecuta acls)"
+            edge["title"] = edge.get("title") or etype
 
 
 def _enrich_graph_for_recon(graph: dict[str, Any], unauth: dict[str, Any]) -> None:
@@ -277,7 +279,10 @@ def build_ops_payload(
             "enabled": primary.get("enabled", True),
         }
 
-    _tag_graph_missions(graph, quests)
+    paths_data = _load_json(ws_path / "paths.json") or {"paths": [], "quick_wins": []}
+    attack_paths = list(paths_data.get("paths") or [])
+
+    _tag_graph_paths(graph, attack_paths)
 
     next_edge_data = ops_state.get("next_edge") or {}
     next_hop_cmd = graph.get("next_hop_cmd")
@@ -293,16 +298,32 @@ def build_ops_payload(
     }
 
     cred_inventory: list[dict[str, str]] = []
+    file_creds = _best_cred_per_user(
+        (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+    )
     if ops_progress is None:
-        cred_iter = _best_cred_per_user(
-            (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
-        ).values()
+        best_creds = dict(file_creds)
     else:
-        cred_iter = [
-            {"username": u, "status": "valid", "source": "dashboard"}
-            for u in ops_progress.verified_users
-        ]
-    for cred in cred_iter:
+        verified = ops_progress.verified_set()
+        if verified:
+            best_creds = {
+                user: cred
+                for user, cred in file_creds.items()
+                if user.lower() in verified
+            }
+        elif pivot_user:
+            pivot_key = str(pivot_user).lower()
+            best_creds = {
+                user: cred
+                for user, cred in file_creds.items()
+                if user.lower() == pivot_key
+            }
+        else:
+            best_creds = {}
+        for user in verified:
+            if user not in best_creds:
+                best_creds[user] = {"username": user, "status": "valid", "source": "dashboard"}
+    for cred in best_creds.values():
         cred_inventory.append(
             {
                 "user": str(cred.get("username", "")),
@@ -452,6 +473,8 @@ def build_ops_payload(
         "dashboard": ops_state,
         "mission": mission,
         "quests": quests,
+        "attack_paths": attack_paths,
+        "quick_wins": list(paths_data.get("quick_wins") or []),
         "actions": actions,
         "objective": objective,
         "methodology": methodology_lines(ws_path),
@@ -463,6 +486,7 @@ def build_ops_payload(
         "progress": progress_flags,
         "graph": graph,
         "engagement_intel": engagement_intel,
+        "findings": _load_json(ws_path / "findings.json") or {"findings": []},
         "operator_setup": build_operator_setup(ws_path, dc_ip=dc_ip, dc_host=dc_host),
         "engagement_framework": ENGAGEMENT_FRAMEWORK,
         "study_map": build_study_map(),

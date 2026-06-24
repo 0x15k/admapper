@@ -25,6 +25,7 @@ class UserRecord:
     enabled: bool = True
     bad_pwd_count: int | None = None
     lockout_time: int | None = None
+    member_of: list[str] = field(default_factory=list)
 
     @property
     def is_machine_account(self) -> bool:
@@ -45,6 +46,7 @@ class UserRecord:
             "enabled": self.enabled,
             "bad_pwd_count": self.bad_pwd_count,
             "lockout_time": self.lockout_time,
+            "member_of": list(self.member_of),
             "is_machine_account": self.is_machine_account,
         }
 
@@ -64,6 +66,7 @@ class UserRecord:
             enabled=bool(data.get("enabled", True)),
             bad_pwd_count=data.get("bad_pwd_count"),
             lockout_time=data.get("lockout_time"),
+            member_of=list(data.get("member_of") or []),
         )
 
 

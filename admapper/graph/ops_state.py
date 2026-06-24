@@ -353,21 +353,22 @@ def compute_stage_and_actions(
     acl_n = len(_acl_findings(ws_path))
     owned = _owned_lower(owned_users)
 
+    file_valid_users = _valid_cred_users(ws_path)
+    users_data = _load_json(ws_path / "users.json") or {}
+    inv = _load_json(ws_path / "auth_inventory.json") or {}
     if ops_progress is not None:
-        valid_users = ops_progress.verified_set()
-        has_scan = ops_progress.scan
-        has_users = ops_progress.enum_users
+        valid_users = file_valid_users | ops_progress.verified_set()
+        has_scan = ops_progress.scan or bool(unauth.get("hosts"))
+        has_users = ops_progress.enum_users or bool(users_data.get("users"))
         has_creds = bool(valid_users)
-        has_enum = ops_progress.enum_users
-        has_loot = ops_progress.loot
-        has_acls = ops_progress.acls
+        has_enum = ops_progress.enum_users or bool(inv)
+        has_loot = ops_progress.loot or bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
+        has_acls = ops_progress.acls or acl_n > 0
     else:
-        valid_users = _valid_cred_users(ws_path)
+        valid_users = file_valid_users
         has_scan = bool(unauth.get("hosts"))
-        users_data = _load_json(ws_path / "users.json") or {}
         has_users = bool(users_data.get("users"))
         has_creds = bool(valid_users)
-        inv = _load_json(ws_path / "auth_inventory.json") or {}
         has_enum = bool(inv)
         has_loot = bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
         has_acls = acl_n > 0
