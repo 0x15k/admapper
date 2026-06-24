@@ -311,9 +311,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
     </div>
 
     <div class="sidebar">
-      <!-- Current Identity / Pivot -->
+      <!-- Pivot Identity / Pivot -->
       <div class="panel" id="panel-pivot">
-        <div class="panel-header">Current Identity</div>
+        <div class="panel-header">Pivot Identity</div>
         <div id="pivot-display">
           <div class="nd-empty">No pivot user set</div>
         </div>
@@ -327,14 +327,14 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 
       <!-- Phases -->
       <div class="panel">
-        <div class="panel-header">Attack Chain <span class="panel-count" id="phase-count">0/12</span></div>
+        <div class="panel-header">Operational Pipeline <span class="panel-count" id="phase-count">0/7</span></div>
         <div class="phases" id="phase-bar"></div>
-        <div class="phase-labels"><span>Recon</span><span>Attack</span><span>Post</span></div>
+        <div class="phase-labels"><span>Discovery</span><span>Inventory</span><span>Creds</span><span>Auth</span><span>Attack</span><span>Pivot</span><span>Synthesis</span></div>
       </div>
 
-      <!-- Actions — grouped -->
+      <!-- Credential state -->
       <div class="panel">
-        <div class="panel-header">Credentials <span class="panel-count" id="cred-count">0</span></div>
+        <div class="panel-header">Credential State <span class="panel-count" id="cred-count">0</span></div>
         <div id="cred-list"></div>
       </div>
 
@@ -344,7 +344,7 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div id="hash-list"></div>
       </div>
 
-      <!-- Actions -->
+      <!-- Operational actions -->
       <div class="panel" id="panel-actions">
         <div class="panel-header">Actions</div>
         <div id="action-buttons"></div>
@@ -379,7 +379,7 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
     <div class="terminal-output" id="terminal"></div>
     <div class="input-bar">
       <input id="input-ip" placeholder="target IP" style="flex:1;max-width:120px"/>
-      <button class="btn" onclick="doScan()" id="btn-scan">Scan</button>
+      <button class="btn" onclick="doDiscovery()" id="btn-scan">Discovery</button>
       <input id="input-user" placeholder="username" style="flex:1;max-width:130px"/>
       <input id="input-pass" placeholder="password" type="password" style="flex:1;max-width:140px"/>
       <button class="btn btn-primary" onclick="doAuth()" id="btn-auth">Authenticate</button>
@@ -480,7 +480,7 @@ function apiPost(path, body) {{
   }});
 }}
 
-function doScan() {{
+function doDiscovery() {{
   const ip = document.getElementById('input-ip').value.trim();
   if (!ip) return;
   apiPost('/api/scan', {{ip}});
@@ -657,10 +657,10 @@ function renderActions(s) {{
   const progress = s.progress || {{}};
   const hasCreds = (s.creds || []).length > 0;
 
-  /* Recon group */
+  /* Discovery & inventory */
   const reconGroup = document.createElement('div');
   reconGroup.className = 'action-group';
-  reconGroup.innerHTML = '<div class="action-group-label">Reconnaissance</div><div class="actions" id="recon-btns"></div>';
+  reconGroup.innerHTML = '<div class="action-group-label">Discovery & Inventory</div><div class="actions" id="recon-btns"></div>';
   container.appendChild(reconGroup);
 
   const reconBtns = reconGroup.querySelector('#recon-btns');
@@ -669,11 +669,11 @@ function renderActions(s) {{
   addBtn(reconBtns, 'Kerberoast', 'doKerb()', true);
   addBtn(reconBtns, 'ACLs', 'doAcls()', progress.scan);
 
-  /* Attack group */
+  /* Attack execution */
   if (progress.scan || hasCreds) {{
     const atkGroup = document.createElement('div');
     atkGroup.className = 'action-group';
-    atkGroup.innerHTML = '<div class="action-group-label">Attack</div><div class="actions" id="atk-btns"></div>';
+    atkGroup.innerHTML = '<div class="action-group-label">Attack Execution</div><div class="actions" id="atk-btns"></div>';
     container.appendChild(atkGroup);
 
     const atkBtns = atkGroup.querySelector('#atk-btns');
@@ -691,11 +691,11 @@ function renderActions(s) {{
     atkBtns.appendChild(sprayWrap);
   }}
 
-  /* Report group */
+  /* Synthesis / report */
   if (progress.exploit) {{
     const repGroup = document.createElement('div');
     repGroup.className = 'action-group';
-    repGroup.innerHTML = '<div class="action-group-label">Report</div><div class="actions" id="rep-btns"></div>';
+    repGroup.innerHTML = '<div class="action-group-label">Synthesis</div><div class="actions" id="rep-btns"></div>';
     container.appendChild(repGroup);
     addBtn(repGroup.querySelector('#rep-btns'), 'Generate Brief', 'doBrief()', true);
   }}
