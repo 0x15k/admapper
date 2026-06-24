@@ -213,7 +213,7 @@ class DashboardContext:
         if not username or not password:
             self.emit("usuario y contraseña requeridos", kind="error")
             return
-        if not self.domain and not (self.ws_path / "unauth_scan.json").is_file():
+        if not self.domain:
             self.emit("sin dominio descubierto — ejecutando scan inicial", kind="phase")
             if not self.run_scan(ip=target):
                 self.emit("scan inicial falló; no se puede autenticar todavía", kind="error")
@@ -224,7 +224,7 @@ class DashboardContext:
         pw_b64 = base64.b64encode(password.encode()).decode()
         domain = self.domain or ""
         domain_b64 = base64.b64encode(domain.encode()).decode()
-        self._run_workspace_script(
+        auth_ok = self._run_workspace_script(
             "import base64\n"
             "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
             "from admapper.core.discovery import ensure_domain\n"
@@ -237,6 +237,9 @@ class DashboardContext:
             f"password=base64.b64decode('{pw_b64}').decode(), domain=domain)",
             label=f"autenticar como {username}",
         )
+        if auth_ok:
+            self.emit("autenticación válida — ejecutando enum autenticada", kind="phase")
+            self.run_enum_users()
         from admapper.creds.kerberos_skew import load_workspace_clock_skew
 
         cred_path = self.ws_path / "credentials.json"
