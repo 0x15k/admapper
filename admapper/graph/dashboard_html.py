@@ -141,6 +141,19 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .node-detail .nd-edge{{font-size:0.65rem;color:var(--text-dim);padding:0.1rem 0}}
 .nd-empty{{font-size:0.7rem;color:var(--text-muted);font-style:italic}}
 
+/* Guidance */
+.guide-card{{
+  background:linear-gradient(135deg,#1f2937 0%,#111827 100%);
+  border:1px solid var(--border-light);
+  border-left:3px solid var(--accent);
+  border-radius:6px;
+  padding:0.5rem 0.6rem;
+  margin:0.4rem 0;
+}}
+.guide-card .guide-title{{font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.18rem}}
+.guide-card .guide-main{{font-size:0.78rem;font-weight:600;color:var(--text)}}
+.guide-card .guide-sub{{font-size:0.66rem;color:var(--text-dim);margin-top:0.12rem}}
+
 /* Phase bar */
 .phases{{display:flex;gap:2px;margin-bottom:0.2rem}}
 .phase{{
@@ -317,6 +330,11 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div id="pivot-display">
           <div class="nd-empty">No pivot user set</div>
         </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Next Best Action</div>
+        <div id="next-action"></div>
       </div>
 
       <!-- Node Detail (populated on click) -->
@@ -534,6 +552,7 @@ function renderState(s) {{
   document.getElementById('h-pivot').textContent = (s.player||{{}}).pivot || 'none';
 
   renderPivotCard(s);
+  renderGuidance(s);
   renderPhases(s.phases || []);
   renderActions(s);
   renderCredentials(s.creds || [], s.pth_sessions || []);
@@ -543,13 +562,52 @@ function renderState(s) {{
   renderGraph(s.graph || {{}});
 }}
 
+function renderGuidance(s) {{
+  const el = document.getElementById('next-action');
+  const phases = s.phases || [];
+  const firstPending = phases.find(p => !p.done) || phases[phases.length - 1];
+  const pivot = (s.player || {{}}).pivot;
+  const creds = s.creds || [];
+  const findings = s.findings || {{}};
+  const attackPaths = s.quests || [];
+
+  let title = 'Discovery';
+  let main = 'Run Discovery to resolve the target, domain and initial surface.';
+  let sub = 'Use the IP field + Discovery button to bootstrap the engagement.';
+
+  if (!pivot) {{
+    title = 'Authentication';
+    main = 'Authenticate to promote a pivot user and unlock auth collection.';
+    sub = 'Pick a validated credential or add a known username/password pair.';
+  }} else if (!creds.length) {{
+    title = 'Credential State';
+    main = 'Add or validate credentials to unlock roast/spray and pivot options.';
+    sub = 'The GUI will keep the same order as the CLI workflow.';
+  }} else if (!attackPaths.length && (findings.findings || []).length) {{
+    title = 'Attack Paths';
+    main = 'Review findings and run ACLs / ADCS / coercion to surface paths.';
+    sub = 'Paths appear only after the required prerequisites are collected.';
+  }} else if (firstPending) {{
+    const label = firstPending.label || 'Synthesis';
+    title = 'Operational Pipeline';
+    main = 'Proceed with ' + label + '.';
+    sub = 'The interface is ordered to match the CLI pipeline.';
+  }}
+
+  el.innerHTML = '<div class=\"guide-card\">' +
+    '<div class=\"guide-title\">' + escHtml(title) + '</div>' +
+    '<div class=\"guide-main\">' + escHtml(main) + '</div>' +
+    '<div class=\"guide-sub\">' + escHtml(sub) + '</div>' +
+  '</div>';
+}}
+
 /* ── Pivot Card ───────────────────────────────────────────── */
 function renderPivotCard(s) {{
   const el = document.getElementById('pivot-display');
   const pivot = (s.player || {{}}).pivot;
   const meta = s.meta || {{}};
   if (!pivot) {{
-    el.innerHTML = '<div class="nd-empty">Authenticate to set a pivot user</div>';
+    el.innerHTML = '<div class="nd-empty">Authenticate to unlock pivot-centric actions</div>';
     return;
   }}
   const initial = pivot.charAt(0).toUpperCase();
@@ -789,7 +847,7 @@ function renderPaths(quests, objective) {{
     el.appendChild(f);
   }});
   if (!ready.length && !objective.headline) {{
-    el.innerHTML = '<div class="nd-empty">Run ACLs to discover paths</div>';
+    el.innerHTML = '<div class="nd-empty">Run ACLs, ADCS, or coercion to discover paths</div>';
   }}
 }}
 
