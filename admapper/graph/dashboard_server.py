@@ -197,13 +197,16 @@ class DashboardContext:
             self.emit("sin IP — escribe la IP del objetivo en el terminal de arranque", kind="error")
             return False
         self._persist_target_ip(target)
-        cmd = self._admapper_cmd("scan", "-H", target, "-w", self.workspace)
-        code = self._run_subprocess(cmd)
-        if code == 0:
+        ok = self._run_workspace_script(
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'set hosts {target}')\n"
+            "dispatch(session, 'start_unauth')\n",
+            label=f"scan {target}",
+        )
+        if ok:
             self.progress.scan = True
             self.progress.save(self.ws_path)
-            return True
-        return False
+        return ok
 
     def run_auth(self, username: str, password: str, ip: str | None = None) -> None:
         target = (ip or self._dc_ip()).strip()
@@ -213,52 +216,20 @@ class DashboardContext:
         if not username or not password:
             self.emit("usuario y contraseña requeridos", kind="error")
             return
-        if not self.domain:
-            self.emit("sin dominio descubierto — ejecutando scan inicial", kind="phase")
-            if not self.run_scan(ip=target):
-                self.emit("scan inicial falló; no se puede autenticar todavía", kind="error")
-                return
-        import base64
-
-        user_b64 = base64.b64encode(username.encode()).decode()
-        pw_b64 = base64.b64encode(password.encode()).decode()
-        domain = self.domain or ""
-        domain_b64 = base64.b64encode(domain.encode()).decode()
+        self._persist_target_ip(target)
         auth_ok = self._run_workspace_script(
-            "import base64\n"
-            "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
-            "from admapper.core.discovery import ensure_domain\n"
-            f"domain = base64.b64decode('{domain_b64}').decode() or None\n"
-            "try:\n"
-            "    ensure_domain(session, announce=False)\n"
-            "except ValueError:\n"
-            "    pass\n"
-            f"run_dashboard_credential_auth(session, username=base64.b64decode('{user_b64}').decode(), "
-            f"password=base64.b64decode('{pw_b64}').decode(), domain=domain)",
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'set hosts {target}')\n"
+            f"dispatch(session, 'creds add {username} {password}')\n"
+            "dispatch(session, 'creds verify')\n"
+            "dispatch(session, 'start_auth')\n",
             label=f"autenticar como {username}",
         )
         if auth_ok:
-            self.emit("autenticación válida — ejecutando enum autenticada", kind="phase")
-            self.run_enum_users()
-        from admapper.creds.kerberos_skew import load_workspace_clock_skew
-
-        cred_path = self.ws_path / "credentials.json"
-        if cred_path.is_file():
-            creds = json.loads(cred_path.read_text(encoding="utf-8")).get("credentials") or []
-            match = next(
-                (
-                    c
-                    for c in creds
-                    if str(c.get("username", "")).lower() == username.lower()
-                    and str(c.get("status")) == "valid"
-                ),
-                None,
-            )
-            if match:
-                self.progress.scan = True
-                self.progress.remember_auth(username)
-                self.pivot_user = username
-                self.progress.save(self.ws_path)
+            self.progress.scan = True
+            self.progress.remember_auth(username)
+            self.pivot_user = username
+            self.progress.save(self.ws_path)
 
     def _run_workspace_script(self, script: str, *, label: str) -> bool:
         """Run in-process op with stdout routed through the dashboard terminal filter."""
@@ -304,42 +275,11 @@ class DashboardContext:
         return None
 
     def run_enum_users(self) -> None:
-        stored = self._get_stored_credential()
-        if stored:
-            username, password, domain = stored
-            import base64
-
-            u_b64 = base64.b64encode(username.encode()).decode()
-            p_b64 = base64.b64encode(password.encode()).decode()
-            d_b64 = base64.b64encode(domain.encode()).decode()
-            state_data = _load_json_safe(self.ws_path / "unauth_scan.json")
-            dc_ip = ""
-            for host in (state_data.get("hosts") or []):
-                if host.get("is_domain_controller"):
-                    dc_ip = str(host.get("address", ""))
-                    break
-            if not dc_ip:
-                dc_ip = self.host or ""
-            dc_b64 = base64.b64encode(dc_ip.encode()).decode()
-            ok = self._run_workspace_script(
-                "import base64\n"
-                "from admapper.auth.auth_enum import run_auth_enumeration\n"
-                "from admapper.models.credential import Credential\n"
-                f"cred = Credential(username=base64.b64decode('{u_b64}').decode(), "
-                f"secret=base64.b64decode('{p_b64}').decode(), "
-                f"domain=base64.b64decode('{d_b64}').decode(), "
-                "status='valid')\n"
-                f"dc_ip = base64.b64decode('{dc_b64}').decode()\n"
-                f"domain = base64.b64decode('{d_b64}').decode()\n"
-                "run_auth_enumeration(session, cred, dc_ip, domain)",
-                label="enum users (authenticated)",
-            )
-        else:
-            ok = self._run_workspace_script(
-                "from admapper.enumeration.scan import run_user_enumeration\n"
-                "run_user_enumeration(session)",
-                label="enum users",
-            )
+        ok = self._run_workspace_script(
+            "from admapper.cli.commands import dispatch\n"
+            "dispatch(session, 'enum users')",
+            label="enum users",
+        )
         if ok:
             self.progress.enum_users = True
             self.progress.save(self.ws_path)
