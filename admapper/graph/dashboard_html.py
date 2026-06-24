@@ -333,12 +333,6 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
       </div>
 
       <!-- Actions — grouped -->
-      <div class="panel" id="panel-actions">
-        <div class="panel-header">Actions</div>
-        <div id="action-buttons"></div>
-      </div>
-
-      <!-- Credentials -->
       <div class="panel">
         <div class="panel-header">Credentials <span class="panel-count" id="cred-count">0</span></div>
         <div id="cred-list"></div>
@@ -348,6 +342,12 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
       <div class="panel" id="panel-hashes" style="display:none">
         <div class="panel-header">NT Hashes <span class="panel-count" id="hash-count">0</span></div>
         <div id="hash-list"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="panel" id="panel-actions">
+        <div class="panel-header">Actions</div>
+        <div id="action-buttons"></div>
       </div>
 
       <!-- Attack Paths -->
@@ -378,11 +378,11 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
     </div>
     <div class="terminal-output" id="terminal"></div>
     <div class="input-bar">
+      <input id="input-ip" placeholder="target IP" style="flex:1;max-width:120px"/>
+      <button class="btn" onclick="doScan()" id="btn-scan">Scan</button>
       <input id="input-user" placeholder="username" style="flex:1;max-width:130px"/>
       <input id="input-pass" placeholder="password" type="password" style="flex:1;max-width:140px"/>
       <button class="btn btn-primary" onclick="doAuth()" id="btn-auth">Authenticate</button>
-      <input id="input-ip" placeholder="target IP" style="flex:1;max-width:120px"/>
-      <button class="btn" onclick="doScan()" id="btn-scan">Scan</button>
     </div>
   </div>
 
