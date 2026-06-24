@@ -47,6 +47,12 @@ class CredentialStore:
         source: str = "manual",
     ) -> Credential:
         credentials = self.list()
+        existing = next(
+            (c for c in credentials if c.username.lower() == username.strip().lower()),
+            None,
+        )
+        if existing is not None:
+            credentials = [c for c in credentials if c.id != existing.id]
         cred = Credential(
             username=username.strip(),
             secret=secret,

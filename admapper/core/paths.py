@@ -36,7 +36,7 @@ def default_user_workspaces_root() -> Path:
 
 
 def legacy_repo_workspaces() -> Path | None:
-    """Dev/legacy path: ``<repo>/workspaces`` when present."""
+    """Dev path: ``<repo>/workspaces`` when present."""
     repo = find_repo_root()
     if repo is None:
         return None

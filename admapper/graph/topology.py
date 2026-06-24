@@ -221,6 +221,13 @@ def build_network_topology(
                 discoveries.append(f"SMB en {addr}")
 
     if domain_known and dc_id:
+        dc_host = ""
+        for host in host_rows:
+            if host.get("is_domain_controller"):
+                dc_host = str(host.get("hostname") or "")
+                break
+        if not dc_host:
+            dc_host = discovered_domain.split(".")[0] if discovered_domain else ""
         _add_node(
             nodes,
             n_seen,
@@ -238,7 +245,7 @@ def build_network_topology(
             eid="dc-domain",
             src=dc_id,
             tgt="domain",
-            label="RootDSE",
+            label=dc_host or "RootDSE",
             color="#8b5cf6",
             width=2,
         )

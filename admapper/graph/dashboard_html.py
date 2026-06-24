@@ -38,6 +38,7 @@ def build_dashboard_html(
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>ADMapper — {workspace_s}</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
 /* ── Reset & Base ─────────────────────────────────────────── */
@@ -102,15 +103,27 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   background:var(--bg-panel);border-left:1px solid var(--border);
   overflow-y:auto;display:flex;flex-direction:column;
 }}
-.panel{{border-bottom:1px solid var(--border);padding:0.6rem 0.65rem}}
+.panel{{
+  border-bottom:1px solid var(--border);
+  padding:0.55rem 0.65rem;
+}}
+.panel:last-child{{border-bottom:none}}
+.panel-hero{{
+  background:linear-gradient(180deg,rgba(15,23,42,0.98) 0%,rgba(17,24,39,0.96) 100%);
+  border-left:3px solid var(--accent);
+}}
 .panel-header{{
   font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;
-  color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;
-  display:flex;justify-content:space-between;align-items:center;
+  color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;
+  display:flex;justify-content:space-between;align-items:center;gap:0.35rem;
 }}
 .panel-count{{
   background:var(--bg-card);padding:0.1rem 0.4rem;border-radius:999px;
   font-size:0.62rem;color:var(--text-dim);
+}}
+.panel-subtitle{{
+  margin-left:auto;font-size:0.58rem;letter-spacing:0.02em;
+  text-transform:none;color:var(--text-muted);
 }}
 
 /* Pivot identity card */
@@ -148,7 +161,7 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   border-left:3px solid var(--accent);
   border-radius:6px;
   padding:0.5rem 0.6rem;
-  margin:0.4rem 0;
+  margin:0.1rem 0 0.35rem;
 }}
 .guide-card .guide-title{{font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.18rem}}
 .guide-card .guide-main{{font-size:0.78rem;font-weight:600;color:var(--text)}}
@@ -162,11 +175,26 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 }}
 .phase.done{{background:var(--green)}}
 .phase.partial{{background:var(--yellow)}}
-.phase-labels{{display:flex;justify-content:space-between;font-size:0.58rem;color:var(--text-muted)}}
+.phase-labels{{
+  display:flex;justify-content:space-between;gap:0.2rem;
+  font-size:0.55rem;color:var(--text-muted);line-height:1.2;
+}}
+.phase-labels span{{
+  flex:1;text-align:center;padding:0.08rem 0.12rem;border-radius:999px;
+  background:rgba(30,41,59,0.75);border:1px solid var(--border);
+}}
 
 /* Action buttons */
-.action-group{{margin-bottom:0.35rem}}
-.action-group-label{{font-size:0.6rem;color:var(--text-muted);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.05em}}
+.action-group{{
+  margin-bottom:0.45rem;padding:0.45rem 0.5rem;border-radius:8px;
+  background:rgba(15,23,42,0.65);border:1px solid var(--border-light);
+}}
+.action-group-label{{
+  display:flex;align-items:center;justify-content:space-between;gap:0.35rem;
+  font-size:0.62rem;color:var(--text);margin-bottom:0.2rem;
+  text-transform:uppercase;letter-spacing:0.05em;font-weight:600;
+}}
+.action-group-note{{font-size:0.63rem;color:var(--text-dim);line-height:1.35;margin-bottom:0.35rem}}
 .actions{{display:flex;flex-wrap:wrap;gap:0.25rem}}
 .btn{{
   padding:0.25rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:500;
@@ -256,11 +284,11 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .input-bar input::placeholder{{color:var(--text-muted)}}
 
 /* ── Spray inline input ───────────────────────────────────── */
-.spray-inline{{display:flex;gap:0.25rem;align-items:center}}
+.spray-inline{{display:flex;gap:0.25rem;align-items:center;width:100%}}
 .spray-inline input{{
   background:var(--bg-dark);border:1px solid var(--border-light);
   color:var(--text);padding:0.2rem 0.35rem;border-radius:3px;
-  font-size:0.68rem;width:90px;outline:none;
+  font-size:0.68rem;min-width:0;flex:1;outline:none;
 }}
 .spray-inline input:focus{{border-color:var(--accent)}}
 
@@ -311,29 +339,29 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
       </div>
       <div id="graph-canvas"></div>
       <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--orange);border-radius:50%"></span>Pivot</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Owned</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>High-Value</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#ec4899"></span>Kerberoastable</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#a855f7"></span>AS-REP Roastable</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>Group</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--indigo)"></span>Computer</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span>gMSA</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#475569"></span>User</div>
+        <div class="legend-item" style="color:var(--orange)"><i class="fa-solid fa-star" style="margin-right:0.25rem"></i>Pivot</div>
+        <div class="legend-item" style="color:var(--green)"><i class="fa-solid fa-skull-crossbones" style="margin-right:0.25rem"></i>Owned</div>
+        <div class="legend-item" style="color:var(--red)"><i class="fa-solid fa-crown" style="margin-right:0.25rem"></i>High-Value</div>
+        <div class="legend-item" style="color:#ec4899"><i class="fa-solid fa-key" style="margin-right:0.25rem"></i>Kerberoastable</div>
+        <div class="legend-item" style="color:#a855f7"><i class="fa-solid fa-unlock" style="margin-right:0.25rem"></i>AS-REP Roastable</div>
+        <div class="legend-item" style="color:var(--purple)"><i class="fa-solid fa-users" style="margin-right:0.25rem"></i>Group</div>
+        <div class="legend-item" style="color:var(--indigo)"><i class="fa-solid fa-desktop" style="margin-right:0.25rem"></i>Computer</div>
+        <div class="legend-item" style="color:var(--cyan)"><i class="fa-solid fa-user-gear" style="margin-right:0.25rem"></i>gMSA</div>
+        <div class="legend-item" style="color:#94a3b8"><i class="fa-solid fa-user" style="margin-right:0.25rem"></i>User</div>
       </div>
     </div>
 
     <div class="sidebar">
       <!-- Pivot Identity / Pivot -->
-      <div class="panel" id="panel-pivot">
+      <div class="panel panel-hero" id="panel-pivot">
         <div class="panel-header">Pivot Identity</div>
         <div id="pivot-display">
           <div class="nd-empty">No pivot user set</div>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-header">Next Best Action</div>
+      <div class="panel panel-hero">
+        <div class="panel-header">Next Best Action <span class="panel-subtitle">guided by the CLI pipeline</span></div>
         <div id="next-action"></div>
       </div>
 
@@ -356,6 +384,12 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div id="cred-list"></div>
       </div>
 
+      <!-- Discovered Clues -->
+      <div class="panel" id="panel-clues" style="display:none">
+        <div class="panel-header">Discovered Clues <span class="panel-count" id="clue-count">0</span></div>
+        <div id="clue-list" style="display:flex;flex-direction:column;gap:0.35rem;max-height:220px;overflow-y:auto;padding-right:2px"></div>
+      </div>
+
       <!-- Hashes / PTH -->
       <div class="panel" id="panel-hashes" style="display:none">
         <div class="panel-header">NT Hashes <span class="panel-count" id="hash-count">0</span></div>
@@ -363,8 +397,8 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
       </div>
 
       <!-- Operational actions -->
-      <div class="panel" id="panel-actions">
-        <div class="panel-header">Actions</div>
+      <div class="panel panel-hero" id="panel-actions">
+        <div class="panel-header">Actions <span class="panel-subtitle">dispatches to the CLI engine</span></div>
         <div id="action-buttons"></div>
       </div>
 
@@ -430,6 +464,12 @@ function termLog(text, kind) {{
   term.scrollTop = term.scrollHeight;
   /* Uncollapse terminal when new events arrive */
   document.getElementById('terminal-bar').classList.remove('collapsed');
+  const status = document.getElementById('term-status');
+  if (status && kind === 'phase') {{
+    status.textContent = text;
+  }} else if (status && (kind === 'done' || kind === 'error')) {{
+    status.textContent = kind === 'done' ? 'ready' : 'error';
+  }}
 }}
 
 function escHtml(s) {{
@@ -474,11 +514,15 @@ function updateStatus(kind) {{
     el.className = 'status status-running';
     el.innerHTML = '<span class="dot" style="background:var(--yellow)"></span> Running';
     setButtonsDisabled(true);
+    const status = document.getElementById('term-status');
+    if (status) status.textContent = 'running...';
   }} else if (kind === 'done' || kind === 'error') {{
     opRunning = false;
     el.className = 'status status-idle';
     el.innerHTML = '<span class="dot" style="background:var(--green)"></span> Ready';
     setButtonsDisabled(false);
+    const status = document.getElementById('term-status');
+    if (status) status.textContent = kind === 'done' ? 'ready' : 'error';
     setTimeout(refreshState, 500);
   }}
 }}
@@ -509,12 +553,19 @@ function doAuth() {{
   const password = document.getElementById('input-pass').value;
   const ip = document.getElementById('input-ip').value.trim();
   if (!username || !password) return;
-  apiPost('/api/run', {{username, password, ip}});
+  const body = {{username, password}};
+  if (ip) body.ip = ip;
+  apiPost('/api/run', body);
 }}
 
 function doExploit() {{ apiPost('/api/exploit'); }}
 function doAcls() {{ apiPost('/api/acls'); }}
-function doEnum() {{ apiPost('/api/enum'); }}
+function doEnum() {{
+  const hasValidCred = (state.creds || []).some(c => String(c.status || '').toLowerCase() === 'valid');
+  const status = document.getElementById('term-status');
+  if (status) status.textContent = hasValidCred ? 'authenticated enumeration...' : 'enumerating users...';
+  apiPost('/api/enum', hasValidCred ? {{mode: 'auth'}} : {{}});
+}}
 function doAsrep() {{ apiPost('/api/asreproast'); }}
 function doKerb() {{ apiPost('/api/kerberoast'); }}
 function doBrief() {{ apiPost('/api/brief', {{auto: true}}); }}
@@ -556,6 +607,7 @@ function renderState(s) {{
   renderPhases(s.phases || []);
   renderActions(s);
   renderCredentials(s.creds || [], s.pth_sessions || []);
+  renderClues(s.clues || []);
   renderHashes(s.pth_sessions || []);
   renderPaths(s.quests || [], s.objective || {{}});
   renderFindings(s.findings || {{}}, s.highlights || [], s.engagement_intel || {{}});
@@ -570,19 +622,28 @@ function renderGuidance(s) {{
   const creds = s.creds || [];
   const findings = s.findings || {{}};
   const attackPaths = s.quests || [];
+  const progress = s.progress || {{}};
 
   let title = 'Discovery';
   let main = 'Run Discovery to resolve the target, domain and initial surface.';
   let sub = 'Use the IP field + Discovery button to bootstrap the engagement.';
 
-  if (!pivot) {{
+  if (!progress.scan) {{
+    title = 'Discovery';
+    main = 'First resolve the target IP and the domain controller.';
+    sub = 'If the DC is missing, the terminal will suggest a rescan or clock sync.';
+  }} else if (!progress.enum_users) {{
+    title = 'Identity Surface';
+    main = 'Enumerate users so roast, spray and ACL work can branch correctly.';
+    sub = 'This step builds graph context for the next phases.';
+  }} else if (!creds.length) {{
+    title = 'Credential State';
+    main = 'Add or validate credentials before pivot and graph expansion.';
+    sub = 'Only validated entries should be clickable in the credential state.';
+  }} else if (!pivot) {{
     title = 'Authentication';
     main = 'Authenticate to promote a pivot user and unlock auth collection.';
     sub = 'Pick a validated credential or add a known username/password pair.';
-  }} else if (!creds.length) {{
-    title = 'Credential State';
-    main = 'Add or validate credentials to unlock roast/spray and pivot options.';
-    sub = 'The GUI will keep the same order as the CLI workflow.';
   }} else if (!attackPaths.length && (findings.findings || []).length) {{
     title = 'Attack Paths';
     main = 'Review findings and run ACLs / ADCS / coercion to surface paths.';
@@ -699,11 +760,13 @@ function renderPhases(phases) {{
   bar.innerHTML = '';
   let done = 0;
   phases.forEach(p => {{
+    const isDone = p.status === 'done';
+    const isActive = p.status === 'active';
     const el = document.createElement('div');
-    el.className = 'phase' + (p.done ? ' done' : (p.partial ? ' partial' : ''));
-    el.title = p.label || '';
+    el.className = 'phase' + (isDone ? ' done' : (isActive ? ' partial' : ''));
+    el.title = p.title || '';
     bar.appendChild(el);
-    if (p.done) done++;
+    if (isDone) done++;
   }});
   document.getElementById('phase-count').textContent = done + '/' + phases.length;
 }}
@@ -714,15 +777,115 @@ function renderActions(s) {{
   container.innerHTML = '';
   const progress = s.progress || {{}};
   const hasCreds = (s.creds || []).length > 0;
+  const hasValidCred = (s.creds || []).some(c => String(c.status || '').toLowerCase() === 'valid');
+
+  /* Discovered/Dynamic Actions */
+  if (s.actions && s.actions.length > 0) {{
+    const dynGroup = document.createElement('div');
+    dynGroup.className = 'action-group';
+    dynGroup.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+    dynGroup.innerHTML = '<div class="action-group-label" style="color:#f59e0b"><span>Discovered Attack Vectors</span></div>' +
+                          '<div class="action-group-note">Contextual attack execution paths identified by the CLI tool.</div>' +
+                          '<div class="actions" id="dyn-btns" style="flex-direction:column;gap:0.35rem;width:100%"></div>';
+    container.appendChild(dynGroup);
+
+    const dynBtns = dynGroup.querySelector('#dyn-btns');
+    s.actions.forEach(act => {{
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.flexDirection = 'column';
+      row.style.gap = '0.15rem';
+      row.style.width = '100%';
+      row.style.padding = '0.35rem';
+      row.style.borderRadius = '4px';
+      row.style.background = 'rgba(255, 255, 255, 0.03)';
+      row.style.border = '1px solid rgba(255,255,255,0.05)';
+
+      const btn = document.createElement('button');
+      btn.className = act.required ? 'btn btn-primary' : 'btn';
+      btn.style.textAlign = 'left';
+      btn.style.whiteSpace = 'normal';
+      btn.style.wordBreak = 'break-word';
+      btn.style.width = '100%';
+      btn.textContent = act.button || act.id;
+      btn.disabled = !act.enabled || opRunning;
+
+      btn.onclick = () => {{
+        const requiredPivot = act.requires_pivot || 
+                              (act.mission && act.mission.requires_pivot) || 
+                              act.pivot || 
+                              (act.mission && act.mission.principal) || 
+                              act.principal || 
+                              '';
+        const currentPivot = (state.player || {{}}).pivot || '';
+        
+        const runAction = () => {{
+          if (act.id === 'verify_loot') {{
+            const uInput = document.getElementById('input-user');
+            const pInput = document.getElementById('input-pass');
+            if (uInput) uInput.value = act.principal || '';
+            if (pInput) {{
+              pInput.value = '';
+              pInput.focus();
+            }}
+            const inputBar = document.querySelector('.input-bar');
+            if (inputBar) {{
+              inputBar.style.boxShadow = '0 0 10px var(--accent)';
+              setTimeout(() => {{ inputBar.style.boxShadow = 'none'; }}, 2000);
+            }}
+          }} else if (act.id === 'enum') {{
+            doEnum();
+          }} else if (act.action === 'exploit') {{
+            doExploit();
+          }} else if (act.action === 'acls') {{
+            doAcls();
+          }} else if (act.action === 'brief') {{
+            doBrief();
+          }} else if (act.action === 'asreproast') {{
+            doAsrep();
+          }} else if (act.action === 'kerberoast') {{
+            doKerb();
+          }} else if (act.action === 'spray') {{
+            const input = document.getElementById('spray-pw');
+            if (input) input.focus();
+          }} else {{
+            apiPost('/api/' + act.action);
+          }}
+        }};
+
+        if (requiredPivot && requiredPivot.toLowerCase() !== currentPivot.toLowerCase()) {{
+          apiPost('/api/pivot', {{username: requiredPivot}}).then(r => r.json()).then(d => {{
+            if (d.state) renderState(d.state);
+            setTimeout(runAction, 250);
+          }});
+        }} else {{
+          runAction();
+        }}
+      }};
+
+      row.appendChild(btn);
+
+      if (act.reason) {{
+        const note = document.createElement('div');
+        note.style.fontSize = '0.6rem';
+        note.style.color = 'var(--text-dim)';
+        note.style.paddingLeft = '0.2rem';
+        note.textContent = act.reason;
+        row.appendChild(note);
+      }}
+
+      dynBtns.appendChild(row);
+    }});
+  }}
 
   /* Discovery & inventory */
   const reconGroup = document.createElement('div');
   reconGroup.className = 'action-group';
-  reconGroup.innerHTML = '<div class="action-group-label">Discovery & Inventory</div><div class="actions" id="recon-btns"></div>';
+  reconGroup.innerHTML = '<div class="action-group-label"><span>Discovery & Inventory</span></div><div class="action-group-note">Resolve target context and enumerate users before auth-dependent actions.</div><div class="actions" id="recon-btns"></div>';
   container.appendChild(reconGroup);
 
   const reconBtns = reconGroup.querySelector('#recon-btns');
-  addBtn(reconBtns, 'Enum Users', 'doEnum()', true);
+  addBtn(reconBtns, hasValidCred ? 'Start Auth' : 'Enum Users', 'doEnum()', true);
   addBtn(reconBtns, 'AS-REP Roast', 'doAsrep()', true);
   addBtn(reconBtns, 'Kerberoast', 'doKerb()', true);
   addBtn(reconBtns, 'ACLs', 'doAcls()', progress.scan);
@@ -731,7 +894,7 @@ function renderActions(s) {{
   if (progress.scan || hasCreds) {{
     const atkGroup = document.createElement('div');
     atkGroup.className = 'action-group';
-    atkGroup.innerHTML = '<div class="action-group-label">Attack Execution</div><div class="actions" id="atk-btns"></div>';
+    atkGroup.innerHTML = '<div class="action-group-label"><span>Attack Execution</span></div><div class="action-group-note">Use collected context to execute spray, exploit and coercion actions.</div><div class="actions" id="atk-btns"></div>';
     container.appendChild(atkGroup);
 
     const atkBtns = atkGroup.querySelector('#atk-btns');
@@ -740,7 +903,7 @@ function renderActions(s) {{
     /* Spray with inline input */
     const sprayWrap = document.createElement('div');
     sprayWrap.className = 'spray-inline';
-    sprayWrap.innerHTML = '<input id="spray-pw" placeholder="password" style="font-family:var(--mono)"/>';
+    sprayWrap.innerHTML = '<input id="spray-pw" placeholder="password" style="font-family:var(--mono);min-width:0;flex:1"/>';
     const sprayBtn = document.createElement('button');
     sprayBtn.className = 'btn';
     sprayBtn.textContent = 'Spray';
@@ -753,7 +916,7 @@ function renderActions(s) {{
   if (progress.exploit) {{
     const repGroup = document.createElement('div');
     repGroup.className = 'action-group';
-    repGroup.innerHTML = '<div class="action-group-label">Synthesis</div><div class="actions" id="rep-btns"></div>';
+    repGroup.innerHTML = '<div class="action-group-label"><span>Synthesis</span></div><div class="action-group-note">Generate the operator brief after the attack path is built.</div><div class="actions" id="rep-btns"></div>';
     container.appendChild(repGroup);
     addBtn(repGroup.querySelector('#rep-btns'), 'Generate Brief', 'doBrief()', true);
   }}
@@ -779,13 +942,113 @@ function renderCredentials(creds, pth) {{
     el.innerHTML = '<div class="nd-empty">No credentials yet</div>';
     return;
   }}
+  // Sort credentials: valid first, then alphabetically by user name
+  creds.sort((a, b) => {{
+    const aVal = String(a.status || '').toLowerCase() === 'valid' ? 0 : 1;
+    const bVal = String(b.status || '').toLowerCase() === 'valid' ? 0 : 1;
+    if (aVal !== bVal) return aVal - bVal;
+    return a.user.localeCompare(b.user);
+  }});
+
+  const pivotUser = (state.player || {{}}).pivot || '';
   creds.forEach(c => {{
     const row = document.createElement('div');
     row.className = 'cred-row';
+    const isPivot = c.user.toLowerCase() === pivotUser.toLowerCase();
+    if (isPivot) {{
+      row.style.borderLeft = '3px solid var(--orange)';
+      row.style.background = 'rgba(249, 115, 22, 0.1)';
+    }}
     row.innerHTML = '<span class="user">' + escHtml(c.user) + '</span>' +
       '<span class="badge badge-valid">' + escHtml(c.status) + '</span>';
-    row.onclick = () => doPivot(c.user);
-    row.title = 'Click to pivot to ' + c.user;
+    const status = String(c.status || '').toLowerCase();
+    if (status === 'valid') {{
+      row.onclick = () => doPivot(c.user);
+      row.title = 'Click to pivot to ' + c.user;
+    }} else {{
+      row.title = 'Credential not validated yet';
+      row.style.opacity = '0.72';
+    }}
+    el.appendChild(row);
+  }});
+}}
+
+/* ── Loot Clues ────────────────────────────────────────────── */
+function renderClues(clues) {{
+  const panel = document.getElementById('panel-clues');
+  const el = document.getElementById('clue-list');
+  document.getElementById('clue-count').textContent = clues.length;
+
+  if (!clues || !clues.length) {{
+    panel.style.display = 'none';
+    return;
+  }}
+
+  panel.style.display = 'block';
+  el.innerHTML = '';
+
+  // Sort clues alphabetically by user
+  clues.sort((a, b) => a.user.localeCompare(b.user));
+
+  clues.forEach(c => {{
+    const row = document.createElement('div');
+    row.className = 'clue-row';
+    row.style.background = 'rgba(255, 255, 255, 0.03)';
+    row.style.border = '1px solid var(--border-light)';
+    row.style.borderRadius = '4px';
+    row.style.padding = '0.35rem';
+    row.style.marginBottom = '0.1rem';
+    row.style.fontSize = '0.7rem';
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.gap = '0.15rem';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.innerHTML = '<span class="user" style="font-weight:600;color:var(--orange)">' + escHtml(c.user) + '</span>' +
+                       '<span class="badge" style="font-size:0.55rem;background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">loot clue</span>';
+    row.appendChild(header);
+
+    const val = document.createElement('div');
+    val.style.fontFamily = 'var(--mono)';
+    val.style.color = '#fff';
+    val.style.wordBreak = 'break-all';
+    val.style.padding = '0.15rem 0.25rem';
+    val.style.background = 'rgba(0,0,0,0.2)';
+    val.style.borderRadius = '3px';
+    val.textContent = c.string;
+
+    val.style.cursor = 'pointer';
+    val.title = 'Click to autofill into credential inputs';
+    val.onclick = () => {{
+      const uInput = document.getElementById('input-user');
+      const pInput = document.getElementById('input-pass');
+      if (uInput) uInput.value = c.user;
+      if (pInput) {{
+        pInput.value = c.string;
+        pInput.focus();
+      }}
+      const inputBar = document.querySelector('.input-bar');
+      if (inputBar) {{
+        inputBar.style.boxShadow = '0 0 10px var(--accent)';
+        setTimeout(() => {{ inputBar.style.boxShadow = 'none'; }}, 2000);
+      }}
+    }};
+    row.appendChild(val);
+
+    if (c.source) {{
+      const src = document.createElement('div');
+      src.style.fontSize = '0.58rem';
+      src.style.color = 'var(--text-dim)';
+      src.style.whiteSpace = 'nowrap';
+      src.style.overflow = 'hidden';
+      src.style.textOverflow = 'ellipsis';
+      src.textContent = 'Src: ' + c.source;
+      src.title = c.source;
+      row.appendChild(src);
+    }}
+
     el.appendChild(row);
   }});
 }}
@@ -798,6 +1061,8 @@ function renderHashes(pth) {{
   if (!pth.length) {{ panel.style.display = 'none'; return; }}
   panel.style.display = '';
   el.innerHTML = '';
+  // Sort hashes alphabetically by account
+  pth.sort((a, b) => a.account.localeCompare(b.account));
   pth.forEach(h => {{
     const row = document.createElement('div');
     row.className = 'cred-row';
@@ -820,6 +1085,14 @@ function renderPaths(quests, objective) {{
   const el = document.getElementById('path-list');
   el.innerHTML = '';
   const ready = quests.filter(q => q.ready || q.verified);
+  // Sort attack paths by severity first (critical, high, medium, low), then by title
+  const severityOrder = {{ critical: 0, high: 1, medium: 2, low: 3 }};
+  ready.sort((a, b) => {{
+    const aSev = severityOrder[String(a.severity).toLowerCase()] ?? 4;
+    const bSev = severityOrder[String(b.severity).toLowerCase()] ?? 4;
+    if (aSev !== bSev) return aSev - bSev;
+    return a.title.localeCompare(b.title);
+  }});
   document.getElementById('path-count').textContent = ready.length;
   if (objective.headline) {{
     const ob = document.createElement('div');
@@ -842,7 +1115,11 @@ function renderPaths(quests, objective) {{
       '<div class="detail">' + escHtml(q.technique || '') + ' &rarr; ' + escHtml(q.target || '') + '</div>';
     if (q.ready && !opRunning) {{
       f.style.cursor = 'pointer';
-      f.onclick = () => apiPost('/api/exploit');
+      if ((q.action || '').toLowerCase() === 'run') {{
+        f.onclick = () => apiPost('/api/brief', {{auto: true}});
+      }} else {{
+        f.onclick = () => apiPost('/api/exploit');
+      }}
     }}
     el.appendChild(f);
   }});
@@ -893,82 +1170,150 @@ function renderGraph(graphData) {{
 
   graphNodes = graphData.nodes.map(n => {{
     const isPivot = n.username && n.username.toLowerCase() === pivotUser.toLowerCase();
-    const isOwned = n.group === 'operator';
+    const isOwned = n.group === 'operator' || n.identity_role === 'owned' || (state.player && state.player.owned && n.username && state.player.owned.map(u => u.toLowerCase()).includes(n.username.toLowerCase()));
     const isDC = n.group === 'dc';
     const isHV = n.group === 'highvalue';
     const isGroup = n.group === 'group';
     const isComputer = n.group === 'computer';
+    const isGmsa = n.group === 'gmsa';
     const isKerberoastable = n.kerberoastable || n.group === 'kerberoastable';
     const isAsrep = n.asrep_roastable || n.group === 'asrep';
-    const isUser = n.group === 'user' || (!isPivot && !isDC && !isOwned && !isHV && !isGroup && !isComputer && !isGmsa);
+    const isDomain = n.group === 'domain';
+    const isUser = n.group === 'user' || (!isPivot && !isDC && !isOwned && !isHV && !isGroup && !isComputer && !isGmsa && !isDomain);
 
     /* Size by importance */
-    let size = 12;
-    if (isPivot) size = 26;
-    else if (isDC || isKerberoastable || isAsrep) size = 20;
-    else if (isHV) size = 18;
-    else if (isOwned) size = 18;
-    else if (isGroup) size = 14;
-    else if (isComputer) size = 14;
+    let size = 18;
+    if (isPivot) size = 28;
+    else if (isDC) size = 24;
+    else if (isDomain) size = 24;
+    else if (isHV) size = 22;
+    else if (isGroup) size = 20;
+    else if (isComputer) size = 18;
+    else if (isGmsa) size = 20;
+    else if (isKerberoastable || isAsrep) size = 20;
 
-    /* Shape by type */
-    let shape = 'dot';
-    if (isPivot) shape = 'star';
-    else if (isDC) shape = 'diamond';
-    else if (isGroup) shape = 'diamond';
-    else if (isComputer) shape = 'square';
-    else if (isGmsa) shape = 'triangle';
-    else if (isKerberoastable || isAsrep) shape = 'hexagon';
+    /* Shape & Icon logic - BloodHound inspired */
+    let iconChar = '\uf007'; // Default user
+    let iconColor = '#94a3b8'; // Slate gray
+    let shadowColor = 'rgba(0,0,0,0.5)';
+    let shadowSize = 6;
 
-    /* Colors - honor backend first, then fallback */
-    const backendColor = n.color && (typeof n.color === 'string' ? n.color : n.color.background);
-    let color;
     if (isPivot) {{
-      color = {{ background: '#f97316', border: '#fb923c', highlight: {{ background: '#fb923c', border: '#fdba74' }} }};
+      iconChar = '\uf005'; // star
+      iconColor = '#f97316'; // orange
+      shadowColor = 'rgba(249, 115, 22, 0.4)';
+      shadowSize = 12;
     }} else if (isOwned) {{
-      color = {{ background: '#22c55e', border: '#16a34a', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
-    }} else if (isDC) {{
-      color = {{ background: '#22c55e', border: '#4ade80', highlight: {{ background: '#4ade80', border: '#86efac' }} }};
-    }} else if (isHV) {{
-      color = {{ background: '#ef4444', border: '#f87171', highlight: {{ background: '#f87171', border: '#fca5a5' }} }};
-    }} else if (backendColor === '#ec4899' || isKerberoastable) {{
-      color = {{ background: '#ec4899', border: '#f472b6', highlight: {{ background: '#f472b6', border: '#fbcfe8' }} }};
-    }} else if (backendColor === '#a855f7' || isAsrep) {{
-      color = {{ background: '#a855f7', border: '#c084fc', highlight: {{ background: '#c084fc', border: '#e9d5ff' }} }};
-    }} else if (isGroup) {{
-      color = {{ background: '#8b5cf6', border: '#a78bfa', highlight: {{ background: '#a78bfa', border: '#c4b5fd' }} }};
-    }} else if (isComputer) {{
-      color = {{ background: '#6366f1', border: '#818cf8', highlight: {{ background: '#818cf8', border: '#a5b4fc' }} }};
-    }} else if (isGmsa) {{
-      color = {{ background: '#06b6d4', border: '#22d3ee', highlight: {{ background: '#22d3ee', border: '#67e8f9' }} }};
-    }} else {{
-      color = {{ background: '#475569', border: '#64748b', highlight: {{ background: '#64748b', border: '#94a3b8' }} }};
+      iconColor = '#22c55e'; // neon green for owned/operator
+      shadowColor = 'rgba(34, 197, 94, 0.8)';
+      shadowSize = 14;
+    }}
+
+    // Determine default icon char & color per type when not overridden by pivot/owned
+    if (!isPivot) {{
+      if (isDC) {{
+        iconChar = '\uf233'; // server
+        if (!isOwned) iconColor = '#ef4444'; // bright red DC
+      }} else if (isDomain) {{
+        iconChar = '\uf0ac'; // globe
+        if (!isOwned) iconColor = '#f43f5e'; // rose red domain
+      }} else if (isHV) {{
+        iconChar = '\uf521'; // crown
+        if (!isOwned) iconColor = '#ef4444'; // bright red
+      }} else if (isGroup) {{
+        iconChar = '\uf0c0'; // users
+        if (!isOwned) iconColor = '#eab308'; // yellow/gold
+      }} else if (isComputer) {{
+        iconChar = '\uf390'; // desktop
+        if (!isOwned) iconColor = '#3b82f6'; // Indigo blue
+      }} else if (isGmsa) {{
+        iconChar = '\uf4ff'; // user-gear
+        if (!isOwned) iconColor = '#06b6d4'; // cyan
+      }} else if (isKerberoastable) {{
+        iconChar = '\uf084'; // key
+        if (!isOwned) iconColor = '#ec4899'; // pink
+      }} else if (isAsrep) {{
+        iconChar = '\uf09c'; // unlock
+        if (!isOwned) iconColor = '#a855f7'; // purple
+      }} else if (isUser) {{
+        iconChar = '\uf007'; // user
+        if (!isOwned) iconColor = '#94a3b8'; // slate gray
+      }}
+    }}
+
+    const backendColor = n.color && (typeof n.color === 'string' ? n.color : n.color.background);
+    if (backendColor && !isPivot && !isOwned && !isDC && !isHV && !isDomain && !isGroup && !isComputer && !isGmsa && !isKerberoastable && !isAsrep && !isUser) {{
+      iconColor = backendColor;
     }}
 
     /* Truncate long labels and strip redundant symbols */
     let label = n.label || n.username || n.id;
-    label = label.replace(/^[\\u2605\\u2606\\u2726]\\s*/g, '');  /* Strip star prefix — shape already indicates pivot */
+    label = label.replace(/^[\\u2605\\u2606\\u2726]\\s*/g, '');  /* Strip star prefix */
     if (label.length > 22) label = label.substring(0, 20) + '...';
 
     return {{
       ...n,
       label,
-      shape,
-      size,
-      color,
-      borderWidth: isPivot ? 3 : 2,
-      shadow: {{ enabled: true, size: isPivot ? 12 : 6, color: 'rgba(0,0,0,0.3)' }},
-      font: {{ color: '#e2e8f0', size: isPivot ? 13 : (isDC ? 12 : 10), strokeWidth: 2, strokeColor: '#0a0e1a' }},
+      shape: 'icon',
+      icon: {{
+        face: '"Font Awesome 6 Free"',
+        weight: '900',
+        code: iconChar,
+        size: size,
+        color: iconColor
+      }},
+      shadow: {{ enabled: true, size: shadowSize, color: shadowColor, x: 0, y: 0 }},
+      font: {{ color: '#e2e8f0', size: isPivot ? 12 : (isDC ? 11 : 9), strokeWidth: 2, strokeColor: '#0a0e1a' }},
     }};
   }});
 
-  graphEdges = graphData.edges.map(e => ({{
-    ...e,
-    smooth: {{ type: 'dynamic' }},
-    font: {{ color: '#64748b', size: 0, strokeWidth: 0 }},
-    color: {{ color: '#334155', highlight: '#60a5fa', hover: '#60a5fa', opacity: 0.6 }},
-    hoverWidth: 1.5,
-  }}));
+  graphEdges = graphData.edges.map(e => {{
+    const lbl = String(e.label || '').trim();
+    const lowerLbl = lbl.toLowerCase();
+    let edgeColor = '#334155';
+    let width = 1.5;
+    let dashes = e.dashes || false;
+
+    if (e.pivot_edge) {{
+      edgeColor = '#f97316'; // Neon orange for current pivot path
+      width = 2.5;
+    }} else if (['genericall', 'genericwrite', 'writedacl', 'writeowner', 'owns', 'dcsync', 'getchangesall', 'getchanges', 'allextendedrights', 'addmember', 'allowedtoact'].some(k => lowerLbl.includes(k))) {{
+      edgeColor = '#f87171'; // Red for control/attack path
+      width = 1.8;
+    }} else if (['adminto', 'localadmin'].some(k => lowerLbl.includes(k))) {{
+      edgeColor = '#facc15'; // Yellow for admin rights
+      width = 1.8;
+    }} else if (['hassession', 'allowedtodelegate'].some(k => lowerLbl.includes(k))) {{
+      edgeColor = '#38bdf8'; // Sky blue for session/delegation
+      width = 1.5;
+    }} else if (['memberof', 'contains', 'member of domain'].some(k => lowerLbl.includes(k))) {{
+      edgeColor = '#64748b'; // Slate gray for structure
+      width = 1.2;
+    }}
+
+    return {{
+      ...e,
+      label: lbl,
+      smooth: {{ type: 'dynamic' }},
+      font: {{
+        color: '#e2e8f0',
+        size: 8,
+        face: 'var(--font)',
+        strokeWidth: 2,
+        strokeColor: '#0a0e1a',
+        align: 'top'
+      }},
+      color: {{
+        color: edgeColor,
+        highlight: '#60a5fa',
+        hover: '#60a5fa',
+        opacity: e.pivot_edge ? 0.95 : 0.75
+      }},
+      width: width,
+      dashes: dashes,
+      hoverWidth: 1.5,
+    }};
+  }});
 
   const container = document.getElementById('graph-canvas');
 
@@ -1009,11 +1354,10 @@ function renderGraph(graphData) {{
       arrows: {{ to: {{ enabled: true, scaleFactor: 0.6 }} }},
       smooth: {{ type: 'dynamic' }},
     }},
-    nodes: {{
-      shape: 'dot',
-      size: 12,
-      borderWidth: 2,
-    }},
+  }});
+
+  document.fonts.ready.then(() => {{
+    if (network) network.redraw();
   }});
 
   network.once('stabilizationIterationsDone', () => {{
@@ -1032,10 +1376,19 @@ function renderGraph(graphData) {{
   }});
   ro.observe(graphArea);
 
-  /* Click node -> show detail */
+  /* Click node -> show detail and pivot if owned/valid */
   network.on('click', (params) => {{
     if (params.nodes.length) {{
-      showNodeDetail(params.nodes[0]);
+      const nodeId = params.nodes[0];
+      showNodeDetail(nodeId);
+      const node = graphNodes.find(n => n.id === nodeId);
+      if (node && node.username) {{
+        const isOwned = node.identity_role === 'owned' || node.identity_role === 'pivot' || 
+                        (state.player && state.player.owned && state.player.owned.map(u => u.toLowerCase()).includes(node.username.toLowerCase()));
+        if (isOwned) {{
+          doPivot(node.username);
+        }}
+      }}
     }} else {{
       document.getElementById('panel-node-detail').style.display = 'none';
       selectedNodeId = null;

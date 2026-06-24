@@ -10,6 +10,27 @@ from admapper.graph.ops_state import (
 
 
 def test_need_creds_stage(tmp_path: Path) -> None:
+    """With scan + users but no creds → need_creds stage."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "unauth_scan.json").write_text(
+        json.dumps({"hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]})
+    )
+    (ws / "users.json").write_text(
+        json.dumps({"users": [{"username": "wallace"}, {"username": "admin"}]})
+    )
+    state = build_objective_ops_state(
+        ws, workspace="ws", domain="lab.htb", owned_users=[], pivot_user=None
+    )
+    assert state["stage"] == "need_creds"
+    assert state["engagement_over"] is False
+    action_ids = {a["action"] for a in state["actions"]}
+    assert "run" in action_ids
+    assert any(a.get("required") for a in state["actions"])
+
+
+def test_enum_stage_no_users(tmp_path: Path) -> None:
+    """With scan but no users and no creds → enum stage."""
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "unauth_scan.json").write_text(
@@ -18,11 +39,10 @@ def test_need_creds_stage(tmp_path: Path) -> None:
     state = build_objective_ops_state(
         ws, workspace="ws", domain="lab.htb", owned_users=[], pivot_user=None
     )
-    assert state["stage"] == "need_creds"
-    assert state["engagement_over"] is True
+    assert state["stage"] == "enum"
+    assert state["engagement_over"] is False
     action_ids = {a["action"] for a in state["actions"]}
     assert "enum" in action_ids
-    assert "run" in action_ids
     assert any(a.get("required") for a in state["actions"])
 
 

@@ -32,11 +32,7 @@ class OpsProgress:
     def load(cls, ws_path: Path) -> OpsProgress:
         path = Path(ws_path) / _PROGRESS_FILE
         if not path.is_file():
-            legacy = Path(ws_path) / "game_progress.json"
-            if legacy.is_file():
-                path = legacy
-            else:
-                return cls.fresh()
+            return cls.fresh()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):

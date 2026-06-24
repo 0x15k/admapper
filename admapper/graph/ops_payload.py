@@ -218,11 +218,12 @@ def build_ops_payload(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
     ops_progress: OpsProgress | None = None,
+    target_ip: str | None = None,
 ) -> dict[str, Any]:
     if ops_progress is not None:
-        owned = list(ops_progress.owned_users)
+        owned = sorted(set(ops_progress.owned_users) | set(owned_users or []), key=str.lower)
     else:
-        owned = list(owned_users or [])
+        owned = sorted(set(owned_users or []), key=str.lower)
     state = _load_json(ws_path / "state.json") or {}
     pivot = (
         pivot_user
@@ -238,6 +239,10 @@ def build_ops_payload(
     discovered_domain = str(unauth.get("domain") or "").strip()
     domain_known = bool(discovered_domain and has_scan)
     domain_s = discovered_domain if domain_known else (domain if domain and has_scan else "???")
+    target_ip_s = str(target_ip or "").strip()
+    if not target_ip_s:
+        state = _load_json(ws_path / "state.json") or {}
+        target_ip_s = str(state.get("hosts") or "").strip()
     dc_ip = ""
     dc_host = ""
     for host in unauth.get("hosts") or []:
@@ -245,6 +250,8 @@ def build_ops_payload(
             dc_ip = str(host.get("address", ""))
             dc_host = str(host.get("hostname") or "")
             break
+    if target_ip_s and not dc_ip:
+        dc_ip = target_ip_s
     if not dc_ip:
         state = _load_json(ws_path / "state.json") or {}
         dc_ip = str(state.get("hosts") or "").strip()

@@ -8,7 +8,7 @@ from admapper.core.output import print_success
 from admapper.creds.common import pick_dc_ip
 from admapper.creds.time_sync import ensure_dc_clock
 from admapper.creds.verify import run_credential_verify
-from admapper.escalate.analyze import set_pivot_user
+from admapper.escalate.analyze import mark_user_owned, set_pivot_user
 from admapper.models.credential import Credential, CredentialStatus
 
 if TYPE_CHECKING:
@@ -27,8 +27,23 @@ def run_dashboard_credential_auth(
         raise RuntimeError("no active workspace")
 
     from admapper.core.discovery import ensure_domain
+    from admapper.recon.ldap_probe import discover_domain_from_bind
 
-    resolved_domain = domain or ensure_domain(session, announce=False)
+    resolved_domain = domain or session.workspace.domain
+    if not resolved_domain:
+        target = _workspace_target_ip(session)
+        resolved_domain = discover_domain_from_bind(
+            target,
+            username.strip(),
+            password,
+            domain_hint=domain,
+        )
+        if resolved_domain:
+            session.set_domain(resolved_domain)
+            print_success(f"domain inferred from LDAP bind: {resolved_domain}")
+    if not resolved_domain:
+        resolved_domain = ensure_domain(session, announce=False)
+
     dc_ip = pick_dc_ip(session)
     if not dc_ip:
         raise ValueError("sin DC — escanea el objetivo primero")
@@ -42,16 +57,30 @@ def run_dashboard_credential_auth(
 
     user_key = username.strip().lower()
     existing = next((c for c in store.list() if c.username.lower() == user_key), None)
-    if existing is None:
-        cred = store.add(username.strip(), password, domain=resolved_domain, source="dashboard")
-    else:
-        cred = store.add(username.strip(), password, domain=resolved_domain, source="dashboard")
+    if existing is not None:
+        store.remove(existing.id)
+    cred = store.add(username.strip(), password, domain=resolved_domain, source="dashboard")
 
     result = run_credential_verify(session, cred.id)
     verified = result.credential
     if verified.status != CredentialStatus.VALID:
         raise ValueError(f"credencial inválida para {username}")
 
+    mark_user_owned(session, verified.username, refresh=True)
     set_pivot_user(session, verified.username)
     print_success(f"Credencial válida: {verified.display_user()}")
     return verified
+
+
+def _workspace_target_ip(session: Session) -> str:
+    if session.workspace is None:
+        raise RuntimeError("no active workspace")
+    hosts = (session.workspace.hosts or "").strip()
+    if hosts:
+        return hosts.split()[0]
+    from admapper.core.hosts import HostsStore
+
+    for h in HostsStore(session.workspaces, session.workspace.name).list():
+        if h.address:
+            return h.address
+    raise ValueError("no target IP set")

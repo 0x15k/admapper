@@ -1,4 +1,4 @@
-"""Game UI mode — no interactive sudo from browser-driven subprocesses."""
+"""Dashboard mode — no interactive sudo from browser-driven subprocesses."""
 
 from __future__ import annotations
 

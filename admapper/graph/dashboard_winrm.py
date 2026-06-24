@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from admapper.core.output import print_success
 from admapper.creds.common import collect_gained_hashes, pick_dc_ip, resolve_winrm_host_for_account
-from admapper.escalate.analyze import set_pivot_user
 from admapper.winrm.client import WinRMClient, WinRMError
 
 if TYPE_CHECKING:
@@ -69,7 +68,9 @@ def run_dashboard_winrm_pth(session: Session, account: str) -> str:
     if result.returncode != 0 or not result.stdout.strip():
         raise ValueError(f"WinRM sin salida (rc={result.returncode})")
 
-    set_pivot_user(session, machine_user)
-    print_success(f"WinRM PTH OK — pivot → {domain}\\{machine_user}")
+    from admapper.escalate.analyze import mark_user_owned
+
+    mark_user_owned(session, machine_user, refresh=True)
+    print_success(f"WinRM PTH OK — owned + pivot → {domain}\\{machine_user}")
     print_success(f"whoami: {result.stdout.strip()}")
     return result.stdout.strip()

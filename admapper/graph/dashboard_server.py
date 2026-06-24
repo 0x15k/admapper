@@ -22,9 +22,21 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
 from admapper.core.dashboard_mode import enable_dashboard_mode, dashboard_subprocess_env
+from admapper.models.workspace import OperationMode
+
+
+def _server_log(msg: str) -> None:
+    """Append a timestamped line to the server debug log."""
+    try:
+        with Path("/tmp/admapper_server.log").open("a", encoding="utf-8") as fh:
+            fh.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+    except OSError:
+        pass
+
+
 from admapper.graph.ops_progress import OpsProgress
 from admapper.graph.dashboard_html import build_dashboard_html
-from admapper.graph.ops_ui import build_ops_html, build_ops_payload
+from admapper.graph.ops_ui import build_ops_payload
 from admapper.graph.terminal_filter import TerminalFilter
 from admapper.analysis.user_match import refresh_workspace_intel
 
@@ -76,30 +88,100 @@ class DashboardContext:
     def refresh_payload(self) -> dict[str, Any]:
         refresh_workspace_intel(self.ws_path)
         self.progress = OpsProgress.load(self.ws_path)
+        self._sync_loot_progress()
+
+        # Sync verified/owned users into self.progress from state.json & credentials.json
+        state_path = self.ws_path / "state.json"
+        if state_path.is_file():
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                state_owned = list(state.get("owned_users") or [])
+                for u in state_owned:
+                    if u.lower() not in {o.lower() for o in self.progress.owned_users}:
+                        self.progress.owned_users.append(u)
+                    if u.lower() not in {o.lower() for o in self.progress.verified_users}:
+                        self.progress.verified_users.append(u)
+            except Exception:
+                pass
+
+        creds_path = self.ws_path / "credentials.json"
+        if creds_path.is_file():
+            try:
+                cdata = json.loads(creds_path.read_text(encoding="utf-8"))
+                for c in cdata.get("credentials") or []:
+                    username = c.get("username")
+                    if str(c.get("status")) == "valid" and username:
+                        username_s = str(username)
+                        if username_s.lower() not in {u.lower() for u in self.progress.verified_users}:
+                            self.progress.verified_users.append(username_s)
+                        if username_s.lower() not in {u.lower() for u in self.progress.owned_users}:
+                            self.progress.owned_users.append(username_s)
+            except Exception:
+                pass
+
+        self.progress.save(self.ws_path)
+
         # Keep initial owned/pivot context even if ops_progress file is empty.
         file_owned = set(self.progress.owned_users)
         initial_owned = {u.lower() for u in (self._initial_owned_users or [])}
         merged_owned = sorted(file_owned | initial_owned, key=str.lower)
         self.owned_users = list(merged_owned)
+
+        # Sync pivot and owned from state.json / credentials.json when context
+        # was not established via CLI flags (e.g. `admapper web -H <ip>` only).
+        state_path = self.ws_path / "state.json"
+        if state_path.is_file():
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            if state.get("domain"):
+                self.domain = str(state["domain"])
+            if state.get("hosts") and not self.host:
+                self.host = str(state["hosts"])
+            # Inherit owned_users from state.json when progress is empty.
+            state_owned = list(state.get("owned_users") or [])
+            if state_owned:
+                for u in state_owned:
+                    if u.lower() not in {o.lower() for o in self.owned_users}:
+                        self.owned_users.append(u)
+            # Inherit pivot_user from state.json when not set.
+            if not self.pivot_user and state.get("pivot_user"):
+                self.pivot_user = str(state["pivot_user"])
+
+        # Derive pivot from valid credentials when still unset.
+        if not self.pivot_user:
+            creds_path = self.ws_path / "credentials.json"
+            if creds_path.is_file():
+                try:
+                    cdata = json.loads(creds_path.read_text(encoding="utf-8"))
+                    for c in cdata.get("credentials") or []:
+                        if str(c.get("status")) == "valid" and c.get("username"):
+                            self.pivot_user = str(c["username"])
+                            if self.pivot_user.lower() not in {
+                                u.lower() for u in self.owned_users
+                            }:
+                                self.owned_users.append(self.pivot_user)
+                            break
+                except (json.JSONDecodeError, OSError):
+                    pass
+
         if self.pivot_user and self.pivot_user.lower() not in {
             u.lower() for u in self.owned_users
         }:
             verified = self.progress.verified_set()
             if self.pivot_user.lower() not in verified:
                 self.pivot_user = self.owned_users[-1] if self.owned_users else None
-        state_path = self.ws_path / "state.json"
-        if state_path.is_file():
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            if state.get("domain"):
-                self.domain = str(state["domain"])
-        return build_ops_payload(
+
+        payload = build_ops_payload(
             self.ws_path,
             workspace=self.workspace,
             domain=self.domain,
             owned_users=self.owned_users,
             pivot_user=self.pivot_user,
             ops_progress=self.progress,
+            target_ip=self.host,
         )
+        payload["running"] = bool(self.running)
+        payload["busy"] = bool(self.op_lock.locked())
+        return payload
 
     def _sync_loot_progress(self) -> None:
         manifest_path = self.ws_path / "loot_manifest.json"
@@ -186,7 +268,7 @@ class DashboardContext:
         from admapper.core.session import Session
 
         session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
+        session.select_workspace(self.workspace, create=True)
         dispatch(session, f"set hosts {ip}")
         session.persist_workspace()
         self.host = ip
@@ -209,7 +291,7 @@ class DashboardContext:
         return ok
 
     def run_auth(self, username: str, password: str, ip: str | None = None) -> None:
-        target = (ip or self._dc_ip()).strip()
+        target = (ip or self._dc_ip() or self.host or "").strip()
         if not target:
             self.emit("sin IP — escribe la IP del objetivo antes de autenticar", kind="error")
             return
@@ -217,34 +299,61 @@ class DashboardContext:
             self.emit("usuario y contraseña requeridos", kind="error")
             return
         self._persist_target_ip(target)
+        _server_log(f"[auth] target={target} user={username}")
+
+        # Phase 02 — make sure we have discovered the domain / DC before verifying creds.
+        if not self.domain:
+            self.emit("descubriendo dominio/DC antes de validar credenciales", kind="phase")
+            ok = self._run_workspace_script(
+                "from admapper.cli.commands import dispatch\n"
+                f"dispatch(session, 'set hosts {target}')\n"
+                "dispatch(session, 'start_unauth')\n",
+                label=f"scan {target}",
+            )
+            if not ok:
+                self.emit("no se pudo descubrir el dominio — ejecuta ESCANEAR primero", kind="error")
+                return
+            self.progress.scan = True
+            self.progress.save(self.ws_path)
+            self.domain = self._load_domain_from_state() or self.domain
+            if not self.domain:
+                self.emit("el escaneo no descubrió el dominio — verifica VPN/objetivo", kind="error")
+                return
+
         auth_ok = self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            f"dispatch(session, 'set hosts {target}')\n"
-            f"dispatch(session, 'creds add {username} {password}')\n"
-            "dispatch(session, 'creds verify')\n"
-            "dispatch(session, 'start_auth')\n",
+            "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
+            f"run_dashboard_credential_auth(session, username={username!r}, password={password!r}, domain={self.domain!r})\n",
             label=f"autenticar como {username}",
         )
         if auth_ok:
-            self.progress.scan = True
             self.progress.remember_auth(username)
             self.pivot_user = username
+            if self.ws_path.joinpath("graph.json").is_file():
+                self._run_workspace_script(
+                    "from admapper.escalate.analyze import mark_user_owned\n"
+                    f"mark_user_owned(session, {username!r}, refresh=True)\n",
+                    label=f"mark owned {username}",
+                )
             self.progress.save(self.ws_path)
 
     def _run_workspace_script(self, script: str, *, label: str) -> bool:
         """Run in-process op with stdout routed through the dashboard terminal filter."""
         import io
-        from contextlib import redirect_stdout
+        import traceback as _traceback
+        from contextlib import redirect_stderr, redirect_stdout
 
         from admapper.core.session import Session
 
         self.emit(label, kind="cmd")
         self.terminal_filter.reset()
         session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
+        session.select_workspace(self.workspace, create=True)
+        if session.workspace is not None:
+            session.workspace.mode = OperationMode.AUTO
+        _server_log(f"[run] workspace={self.workspace} label={label}")
         buf = io.StringIO()
         try:
-            with redirect_stdout(buf):
+            with redirect_stdout(buf), redirect_stderr(buf):
                 exec(script, {"session": session, "__name__": "__main__"})  # noqa: S102
             session.persist_workspace()
             for line in buf.getvalue().splitlines():
@@ -252,9 +361,15 @@ class DashboardContext:
                 if filtered:
                     kind = "done" if filtered.startswith("✓") else "log"
                     self.emit(filtered, kind=kind)
+            raw = buf.getvalue()
+            if raw.strip():
+                _server_log(f"[stdout/stderr] {label}\n{raw[:4000]}")
+            _server_log(f"[done] {label} output_lines={len(raw.splitlines())}")
             self.emit("fin · código 0", kind="done")
             return True
         except Exception as exc:  # noqa: BLE001
+            tb = _traceback.format_exc()
+            _server_log(f"[error] {label}: {exc}\n{tb}")
             self.emit(str(exc), kind="error")
             self.emit("fin · código 1", kind="error")
             return False
@@ -274,12 +389,56 @@ class DashboardContext:
                 )
         return None
 
+    def _load_domain_from_state(self) -> str | None:
+        state_path = self.ws_path / "state.json"
+        if state_path.is_file():
+            data = json.loads(state_path.read_text(encoding="utf-8"))
+            if data.get("domain"):
+                return str(data["domain"])
+        return None
+
+    def _load_credentials(self) -> list[dict[str, Any]]:
+        creds_path = self.ws_path / "credentials.json"
+        if not creds_path.is_file():
+            return []
+        try:
+            data = json.loads(creds_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        return list(data.get("credentials") or [])
+
     def run_enum_users(self) -> None:
-        ok = self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            "dispatch(session, 'enum users')",
-            label="enum users",
-        )
+        from admapper.models.credential import CredentialStatus
+
+        store = self._load_credentials()
+        chosen = None
+        for item in store:
+            if item.get("status") != CredentialStatus.VALID.value:
+                continue
+            if not item.get("secret"):
+                continue
+            chosen = item
+            pivot = (self.pivot_user or "").strip().lower()
+            if pivot and str(item.get("username", "")).strip().lower() == pivot:
+                break
+        has_valid_cred = chosen is not None
+        if has_valid_cred:
+            display_user = str(chosen.get("username", "")).strip()
+            display_domain = str(chosen.get("domain") or self.domain or "").strip()
+            shown = f"{display_domain}\\{display_user}" if display_domain else display_user
+            self.emit(f"authenticated LDAP/SMB enumeration as {shown}", kind="phase")
+            ok = self._run_workspace_script(
+                "from admapper.cli.commands import dispatch\n"
+                f"dispatch(session, 'enum auth --cred-id {chosen.get('id')}')",
+                label=f"enum auth {shown}",
+            )
+        else:
+            self.emit("pre-auth user enumeration", kind="phase")
+            ok = self._run_workspace_script(
+                "from admapper.cli.commands import dispatch\n"
+                "dispatch(session, 'enum users')",
+                label="enum users",
+            )
         if ok:
             self.progress.enum_users = True
             self.progress.save(self.ws_path)
@@ -333,9 +492,11 @@ class DashboardContext:
             self.progress.save(self.ws_path)
 
     def set_pivot(self, username: str) -> None:
+        if self.pivot_user and self.pivot_user.lower() == username.lower():
+            return
         self._run_workspace_script(
             "from admapper.cli.commands import dispatch\n"
-            f"dispatch(session, 'pivot {username}')",
+            f"dispatch(session, 'escalate pivot {username}')",
             label=f"pivot {username}",
         )
         self.pivot_user = username
@@ -352,6 +513,17 @@ class DashboardContext:
             self.pivot_user = account
             self.progress.remember_auth(account)
             self.progress.exploit = True
+            # Mark the machine account as owned in the attack graph
+            if self.ws_path.joinpath("graph.json").is_file():
+                self._run_workspace_script(
+                    "from admapper.escalate.analyze import mark_user_owned\n"
+                    f"mark_user_owned(session, {account!r}, refresh=True)\n",
+                    label=f"mark owned {account}",
+                )
+            if account.lower() not in {u.lower() for u in self.owned_users}:
+                self.owned_users.append(account)
+            if account.lower() not in {u.lower() for u in self.progress.owned_users}:
+                self.progress.owned_users.append(account)
             self.progress.save(self.ws_path)
 
     def run_brief(self, *, auto: bool = False) -> None:
@@ -418,23 +590,6 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
             path = urlparse(self.path).path
             if path in {"/", "/index.html", "/dashboard"}:
                 html_content = build_dashboard_html(
-                    ctx.ws_path,
-                    workspace=ctx.workspace,
-                    domain=ctx.domain,
-                    owned_users=ctx.owned_users,
-                    pivot_user=ctx.pivot_user,
-                    api_mode=True,
-                )
-                body = html_content.encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
-
-            if path == "/legacy":
-                html_content = build_ops_html(
                     ctx.ws_path,
                     workspace=ctx.workspace,
                     domain=ctx.domain,
@@ -536,6 +691,18 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
                 return
 
             if path == "/api/enum":
+                if str(body.get("mode", "")).strip().lower() == "auth":
+                    if not ctx._get_stored_credential():
+                        _json_response(self, 400, {"error": "valid credential required"})
+                        return
+                    self._start_background(
+                        lambda: ctx._run_workspace_script(
+                            "from admapper.auth.start_auth import run_start_auth\n"
+                            "run_start_auth(session)\n",
+                            label="authenticated enum",
+                        )
+                    )
+                    return
                 self._start_background(ctx.run_enum_users)
                 return
 
@@ -613,7 +780,6 @@ def run_dashboard_server(
 
     print_success(f"ADMapper dashboard → {url}")
     print_info("Ctrl+C para detener el servidor")
-    print_info("legacy UI disponible en /legacy")
     if open_browser:
         try:
             webbrowser.open(url)

@@ -63,6 +63,12 @@ def _mark_owned_user(session: Session, username: str) -> None:
     if username.lower() not in {u.lower() for u in owned}:
         owned.append(username)
     session.workspace.pivot_user = username
+    from admapper.analysis.user_match import refresh_workspace_intel
+
+    refresh_workspace_intel(
+        session.workspaces.path_for(session.workspace.name),
+        users_store=None,
+    )
     session.persist_workspace()
 
 

@@ -143,8 +143,10 @@ def run_winrm_shell(
             if result.returncode != 0:
                 raise typer.Exit(result.returncode)
             print_success(f"WinRM OK ({result.shell})")
+            _auto_mark_owned(domain=domain, username=username, dc_ip=dc)
         else:
             client.interactive_shell()
+            _auto_mark_owned(domain=domain, username=username, dc_ip=dc)
     except WinRMError as exc:
         print_error(str(exc))
         print_info(winrm_deps_hint())
@@ -155,3 +157,35 @@ def run_winrm_shell(
                 f"try machine PTH: admapper winrm -H {dc} -d {domain} -u '{account}' --hash {h}"
             )
         raise typer.Exit(1) from exc
+
+
+def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
+    """Best-effort: mark user as owned in the workspace after successful WinRM."""
+    try:
+        from admapper.core.session import Session
+        from admapper.escalate.analyze import mark_user_owned
+
+        session = Session.bootstrap()
+        # Locate workspace for this target
+        slug = f"target-{dc_ip.replace('.', '-')}" if dc_ip and dc_ip[0].isdigit() else None
+        ws_name: str | None = None
+        if slug:
+            for name in session.workspaces.list_workspaces():
+                if slug in name:
+                    ws_name = name
+                    break
+        if not ws_name:
+            # Fall back to first workspace that has this domain
+            for name in session.workspaces.list_workspaces():
+                session.select_workspace(name)
+                if session.workspace and session.workspace.domain and session.workspace.domain.lower() == domain.lower():
+                    ws_name = name
+                    break
+        if ws_name:
+            session.select_workspace(ws_name)
+            if session.workspace:
+                mark_user_owned(session, username, refresh=True)
+                print_success(f"auto-owned: {username} → pwned en workspace {ws_name}")
+    except Exception as exc:
+        print_info(f"auto-owned skip: {exc}")
+

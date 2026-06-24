@@ -393,7 +393,7 @@ def compute_stage_and_actions(
             "actions": actions,
         }
 
-    if has_scan and not has_users:
+    if has_scan and not has_users and not has_creds:
         actions.append(
             {
                 "id": "enum_users",
@@ -404,6 +404,12 @@ def compute_stage_and_actions(
                 "required": True,
             }
         )
+        return {
+            "stage": "enum",
+            "stage_label": "Recon OK — enumera identidades",
+            "engagement_over": False,
+            "actions": actions,
+        }
 
     if has_scan and has_users and not has_creds:
         actions.extend(
@@ -432,7 +438,33 @@ def compute_stage_and_actions(
                     "reason": "P04 — prueba una contraseña en el user list",
                     "required": False,
                 },
+                {
+                    "id": "cred",
+                    "action": "run",
+                    "button": "▶ INTRODUCIR CREDENCIALES",
+                    "enabled": True,
+                    "reason": "Si tienes una credencial correcta, validarla desbloquea el resto",
+                    "required": True,
+                },
             ]
+        )
+        return {
+            "stage": "need_creds",
+            "stage_label": "Enum OK — falta credencial válida",
+            "engagement_over": False,
+            "actions": actions,
+        }
+
+    if has_scan and not has_users:
+        actions.append(
+            {
+                "id": "enum_users",
+                "action": "enum",
+                "button": "▶ ENUMERAR USUARIOS (IDENT)",
+                "enabled": True,
+                "reason": "SAMR · LDAP · AS-REP / Kerberoast surface",
+                "required": True,
+            }
         )
 
     if not has_creds:

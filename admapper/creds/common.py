@@ -93,7 +93,8 @@ def pick_dc_ip(session: Session) -> str | None:
     if not dcs:
         dcs = [h for h in hosts if 88 in h.open_ports or 389 in h.open_ports]
     if not dcs:
-        return None
+        fallback = str(session.workspace.hosts or "").strip()
+        return fallback or None
     return dcs[0].address
 
 

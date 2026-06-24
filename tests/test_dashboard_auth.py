@@ -90,3 +90,35 @@ def test_dashboard_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) 
     called_id = mock_verify.call_args[0][1]
     assert any(c.id == called_id and c.username == "svc_recovery" for c in added)
     mock_pivot.assert_called_once_with(session, "svc_recovery")
+
+
+def test_dashboard_auth_uses_session_target_ip_when_ip_missing(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    session.workspace.hosts = "10.0.0.1"
+    session.persist_workspace()
+
+    verified = Credential(
+        id="new-svc",
+        username="svc_recovery",
+        secret="pw",
+        domain="lab.htb",
+        status=CredentialStatus.VALID,
+    )
+
+    with (
+        patch("admapper.graph.dashboard_auth.pick_dc_ip", return_value="10.0.0.1"),
+        patch("admapper.graph.dashboard_auth.ensure_dc_clock"),
+        patch("admapper.graph.dashboard_auth.run_credential_verify") as mock_verify,
+        patch("admapper.graph.dashboard_auth.set_pivot_user"),
+    ):
+        mock_verify.return_value.credential = verified
+
+        run_dashboard_credential_auth(
+            session,
+            username="svc_recovery",
+            password="Em3rg3ncyPa$$2026",
+            domain="lab.htb",
+        )
+
+    added = session.credentials.list()
+    assert any(c.username == "svc_recovery" for c in added)

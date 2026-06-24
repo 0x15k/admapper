@@ -6,7 +6,7 @@ Canonical AD pentest phase model — merges the best of:
 - **CRTO** (Zero-Point): operator loop recon → pivot → execute → repeat
 - **MITRE ATT&CK**: tactic/technique tags per phase (not the primary spine)
 
-Game UI exposes a shortened OPS_PHASES view; CLI/reporting use UNIFIED_PHASES (P1–P12).
+Dashboard exposes a shortened OPS_PHASES view; CLI/reporting use UNIFIED_PHASES (P1–P12).
 """
 
 from __future__ import annotations

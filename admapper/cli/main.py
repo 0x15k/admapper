@@ -708,6 +708,16 @@ def web(
         raise typer.Exit(1)
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
+    if host and ws.hosts and ws.hosts.strip() != host.strip():
+        ws = session.select_workspace(default_workspace_name(host), create=True)
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        ws_path = session.workspaces.path_for(ws.name)
+    elif host and not ws.hosts:
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        ws_path = session.workspaces.path_for(ws.name)
+        ws = session.workspace
     run_dashboard_server(
         ws_path=ws_path,
         workspace=ws.name,
@@ -766,6 +776,16 @@ def dashboard(
         raise typer.Exit(1)
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
+    if host and ws.hosts and ws.hosts.strip() != host.strip():
+        ws = session.select_workspace(default_workspace_name(host), create=True)
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        ws_path = session.workspaces.path_for(ws.name)
+    elif host and not ws.hosts:
+        dispatch(session, f"set hosts {host.strip()}")
+        session.persist_workspace()
+        ws_path = session.workspaces.path_for(ws.name)
+        ws = session.workspace
     write_ops_html(
         ws_path,
         workspace=ws.name,
