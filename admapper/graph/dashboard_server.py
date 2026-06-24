@@ -702,6 +702,12 @@ def run_dashboard_server(
     class _ReuseServer(ThreadingHTTPServer):
         allow_reuse_address = True
 
+        def handle_error(self, request: Any, client_address: tuple[str, int]) -> None:
+            exc_type, exc, _ = sys.exc_info()
+            if exc_type and issubclass(exc_type, (BrokenPipeError, ConnectionResetError, OSError)):
+                return
+            super().handle_error(request, client_address)
+
     httpd: ThreadingHTTPServer | None = None
     bound_port = port
     for candidate in range(port, port + 10):
