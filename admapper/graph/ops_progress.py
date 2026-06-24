@@ -23,6 +23,7 @@ class OpsProgress:
     owned_users: list[str] = field(default_factory=list)
     verified_users: list[str] = field(default_factory=list)
     loot_users: list[str] = field(default_factory=list)
+    owned_methods: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def fresh(cls) -> OpsProgress:
@@ -47,6 +48,7 @@ class OpsProgress:
             owned_users=list(data.get("owned_users") or []),
             verified_users=list(data.get("verified_users") or []),
             loot_users=list(data.get("loot_users") or []),
+            owned_methods=dict(data.get("owned_methods") or {}),
         )
 
     def save(self, ws_path: Path) -> None:
@@ -61,10 +63,11 @@ class OpsProgress:
             "owned_users": sorted(set(self.owned_users), key=str.lower),
             "verified_users": sorted(set(self.verified_users), key=str.lower),
             "loot_users": sorted(set(self.loot_users), key=str.lower),
+            "owned_methods": dict(self.owned_methods),
         }
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    def remember_auth(self, username: str) -> None:
+    def remember_auth(self, username: str, *, method: str = "password") -> None:
         user = username.strip()
         if not user:
             return
@@ -72,6 +75,23 @@ class OpsProgress:
         for bucket in (self.auth_users, self.owned_users, self.verified_users):
             if key not in {u.lower() for u in bucket}:
                 bucket.append(user)
+        if key not in self.owned_methods:
+            self.owned_methods[key] = method
+
+    def remember_owned(self, username: str, *, method: str) -> None:
+        """Mark user as owned with a specific auth method.
+
+        Methods: password, ntlm_hash, spray, kerberoast, asreproast,
+                 exploit_acl, dll_hijack, winrm_pth, certificate.
+        """
+        user = username.strip()
+        if not user:
+            return
+        key = user.lower()
+        if key not in {u.lower() for u in self.owned_users}:
+            self.owned_users.append(user)
+        # Always update method (later compromise may refine it)
+        self.owned_methods[key] = method
 
     def remember_loot_users(self, usernames: list[str]) -> None:
         self.loot = True

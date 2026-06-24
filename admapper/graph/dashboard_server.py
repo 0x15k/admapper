@@ -170,6 +170,9 @@ class DashboardContext:
             if self.pivot_user.lower() not in verified:
                 self.pivot_user = self.owned_users[-1] if self.owned_users else None
 
+        # Infer owned_methods from workspace artifacts for users missing a method
+        self._infer_owned_methods()
+
         payload = build_ops_payload(
             self.ws_path,
             workspace=self.workspace,
@@ -196,6 +199,119 @@ class DashboardContext:
         if users or data.get("file_count"):
             self.progress.remember_loot_users(users)
             self.progress.save(self.ws_path)
+
+    def _sync_spray_owned(self) -> None:
+        """After spray, read spray_report.json and mark hits as owned."""
+        report_path = self.ws_path / "spray_report.json"
+        if not report_path.is_file():
+            return
+        try:
+            data = json.loads(report_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        for user in data.get("hits") or []:
+            user_s = str(user).strip()
+            if user_s:
+                self.progress.remember_owned(user_s, method="spray")
+                if user_s.lower() not in {u.lower() for u in self.owned_users}:
+                    self.owned_users.append(user_s)
+        self.progress.save(self.ws_path)
+
+    def _sync_exploit_owned(self) -> None:
+        """After exploit, read exploit_log.json and mark gained accounts as owned."""
+        log_path = self.ws_path / "exploit_log.json"
+        if not log_path.is_file():
+            return
+        try:
+            data = json.loads(log_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        for item in data.get("new_hashes") or []:
+            account = str(item.get("account", "")).strip()
+            if account:
+                self.progress.remember_owned(account, method="exploit_acl")
+                if account.lower() not in {u.lower() for u in self.owned_users}:
+                    self.owned_users.append(account)
+        for user in data.get("new_users") or []:
+            user_s = str(user).strip()
+            if user_s:
+                self.progress.remember_owned(user_s, method="exploit_acl")
+                if user_s.lower() not in {u.lower() for u in self.owned_users}:
+                    self.owned_users.append(user_s)
+        self.progress.save(self.ws_path)
+
+    def _sync_new_creds_owned(self, *, source: str, method: str) -> None:
+        """After roast/other credential attacks, sync newly valid creds as owned."""
+        creds_path = self.ws_path / "credentials.json"
+        if not creds_path.is_file():
+            return
+        try:
+            data = json.loads(creds_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        for c in data.get("credentials") or []:
+            cred_source = str(c.get("source", ""))
+            username = str(c.get("username", "")).strip()
+            status = str(c.get("status", ""))
+            if cred_source == source and username:
+                # Even unverified creds from roast are worth tracking
+                self.progress.remember_owned(username, method=method)
+                if username.lower() not in {u.lower() for u in self.owned_users}:
+                    self.owned_users.append(username)
+        self.progress.save(self.ws_path)
+
+    def _infer_owned_methods(self) -> None:
+        """Backfill owned_methods for users that don't have a method yet."""
+        known = set(self.progress.owned_methods.keys())
+        need = {u.lower() for u in self.progress.owned_users} - known
+        if not need:
+            return
+        # Infer from credentials.json
+        creds_path = self.ws_path / "credentials.json"
+        if creds_path.is_file():
+            try:
+                cdata = json.loads(creds_path.read_text(encoding="utf-8"))
+                for c in cdata.get("credentials") or []:
+                    uname = str(c.get("username", "")).strip().lower()
+                    if uname not in need:
+                        continue
+                    cred_type = str(c.get("type", ""))
+                    source = str(c.get("source", ""))
+                    if source in {"spray"}:
+                        method = "spray"
+                    elif source in {"kerberoast"}:
+                        method = "kerberoast"
+                    elif source in {"asreproast"}:
+                        method = "asreproast"
+                    elif cred_type == "ntlm":
+                        method = "ntlm_hash"
+                    elif cred_type == "kerberos":
+                        method = "kerberos"
+                    else:
+                        method = "password"
+                    self.progress.owned_methods[uname] = method
+                    need.discard(uname)
+            except (json.JSONDecodeError, OSError):
+                pass
+        # Infer from exploit_log.json
+        if need:
+            log_path = self.ws_path / "exploit_log.json"
+            if log_path.is_file():
+                try:
+                    data = json.loads(log_path.read_text(encoding="utf-8"))
+                    hash_accounts = {
+                        str(h.get("account", "")).strip().lower()
+                        for h in data.get("new_hashes") or []
+                    }
+                    for u in list(need):
+                        if u in hash_accounts or u.rstrip("$") in hash_accounts:
+                            self.progress.owned_methods[u] = "exploit_acl"
+                            need.discard(u)
+                except (json.JSONDecodeError, OSError):
+                    pass
+        # Default remaining to "password"
+        for u in need:
+            self.progress.owned_methods[u] = "password"
 
     def _admapper_cmd(self, *args: str) -> list[str]:
         exe = shutil.which("admapper")
@@ -326,7 +442,7 @@ class DashboardContext:
             label=f"autenticar como {username}",
         )
         if auth_ok:
-            self.progress.remember_auth(username)
+            self.progress.remember_auth(username, method="password")
             self.pivot_user = username
             if self.ws_path.joinpath("graph.json").is_file():
                 self._run_workspace_script(
@@ -449,6 +565,7 @@ class DashboardContext:
             "dispatch(session, 'asreproast')",
             label="asreproast",
         )
+        self._sync_new_creds_owned(source="asreproast", method="asreproast")
 
     def run_kerberoast(self) -> None:
         self._run_workspace_script(
@@ -456,6 +573,7 @@ class DashboardContext:
             "dispatch(session, 'kerberoast')",
             label="kerberoast",
         )
+        self._sync_new_creds_owned(source="kerberoast", method="kerberoast")
 
     def run_spray(self, password: str) -> None:
         if not password:
@@ -464,12 +582,14 @@ class DashboardContext:
         import base64
 
         pw_b64 = base64.b64encode(password.encode()).decode()
-        self._run_workspace_script(
+        ok = self._run_workspace_script(
             "import base64\n"
             "from admapper.cli.commands import dispatch\n"
             f"dispatch(session, 'spray ' + base64.b64decode('{pw_b64}').decode())",
             label="spray '***'",
         )
+        if ok:
+            self._sync_spray_owned()
 
     def run_exploit(self) -> None:
         ok = self._run_workspace_script(
@@ -479,6 +599,7 @@ class DashboardContext:
         )
         if ok:
             self.progress.exploit = True
+            self._sync_exploit_owned()
             self.progress.save(self.ws_path)
 
     def run_acls(self) -> None:
@@ -500,7 +621,7 @@ class DashboardContext:
             label=f"pivot {username}",
         )
         self.pivot_user = username
-        self.progress.remember_auth(username)
+        self.progress.remember_auth(username, method="password")
         self.progress.save(self.ws_path)
 
     def run_winrm_pth(self, account: str) -> None:
@@ -511,7 +632,7 @@ class DashboardContext:
         )
         if ok:
             self.pivot_user = account
-            self.progress.remember_auth(account)
+            self.progress.remember_auth(account, method="ntlm_hash")
             self.progress.exploit = True
             # Mark the machine account as owned in the attack graph
             if self.ws_path.joinpath("graph.json").is_file():
