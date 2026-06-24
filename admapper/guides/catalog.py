@@ -441,7 +441,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
     "adcs_esc": _g(
         "adcs_esc",
         title="AD CS ESC attacks",
-        summary="Abuse misconfigured certificate templates and CAs (ESC1–ESC16).",
+        summary="Abuse misconfigured certificate templates and CAs using the current ESC catalog.",
         prerequisites=(
             "AD CS installed (pKIEnrollmentService in LDAP)",
             "Valid domain credential",

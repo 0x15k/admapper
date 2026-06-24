@@ -392,14 +392,14 @@ Las fases están ordenadas por **dependencia**: cada una consume la salida de la
 
 ---
 
-### Fase 12 — ADCS (ESC1–ESC16)
+### Fase 12 — ADCS (current ESC catalog)
 
 | ID | Tarea | Técnica | MITRE | Estado |
 |---|---|---|---|---|
-| 12.1 | Detección de templates vulnerables (ESC1–ESC17) | ADCS enum | T1649 | ✅ |
+| 12.1 | Detección de templates vulnerables (current ESC catalog) | ADCS enum | T1649 | ✅ |
 | 12.2 | Explotación ESC1 (SAN editable + EKU) | ESC1 | T1649 | ✅ |
 | 12.3 | Explotación ESC8 (NTLM relay → web enrollment) | ESC8 | T1649 | ✅ |
-| 12.4 | ESC2–ESC7, ESC9–ESC16 (una a una) | ADCS ESC | T1649 | ✅ |
+| 12.4 | ESC2–ESC7, ESC9–ESC15 + Golden Certificate (una a una) | ADCS ESC | T1649 | ✅ |
 | 12.5 | GoldenCert | CA abuse | T1649 | ✅ |
 
 **Depende de:** Fase 8
