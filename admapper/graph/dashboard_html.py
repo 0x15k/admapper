@@ -489,8 +489,9 @@ function doScan() {{
 function doAuth() {{
   const username = document.getElementById('input-user').value.trim();
   const password = document.getElementById('input-pass').value;
+  const ip = document.getElementById('input-ip').value.trim();
   if (!username || !password) return;
-  apiPost('/api/run', {{username, password}});
+  apiPost('/api/run', {{username, password, ip}});
 }}
 
 function doExploit() {{ apiPost('/api/exploit'); }}

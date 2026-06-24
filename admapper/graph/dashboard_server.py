@@ -191,26 +191,33 @@ class DashboardContext:
         session.persist_workspace()
         self.host = ip
 
-    def run_scan(self, *, ip: str | None = None) -> None:
+    def run_scan(self, *, ip: str | None = None) -> bool:
         target = (ip or self._dc_ip()).strip()
         if not target:
             self.emit("sin IP — escribe la IP del objetivo en el terminal de arranque", kind="error")
-            return
+            return False
         self._persist_target_ip(target)
         cmd = self._admapper_cmd("scan", "-H", target, "-w", self.workspace)
         code = self._run_subprocess(cmd)
         if code == 0:
             self.progress.scan = True
             self.progress.save(self.ws_path)
+            return True
+        return False
 
-    def run_auth(self, username: str, password: str) -> None:
-        ip = self._dc_ip()
-        if not ip:
-            self.emit("sin IP de DC", kind="error")
+    def run_auth(self, username: str, password: str, ip: str | None = None) -> None:
+        target = (ip or self._dc_ip()).strip()
+        if not target:
+            self.emit("sin IP — escribe la IP del objetivo antes de autenticar", kind="error")
             return
         if not username or not password:
             self.emit("usuario y contraseña requeridos", kind="error")
             return
+        if not self.domain and not (self.ws_path / "unauth_scan.json").is_file():
+            self.emit("sin dominio descubierto — ejecutando scan inicial", kind="phase")
+            if not self.run_scan(ip=target):
+                self.emit("scan inicial falló; no se puede autenticar todavía", kind="error")
+                return
         import base64
 
         user_b64 = base64.b64encode(username.encode()).decode()
@@ -601,6 +608,7 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
                     lambda: ctx.run_auth(
                         str(body.get("username", "")).strip(),
                         str(body.get("password", "")),
+                        str(body.get("ip", "")).strip() or None,
                     )
                 )
                 return
