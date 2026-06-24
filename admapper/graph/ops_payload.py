@@ -473,7 +473,7 @@ def build_ops_payload(
         },
         "topology": topology,
         "graph_mode": graph_mode,
-        "player": {"pivot": pivot, "owned": owned},
+        "player": {"pivot": pivot, "owned": owned, "owned_methods": (ops_progress.owned_methods if ops_progress else {})},
         "selectable_identities": selectable,
         "identity_lens": identity_lens,
         "phases": _phase_status(ws_path),

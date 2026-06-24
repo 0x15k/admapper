@@ -86,8 +86,10 @@ def build_selectable_identities(
     """Humans the operator can focus on — owned, cred-valid, or loot-pending."""
     ws_path = Path(ws_path)
     owned = _owned_lower(owned_users)
+    owned_methods: dict[str, str] = {}
     if ops_progress is not None:
         valid = ops_progress.verified_set()
+        owned_methods = dict(ops_progress.owned_methods)
     else:
         valid = _valid_cred_users(ws_path)
     seen: set[str] = set()
@@ -100,6 +102,7 @@ def build_selectable_identities(
         selectable: str,
         cred_valid: bool,
         detail: str = "",
+        auth_method: str = "",
     ) -> None:
         key = username.lower()
         if not username or key in seen:
@@ -114,18 +117,35 @@ def build_selectable_identities(
                 "cred_valid": cred_valid,
                 "owned": key in owned,
                 "detail": detail,
+                "auth_method": auth_method or owned_methods.get(key, ""),
             }
         )
 
+    _METHOD_LABELS = {
+        "password": "🔑 password",
+        "ntlm_hash": "#️⃣ NTLM hash",
+        "spray": "💨 spray",
+        "kerberoast": "🎫 kerberoast",
+        "asreproast": "🎫 AS-REP roast",
+        "exploit_acl": "⚡ exploit ACL",
+        "dll_hijack": "📦 DLL hijack",
+        "winrm_pth": "#️⃣ WinRM PTH",
+        "certificate": "📜 certificado",
+    }
     for user in sorted(owned_users, key=str.lower):
         if user.endswith("$"):
             continue
+        method_key = owned_methods.get(user.lower(), "")
+        method_label = _METHOD_LABELS.get(method_key, method_key)
+        method_part = f" · {method_label}" if method_label else ""
+        cred_part = " · cred válida" if user.lower() in valid else " · sin cred verificada"
         add(
             user,
             role="owned",
             selectable="pivot",
             cred_valid=user.lower() in valid,
-            detail="comprometido" + (" · cred válida" if user.lower() in valid else " · sin cred verificada"),
+            detail=f"comprometido{method_part}{cred_part}",
+            auth_method=method_key,
         )
 
     for user in sorted(valid - owned):
