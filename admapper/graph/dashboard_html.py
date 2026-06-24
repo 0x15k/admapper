@@ -75,8 +75,8 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .status-idle{{background:#14532d;color:#86efac}}
 .status-running{{background:#713f12;color:#fde68a}}
 
-.main{{display:grid;grid-template-columns:1fr 300px;flex:1;min-height:0;overflow:hidden}}
-.graph-area{{position:relative;background:var(--bg-dark);overflow:hidden}}
+.main{{display:grid;grid-template-columns:1fr 300px;grid-template-rows:1fr;flex:1;min-height:0;overflow:hidden}}
+.graph-area{{position:relative;background:var(--bg-dark);overflow:hidden;min-height:350px;flex:1}}
 #graph-canvas{{position:absolute;top:0;left:0;right:0;bottom:0}}
 .graph-controls{{
   position:absolute;top:0.6rem;left:0.6rem;display:flex;gap:0.3rem;z-index:5;
@@ -261,10 +261,10 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 }}
 
 /* ── Responsive ───────────────────────────────────────────── */
-@media(max-width:640px){{
-  .main{{grid-template-columns:1fr;grid-template-rows:1fr auto}}
-  .graph-area{{min-height:250px}}
-  .sidebar{{max-height:35vh;border-left:none;border-top:1px solid var(--border);overflow-y:auto}}
+@media(max-width:900px){{
+  .main{{display:flex;flex-direction:column;min-height:0}}
+  .graph-area{{min-height:350px;flex:1 1 55%}}
+  .sidebar{{border-left:none;border-top:1px solid var(--border);overflow-y:auto;max-height:45vh}}
 }}
 
 /* ── Pulse animation for pivot node ───────────────────────── */
@@ -932,9 +932,9 @@ function renderGraph(graphData) {{
     nodes: new vis.DataSet(graphNodes),
     edges: new vis.DataSet(graphEdges),
   }}, {{
-    width: w + 'px',
-    height: h + 'px',
-    autoResize: false,
+    width: '100%',
+    height: '100%',
+    autoResize: true,
     physics: {{
       stabilization: {{ iterations: 200, updateInterval: 25 }},
       barnesHut: {{ gravitationalConstant: -5000, springLength: 160, springConstant: 0.03 }},
@@ -968,12 +968,8 @@ function renderGraph(graphData) {{
   /* ResizeObserver */
   const ro = new ResizeObserver(() => {{
     if (!network) return;
-    const rw = graphArea.clientWidth;
-    const rh = graphArea.clientHeight;
-    container.style.width = rw + 'px';
-    container.style.height = rh + 'px';
-    network.setSize(rw + 'px', rh + 'px');
     network.redraw();
+    network.fit();
   }});
   ro.observe(graphArea);
 
