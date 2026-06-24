@@ -822,6 +822,10 @@ def build_ops_html(
         i => i.username.toLowerCase() === username.toLowerCase()
       );
       if (!ident) return;
+      if (ident.owned || ident.cred_valid) {{
+        setPivot(ident.username);
+        return;
+      }}
       graphFocus = ident.username;
       infraFocus = null;
       selectedMissionId = null;
@@ -1564,7 +1568,8 @@ def build_ops_html(
           const ul = id.username.toLowerCase();
           let active = '';
           if (ul === pivotNow) active = ' pivot-active';
-          if (focusNow && ul === focusNow && ul !== pivotNow) active = ' focus-active';
+          else if (id.owned) active = ' owned';
+          if (focusNow && ul === focusNow && ul !== pivotNow) active += ' focus-active';
           html += `<button type="button" class="chip pivot-btn${{active}}" data-focus="${{id.username}}" title="${{id.detail || id.role || ''}}">${{id.username}}</button> `;
         }});
         html += '</p>';
@@ -1890,12 +1895,13 @@ def build_ops_html(
       const unmet = sorted.filter(v => !v.ready);
       const show = unmet.slice(0, 3);
       if (!show.length) return '';
-      let html = '<div class="note-block-label">TODO</div>';
+      let html = '<div class="note-callout warn"><div class="note-block-label" style="color:var(--warn); margin-top:0">TODO</div>';
       show.forEach(v => {{
         const pending = (v.prerequisites || []).find(p => !p.met);
         const line = pending ? pending.label : (v.note || v.title);
         html += `<div class="note-todo">[ ] ${{v.title}} — ${{line}}</div>`;
       }});
+      html += '</div>';
       return html;
     }}
 
@@ -1907,29 +1913,32 @@ def build_ops_html(
       const quests = getDisplayQuests();
       let html = '';
       if (creds.length) {{
-        html += '<div class="note-block-label">Credentials</div>';
+        html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">Credentials</div>';
         creds.forEach(c => {{
           const cls = c.status === 'valid' ? 'ok' : 'warn';
           html += noteKv(c.user, c.status, cls);
         }});
+        html += '</div>';
       }}
       if (prog.loot && clues.length) {{
-        html += '<div class="note-block-label">Loot</div>';
+        html += '<div class="note-callout warn"><div class="note-block-label" style="color:var(--warn); margin-top:0">Loot</div>';
         clues.forEach(c => {{
           html += noteKv(c.user, `«${{c.string}}»`, 'warn');
           if (c.source) html += noteKvIndent('archivo', c.source, 'dim');
         }});
+        html += '</div>';
       }}
       if (prog.acls && quests.length && !isInspectingOther()) {{
-        html += '<div class="note-block-label">PrivEsc / ACL</div>';
+        html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">PrivEsc / ACL</div>';
         quests.forEach(q => {{
           const st = q.enabled ? 'verificado' : 'bloqueado';
           html += noteKv(`${{q.principal}}`, `${{q.technique}} → ${{q.target}} (${{st}})`, q.enabled ? 'ok' : 'warn');
         }});
+        html += '</div>';
       }}
       const attackPaths = getDisplayAttackPaths();
       if (attackPaths.length && !isInspectingOther()) {{
-        html += '<div class="note-block-label">Caminos de ataque</div>';
+        html += '<div class="note-callout danger"><div class="note-block-label" style="color:var(--danger); margin-top:0">Caminos de ataque</div>';
         attackPaths.slice(0, 10).forEach(p => {{
           const sev = (p.impact === 'critical' ? 'danger' : (p.impact === 'high' ? 'warn' : ''));
           html += noteKv(p.source_label || p.source, `${{p.target_label || p.target}} · ${{p.impact}}`, sev);
@@ -1937,14 +1946,16 @@ def build_ops_html(
             html += noteKvIndent(s.edge_type, s.narrative || '', 'dim');
           }});
         }});
+        html += '</div>';
       }}
       if (prog.exploit && hashes.length) {{
-        html += '<div class="note-block-label">Hashes / PTH</div>';
+        html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">Hashes / PTH</div>';
         hashes.forEach(h => {{
           html += noteKv(h.account, h.nthash, 'ok');
           const pth = (OPS.pth_sessions || []).find(p => p.account === h.account);
           if (pth && pth.winrm_cmd) html += noteKvIndent('winrm', pth.winrm_cmd, 'dim');
         }});
+        html += '</div>';
       }}
       return html;
     }}

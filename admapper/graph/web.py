@@ -204,6 +204,19 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_METHOD_LABELS = {
+    "password": "🔑 password",
+    "ntlm_hash": "#️⃣ NTLM hash",
+    "spray": "💨 spray",
+    "kerberoast": "🎫 kerberoast",
+    "asreproast": "🎫 AS-REP roast",
+    "exploit_acl": "⚡ exploit ACL",
+    "dll_hijack": "📦 DLL hijack",
+    "winrm_pth": "#️⃣ WinRM PTH",
+    "certificate": "📜 certificado",
+}
+
+
 def build_graph_payload(
     ws_path: Path,
     *,
@@ -211,6 +224,7 @@ def build_graph_payload(
     pivot_user: str | None = None,
     owned_users: list[str] | None = None,
     tactical: bool = False,
+    owned_methods: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Collect nodes/edges for vis-network from graph.json + ACLs + escalate."""
     owned = {u.lower() for u in (owned_users or [])}
@@ -266,12 +280,29 @@ def build_graph_payload(
             role = "pivot"
         elif is_owned:
             role = "owned"
+
+        method_key = (owned_methods or {}).get(username.lower(), "")
+        method_label = _METHOD_LABELS.get(method_key, method_key) if method_key else ""
+        status_part = f"COMPROMISED ({method_label})" if is_owned else "UNCOMPROMISED"
+        title_lines = [
+            f"Type: {node.get('type', 'object').upper()}",
+            f"Name: {username}",
+            f"Status: {status_part}",
+        ]
+        if node.get("kerberoastable"):
+            title_lines.append("Kerberoastable: YES")
+        if node.get("asrep_roastable"):
+            title_lines.append("AS-REP roastable: YES")
+        if node.get("dn"):
+            title_lines.append(f"DN: {node.get('dn')}")
+        node_title = "\n".join(title_lines)
+
         add_node(
             nid,
             label,
             str(node.get("type", "object")),
             _node_color(node, pivot=pivot, owned=owned),
-            title=json.dumps(node, indent=2),
+            title=node_title,
             username=username,
             identity_role=role,
         )

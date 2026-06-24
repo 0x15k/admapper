@@ -262,6 +262,7 @@ def build_ops_payload(
         pivot_user=pivot,
         owned_users=owned,
         tactical=True,
+        owned_methods=(ops_progress.owned_methods if ops_progress else {}),
     )
     _enrich_graph_for_recon(graph, unauth)
 
