@@ -286,15 +286,15 @@ class DashboardContext:
 
     def run_asreproast(self) -> None:
         self._run_workspace_script(
-            "from admapper.creds.asreproast import run_asreproast\n"
-            "run_asreproast(session)",
+            "from admapper.cli.commands import dispatch\n"
+            "dispatch(session, 'asreproast')",
             label="asreproast",
         )
 
     def run_kerberoast(self) -> None:
         self._run_workspace_script(
-            "from admapper.creds.kerberoast import run_kerberoast\n"
-            "run_kerberoast(session)",
+            "from admapper.cli.commands import dispatch\n"
+            "dispatch(session, 'kerberoast')",
             label="kerberoast",
         )
 
@@ -307,115 +307,59 @@ class DashboardContext:
         pw_b64 = base64.b64encode(password.encode()).decode()
         self._run_workspace_script(
             "import base64\n"
-            "from admapper.creds.spray import run_spray\n"
-            f"run_spray(session, base64.b64decode('{pw_b64}').decode())",
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'spray ' + base64.b64decode('{pw_b64}').decode())",
             label="spray '***'",
         )
 
     def run_exploit(self) -> None:
-        """In-process exploit — loot and ACL only; creds come from the operator."""
         ok = self._run_workspace_script(
-            "from admapper.exploit.engine import run_exploit_engagement\n"
-            "from admapper.core.dashboard_mode import effective_sync_clock\n"
-            "run_exploit_engagement(session, max_rounds=3, sync_clock=effective_sync_clock(True))",
+            "from admapper.cli.commands import dispatch\n"
+            "dispatch(session, 'exploit')",
             label="exploit (loot → ACL/gMSA)",
         )
-        self._sync_loot_progress()
         if ok:
-            from admapper.creds.common import collect_gained_hashes
-
-            for account, _ in collect_gained_hashes(self.ws_path):
-                user = account if account.endswith("$") else f"{account}$"
-                self.progress.remember_auth(user)
             self.progress.exploit = True
             self.progress.save(self.ws_path)
 
     def run_acls(self) -> None:
-        from admapper.acl.analyze import run_acl_analysis
-        from admapper.core.session import Session
-
-        session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
-        try:
-            run_acl_analysis(session)
-            session.persist_workspace()
+        ok = self._run_workspace_script(
+            "from admapper.cli.commands import dispatch\n"
+            "dispatch(session, 'acls')",
+            label="acl analysis",
+        )
+        if ok:
             self.progress.acls = True
             self.progress.save(self.ws_path)
-            self.emit("ACL analysis complete", kind="done")
-        except (ValueError, RuntimeError) as exc:
-            self.emit(str(exc), kind="error")
 
     def set_pivot(self, username: str) -> None:
-        from admapper.core.session import Session
-        from admapper.escalate.analyze import set_pivot_user
-        from admapper.graph.identity_lens import _machine_hash_row, _normalize_account, build_selectable_identities
-
-        session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
-        domain = session.workspace.domain or self.domain or ""
-        selectable = build_selectable_identities(
-            self.ws_path,
-            domain=domain,
-            owned_users=list(self.progress.owned_users or []),
-            ops_progress=self.progress,
+        self._run_workspace_script(
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'pivot {username}')",
+            label=f"pivot {username}",
         )
-        match = next(
-            (
-                i
-                for i in selectable
-                if _normalize_account(str(i.get("username", "")))
-                == _normalize_account(username)
-            ),
-            None,
-        )
-        if not match:
-            machine = _machine_hash_row(self.ws_path, username)
-            if machine and self.progress.exploit:
-                match = {
-                    "username": machine["username"],
-                    "selectable": "pivot",
-                    "role": "machine_pth",
-                }
-        if not match:
-            raise ValueError(f"sin perfil para {username} — enumera o compromete primero")
-        if match.get("selectable") == "view":
-            raise ValueError(f"{username} es solo lectura — no es pivot operativo")
-        pivot_name = str(match.get("username") or username)
-        set_pivot_user(session, pivot_name)
-        self.pivot_user = pivot_name
-        self.progress.remember_auth(pivot_name)
+        self.pivot_user = username
+        self.progress.remember_auth(username)
         self.progress.save(self.ws_path)
 
     def run_winrm_pth(self, account: str) -> None:
         ok = self._run_workspace_script(
-            "from admapper.graph.dashboard_winrm import run_dashboard_winrm_pth\n"
-            f"run_dashboard_winrm_pth(session, {account!r})",
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'winrm {account}')",
             label=f"winrm PTH {account}",
         )
-        if not ok:
-            return
-        from admapper.core.session import Session
-
-        session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
-        pivot = (session.workspace.pivot_user if session.workspace else None) or account
-        self.pivot_user = pivot
-        self.progress.remember_auth(pivot)
-        self.progress.exploit = True
-        self.progress.save(self.ws_path)
+        if ok:
+            self.pivot_user = account
+            self.progress.remember_auth(account)
+            self.progress.exploit = True
+            self.progress.save(self.ws_path)
 
     def run_brief(self, *, auto: bool = False) -> None:
-        from admapper.cli.brief import run_brief
-        from admapper.core.session import Session
-
-        session = Session.bootstrap()
-        session.select_workspace(self.workspace, create=False)
-        try:
-            run_brief(session, refresh=True, auto=auto)
-            session.persist_workspace()
-            self.emit("brief complete", kind="done")
-        except (ValueError, RuntimeError) as exc:
-            self.emit(str(exc), kind="error")
+        self._run_workspace_script(
+            "from admapper.cli.commands import dispatch\n"
+            f"dispatch(session, 'brief {'auto' if auto else ''}'.strip())",
+            label="brief",
+        )
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
