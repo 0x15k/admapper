@@ -96,9 +96,10 @@ def test_attack_graph_html_shows_hash_and_krb5_blocker(tmp_path: Path) -> None:
     )
     assert "Hash obtenido" in html
     assert "0123456789abcdef0123456789abcdef" in html
-    assert "msa_health.logging.htb" in html
+    assert "dc01.logging.htb" in html
     assert "Bloqueo" in html
     assert "WinRM" in html
+
     path = write_attack_graph_html(
         ws,
         workspace="ws",

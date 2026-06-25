@@ -44,5 +44,6 @@ def test_resolve_winrm_cred_uses_gmsa_host_not_dc(tmp_path: Path) -> None:
 
     cred = resolve_winrm_cred(session)
     assert cred.username == "msa_health$"
-    assert cred.host == "msa_health.logging.htb"
+    assert cred.host == "dc01.logging.htb"
     assert cred.nthash == "a" * 32
+

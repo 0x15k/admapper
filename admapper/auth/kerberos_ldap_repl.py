@@ -14,7 +14,10 @@ def _attr_values(raw: dict[str, list[bytes]]) -> dict[str, list[str]]:
         decoded: list[str] = []
         for value in values:
             if isinstance(value, bytes):
-                decoded.append(value.decode("utf-8", errors="replace"))
+                if key.lower() in ("objectsid", "ntsecuritydescriptor"):
+                    decoded.append(value.decode("latin-1"))
+                else:
+                    decoded.append(value.decode("utf-8", errors="replace"))
             else:
                 decoded.append(str(value))
         out[key] = decoded
@@ -27,18 +30,18 @@ def _parse_entry(search_result: Any) -> dict[str, Any] | None:
             object_name = search_result.getComponentByName("objectName")
             dn = str(object_name) if object_name is not None else ""
             attrs_component = search_result.getComponentByName("attributes")
-            raw_attrs: dict[str, list[str]] = {}
+            raw_attrs: dict[str, list[bytes]] = {}
             if attrs_component is not None:
                 for idx in range(len(attrs_component)):
                     part = attrs_component.getComponentByPosition(idx)
                     name = str(part.getComponentByName("type"))
                     vals_component = part.getComponentByName("vals")
-                    values: list[str] = []
+                    values: list[bytes] = []
                     if vals_component is not None:
                         for vidx in range(len(vals_component)):
-                            values.append(str(vals_component.getComponentByPosition(vidx)))
+                            values.append(bytes(vals_component.getComponentByPosition(vidx)))
                     raw_attrs[name] = values
-            return {"dn": dn, "attributes": raw_attrs}
+            return {"dn": dn, "attributes": _attr_values(raw_attrs)}
 
         dn = str(search_result["objectName"])
         raw_attrs = {}

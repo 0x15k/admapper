@@ -12,10 +12,10 @@ def test_evil_winrm_pth_no_d_flag() -> None:
         ws_path=None,
         fallback_ip="10.0.0.1",
     )
-    assert host == "msa_health.logging.htb"
+    assert host == "dc01.logging.htb"
     assert "-d " not in cmd
     assert "logging.htb\\msa_health$" in cmd
-    assert cmd.startswith("evil-winrm -i msa_health.logging.htb")
+    assert cmd.startswith("evil-winrm -i dc01.logging.htb")
 
 
 def test_admapper_winrm_pth_no_dc_ip_flag() -> None:
@@ -27,8 +27,9 @@ def test_admapper_winrm_pth_no_dc_ip_flag() -> None:
         fallback_ip="10.0.0.1",
     )
     assert "--dc-ip" not in cmd
-    assert "msa_health.logging.htb" in cmd
+    assert "dc01.logging.htb" in cmd
     assert "admapper winrm -H" in cmd
+
 
 
 def test_run_winrm_shell_pth_accepts_fqdn_without_dc_ip() -> None:

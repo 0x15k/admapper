@@ -176,6 +176,7 @@ def resolve_winrm_host_for_account(
     domain_l = (domain or "").lower().rstrip(".")
     ws = Path(ws_path) if ws_path else None
 
+    is_gmsa = base.startswith("msa_") or base.startswith("gmsa_")
     if ws:
         inv_path = ws / "auth_inventory.json"
         if inv_path.is_file():
@@ -185,9 +186,14 @@ def resolve_winrm_host_for_account(
                 data = {}
             for computer in data.get("computers") or []:
                 name = str(computer.get("name") or "").lower().rstrip("$")
-                dns_host = str(computer.get("dns_host") or computer.get("dnsHostName") or "")
-                if name == base and dns_host:
-                    return dns_host.lower()
+                dn = str(computer.get("dn") or "").lower()
+                if name == base:
+                    if "managed service accounts" in dn or "msas" in dn:
+                        is_gmsa = True
+                        break
+                    dns_host = str(computer.get("dns_host") or computer.get("dnsHostName") or "")
+                    if dns_host:
+                        return dns_host.lower()
 
         for path_name in ("postex_scan.json", "unauth_scan.json"):
             data_path = ws / path_name
@@ -211,10 +217,11 @@ def resolve_winrm_host_for_account(
                     if short == base and hostname:
                         return hostname
 
-    if domain_l and base:
+    if domain_l and base and not is_gmsa:
         return f"{base}.{domain_l}"
 
     return resolve_dc_fqdn(str(ws) if ws else None, domain, fallback_ip=fallback_ip) or fallback_ip or base
+
 
 
 def format_evil_winrm_pth(

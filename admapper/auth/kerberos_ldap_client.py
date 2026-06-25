@@ -14,6 +14,10 @@ class _LdapAttr:
     value: str
     values: list[str]
 
+    @property
+    def raw_values(self) -> list[bytes]:
+        return [v.encode("latin-1") for v in self.values]
+
 
 @dataclass
 class _LdapEntry:

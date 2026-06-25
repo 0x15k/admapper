@@ -173,10 +173,11 @@ def test_engagement_map_shows_hash_and_winrm_next_hop(tmp_path: Path) -> None:
 
     assert "HASH OBTENIDO" in text
     assert "0123456789abcdef0123456789abcdef" in text
-    assert "msa_health.logging.htb" in text
+    assert "dc01.logging.htb" in text
     assert "WinRM" in text
     assert "SIGUIENTE PASO" in text
     assert "──WinRM──►" in text
+
 
 
 def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
