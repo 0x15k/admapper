@@ -98,12 +98,23 @@ def _session_with_workspace(
     host: str | None = None,
     domain: str | None = None,
 ) -> Session:
-    from admapper.core.output import print_error
     from admapper.core.discovery import default_workspace_name
+    from admapper.core.output import print_error
 
     session = Session.bootstrap()
     if workspace:
-        session.select_workspace(workspace, create=False)
+        try:
+            session.select_workspace(workspace, create=False)
+        except FileNotFoundError as exc:
+            hint = ""
+            ws_hint = default_workspace_name(workspace)
+            if ws_hint != workspace and session.workspaces.exists(ws_hint):
+                hint = f" — did you mean '{ws_hint}'?"
+            print_error(f"{exc}{hint}")
+            raise typer.Exit(code=1) from None
+        except ValueError as exc:
+            print_error(str(exc))
+            raise typer.Exit(code=1) from None
     elif host:
         ws_name = default_workspace_name(host)
         session.select_workspace(ws_name, create=False)
