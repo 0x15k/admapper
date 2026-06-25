@@ -749,6 +749,7 @@ Para paridad, el catálogo de ADMapper final debe cubrir al menos estas relacion
 | 2026-06-24 | Backlog — `exploit/tickets.py`: `inject_ticket()` + `pass_the_ticket()` — PTT cross-platform (KRB5CCNAME / Rubeus). |
 | 2026-06-24 | Backlog — `exploit/persistence.py`: `exploit_dsrm_backdoor()` — dump DSRM hash + DsrmAdminLogonBehavior. |
 | 2026-06-24 | Backlog — `exploit/trusts.py`: `exploit_sid_history_nopac()` — SID History via CVE-2021-42278/42287 (noPac). |
+| 2026-06-25 | Auditorías de Postura PingCastle: Stale Systems, GPO Abuse, Stale AdminCount y ESC8 HTTP web enrollment. |
 
 ---
 

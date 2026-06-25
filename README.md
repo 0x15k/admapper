@@ -13,7 +13,7 @@
 - **Lateral movement** — WMI, PSExec, SMB, DCOM, AT exec, NTLM relay, coercion (PetitPotam, PrinterBug, DFSCoerce)
 - **Privilege escalation** — RBCD, GPO abuse, trust exploitation, noPac (CVE-2021-42278/42287), SID History
 - **Persistence** — AdminSDHolder, DSRM backdoor, certificate persistence, DCShadow
-- **Security posture** — SMB signing, LAPS coverage, NTLMv1, LDAP signing, DA session detection
+- **Security posture & Auditing (PingCastle style)** — SMB signing, LAPS coverage, NTLMv1, LDAP signing, DA session detection, Stale Systems (pwdLastSet / lastLogonTimestamp > 45 days), Writable GPOs / GPO Abuse, Stale AdminCount (Shadow Admins) detection, and ESC8 unencrypted web enrollment checks.
 - **OPSEC profiles** — `stealth / normal / lab` — controls delays, confirmations, and feature gates
 - **Automated pipeline** — `admapper run` chains recon + attack + escalation in one command
 - **Guided exploitation** — each finding includes step-by-step exploitation guides (BloodHound-style)
@@ -134,7 +134,7 @@ ADMapper follows a dependency-driven pipeline so every step has context before m
 2. **Inventory** — `enum users` → roastable targets surfaced automatically
 3. **Credential validation** — `creds add` → `creds verify`
 4. **Auth collection** — `start_auth` → `enum auth` → `acls` → `adcs` → `coerce` → `mssql`
-   - Security posture checked automatically: SMB signing, LAPS, NTLMv1, LDAP signing, DA sessions
+   - Security posture checked automatically: SMB signing, LAPS, NTLMv1, LDAP signing, DA sessions, stale systems, GPO abuse, shadow admins, and ESC8 unencrypted web enrollment CA checks.
 5. **Attack execution** — `asreproast`, `kerberoast`, `spray`, `exploit`
 6. **Pivoting / post-exploitation** — `pivot`, `winrm`, `postex`
 7. **Synthesis** — `paths`, `brief`, `export`
@@ -151,7 +151,7 @@ Each engagement stores its data in `workspaces/<name>/`:
 | `auth_inventory.json` | Full LDAP dump (users, groups, computers, GPOs, delegations) |
 | `graph.json` | Attack graph nodes + edges |
 | `findings.json` | Prioritised findings with MITRE mappings |
-| `security_posture.json` | SMB signing / LAPS / NTLMv1 / LDAP signing / DA sessions |
+| `security_posture.json` | SMB signing / LAPS / NTLMv1 / LDAP signing / DA sessions / stale systems |
 | `acl_findings.json` | Dangerous ACE findings (GenericAll, WriteDacl, etc.) |
 | `adcs_findings.json` | ESC vulnerabilities |
 | `kerberos_ops.json` | Delegation + shadow creds + timeroast opportunities |

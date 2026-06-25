@@ -212,7 +212,7 @@ def test_escalate_stale_admin_count_shadow_admin(tmp_path: Path) -> None:
         def merge(self, new_findings):
             findings.extend(new_findings)
             return new_findings
-    with patch("admapper.escalate.analyze.FindingsStore", MockFindingsStore):
+    with patch("admapper.core.findings.FindingsStore", MockFindingsStore):
         run_escalate_analysis(session, pivot_user="attacker", quiet=True)
     assert len(findings) == 1
     assert findings[0].key == "stale_admin_count"
