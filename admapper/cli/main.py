@@ -725,6 +725,36 @@ def web(
         session.persist_workspace()
         ws_path = session.workspaces.path_for(ws.name)
         ws = session.workspace
+
+    # Try to resolve domain and sync hosts mapping
+    from admapper.core.discovery import resolve_domain, ensure_domain
+    from admapper.cli.scan import sync_hosts_from_session
+    from admapper.recon.unauth import run_unauth_scan
+
+    resolved_domain = ws.domain or resolve_domain(session)
+    if not resolved_domain and host:
+        from admapper.recon.ports import scan_host
+        print_info(f"Probing target DC reachability: {host.strip()}...")
+        open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
+        if not open_ports:
+            print_error(
+                f"Error: Host {host.strip()} is unreachable or AD ports (88, 389, 445, 636) are closed.\n"
+                "Please verify your connection/VPN and try again."
+            )
+            raise typer.Exit(1)
+
+        print_info("No domain cached. Running unauthenticated discovery...")
+        try:
+            run_unauth_scan(session)
+            resolved_domain = ensure_domain(session, announce=True)
+        except Exception as exc:
+            print_error(f"Unauthenticated discovery failed: {exc}")
+
+    if resolved_domain:
+        ws.domain = resolved_domain
+        session.persist_workspace()
+        sync_hosts_from_session(session, enabled=True)
+
     run_dashboard_server(
         ws_path=ws_path,
         workspace=ws.name,
@@ -800,6 +830,36 @@ def dashboard(
         session.persist_workspace()
         ws_path = session.workspaces.path_for(ws.name)
         ws = session.workspace
+
+    # Try to resolve domain and sync hosts mapping
+    from admapper.core.discovery import resolve_domain, ensure_domain
+    from admapper.cli.scan import sync_hosts_from_session
+    from admapper.recon.unauth import run_unauth_scan
+
+    resolved_domain = ws.domain or resolve_domain(session)
+    if not resolved_domain and host:
+        from admapper.recon.ports import scan_host
+        print_info(f"Probing target DC reachability: {host.strip()}...")
+        open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
+        if not open_ports:
+            print_error(
+                f"Error: Host {host.strip()} is unreachable or AD ports (88, 389, 445, 636) are closed.\n"
+                "Please verify your connection/VPN and try again."
+            )
+            raise typer.Exit(1)
+
+        print_info("No domain cached. Running unauthenticated discovery...")
+        try:
+            run_unauth_scan(session)
+            resolved_domain = ensure_domain(session, announce=True)
+        except Exception as exc:
+            print_error(f"Unauthenticated discovery failed: {exc}")
+
+    if resolved_domain:
+        ws.domain = resolved_domain
+        session.persist_workspace()
+        sync_hosts_from_session(session, enabled=True)
+
     write_ops_html(
         ws_path,
         workspace=ws.name,

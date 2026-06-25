@@ -12,4 +12,9 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     cfg_dir.mkdir()
     cfg_path = cfg_dir / "config.json"
     monkeypatch.setattr("admapper.core.config.global_config_path", lambda: cfg_path)
+
+    # Reset CLI workspaces root override to avoid leaks between tests
+    from admapper.core.paths import set_cli_workspaces_root
+    set_cli_workspaces_root(None)
+
     return cfg_path
