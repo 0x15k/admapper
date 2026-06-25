@@ -51,8 +51,6 @@ _SUPPRESS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"^✓  owned marcado:",
         r"^✓ pivot →",
         r"^→ grafo → file://",
-        r"^✓  log exploit →",
-        r"^✓  log exploit",
         r"^═+$",
         r"^  MAPA DE ENGAGEMENT",
         r"^  Dominio\s*:",

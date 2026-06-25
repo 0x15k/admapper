@@ -613,7 +613,10 @@ class DashboardContext:
                     kind = "phase"
                 self.emit(filtered, kind=kind)
         code = proc.wait()
-        self.emit(f"fin · código {code}", kind="done" if code == 0 else "error")
+        if code == 0:
+            self.emit("✓ Execution finished successfully", kind="done")
+        else:
+            self.emit(f"✗ Execution failed with exit code {code}", kind="error")
         return code
 
     def _persist_target_ip(self, ip: str) -> None:
@@ -718,13 +721,13 @@ class DashboardContext:
             if raw.strip():
                 _server_log(f"[stdout/stderr] {label}\n{raw[:4000]}")
             _server_log(f"[done] {label} output_lines={len(raw.splitlines())}")
-            self.emit("fin · código 0", kind="done")
+            self.emit("✓ Action completed successfully", kind="done")
             return True
         except Exception as exc:  # noqa: BLE001
             tb = _traceback.format_exc()
             _server_log(f"[error] {label}: {exc}\n{tb}")
             self.emit(str(exc), kind="error")
-            self.emit("fin · código 1", kind="error")
+            self.emit("✗ Action failed", kind="error")
             return False
 
     def _get_stored_credential(self) -> tuple[str, str, str] | None:

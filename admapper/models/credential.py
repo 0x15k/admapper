@@ -30,6 +30,18 @@ class Credential:
     source: str = "manual"
     id: str = field(default_factory=lambda: uuid4().hex[:12])
 
+    @property
+    def password(self) -> str | None:
+        """Alias for secret when the credential type is PASSWORD."""
+        if self.cred_type == CredentialType.PASSWORD:
+            return self.secret
+        return None
+
+    @property
+    def uses_nthash(self) -> bool:
+        """Whether the credential is an NTLM hash."""
+        return self.cred_type == CredentialType.NTLM
+
     def to_dict(self, *, include_secret: bool = True) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "id": self.id,
