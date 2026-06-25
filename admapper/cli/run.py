@@ -12,10 +12,23 @@ if __name__ == "__main__":
         "  python3 -m admapper.cli.main run -H <ip> ..."
     )
 
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from admapper.cli.commands import dispatch
 from admapper.core.discovery import default_workspace_name, ensure_domain
 from admapper.core.output import print_info
 from admapper.core.session import Session
+
+
+def _load_json(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def run_engagement(
@@ -82,9 +95,11 @@ def run_engagement(
         if session.workspace
         else None
     )
-    unauth_cached = bool(ws_path and (ws_path / "unauth_scan.json").is_file())
+    unauth_cache = _load_json(ws_path / "unauth_scan.json") if ws_path else None
+    unauth_has_domain = bool(unauth_cache and unauth_cache.get("domain"))
+    unauth_cached = bool(ws_path and (ws_path / "unauth_scan.json").is_file() and unauth_has_domain)
     if unauth_cached:
-        print_info("unauth_scan.json cached — skipping Phase 1 recon")
+        print_info("unauth_scan.json cached with domain — skipping Phase 1 recon")
     else:
         dispatch(session, "start_unauth")
 
@@ -101,7 +116,10 @@ def run_engagement(
 
     if not session.workspace or not session.workspace.domain:
         from admapper.recon.ldap_probe import discover_domain_from_bind
+        from admapper.creds.kerberos_skew import ensure_workspace_skew
 
+        if ws_path:
+            ensure_workspace_skew(ws_path)
         inferred = discover_domain_from_bind(
             host,
             username,
