@@ -45,3 +45,15 @@ This document provides project-scoped rules, architecture guidelines, and logic 
 - **GPO Abuse & Writable GPOs**: Audits security descriptors on GPO containers (`groupPolicyContainer` objects) in `admapper/acl/analyze.py`. When a compromised principal has write permissions, generates `gpo_abuse` escalation edges in `admapper/escalate/edges.py` mapped directly to target computers under affected OUs (matching OU `gPLink` links) or all computers if linked at the domain root.
 - **Stale AdminCount (Shadow Admins)**: Cross-references accounts that have `adminCount=1` against active membership in administrative groups (including nested groups resolved recursively). If not active, logs them as a `stale_admin_count` shadow admin finding in `admapper/escalate/analyze.py`.
 - **ESC8 AD CS HTTP Web Enrollment Check**: Audits whether certificate enrollment endpoints expose unencrypted HTTP (`http://`) in `admapper/adcs/enum.py`. If active, logs `esc8` in `adcs_findings.json` setting `requires_external_listener: true`.
+
+## 7. Privilege-Free Operation, Visual Style System & Subprocess Handling
+- **Bypassing Sudo & Clock Sync (`--no-sync`, `--no-hosts-sync`)**:
+  - ADMapper runs entirely without administrative privileges. When local clock sync is disabled or fails, it queries the domain controller's Root DSE anonymously for `currentTime` (on port 389), calculates the local offset, and configures `libfaketime` via the workspace state.
+  - The `sync_enabled` preference is saved globally for the process so that subsequent nested calls (such as in `verify.py` or exploit runs) honor the setting and bypass interactive `sudo` prompts.
+- **CLI Visual Style System**:
+  - All console printing must go through [output.py](file:///Users/yamillabarreralopez/Projects/admapper/admapper/core/output.py) to maintain consistent bracket prefixes: `[+]` (success), `[-]` (failure), `[*]` (status/info), `[!]` (warnings/critical posture), and `[?]` (prompts).
+  - Scan progress logs must follow a fixed columnar layout: `[TIMESTAMP] [PROTOCOL] [IP/HOST] [PREFIX] [MESSAGE]` with dim timestamps and padded headers.
+  - Extracted credentials and key compromises must be highlighted in Nuclei-style panels using `print_loot_box`.
+- **Subprocess Error Handling**:
+  - Dynacally evaluated python script workers run in subprocesses (e.g. `GSSAPI` modification workers) must catch all inner connection and import exceptions and print structured JSON outputs instead of letting raw tracebacks escape to stderr.
+

@@ -1,143 +1,152 @@
-# ADMapper — Análisis de compatibilidad
+# ADMapper — Compatibilidad, Dependencias y Plataformas
 
-ADMapper es un **paquete Python** con script de consola (`admapper`). No es un binario nativo ni una app Electron: se instala con pip y corre sobre el intérprete Python del sistema.
-
-```
-pip install admapper          # núcleo
-pip install "admapper[recon]" # + impacket (SMB/Kerberos/roast)
-admapper start                # entry point → admapper.cli.main:app
-```
-
-**Requisito único real:** Python **3.11+** en macOS, Linux o Windows.
+ADMapper es un **paquete Python** con un script de consola (`admapper`). Se instala a través de `pip` y se ejecuta sobre el intérprete de Python del sistema operativo local.
 
 ---
 
-## Tres capas de dependencias
+## 1. Requisitos y Versiones de Python
 
-La compatibilidad no es “¿funciona en Windows?” sino **¿qué capa usa cada comando?**
+- **Versión mínima:** Python 3.11+
+- **Versiones probadas:** Python 3.11 a 3.14
+- **Entry Point de distribución:** `admapper` -> `admapper.cli.main:main`
 
-| Capa | Instalación | Qué es | ¿Multiplataforma? |
+---
+
+## 2. Capas de Dependencias (Tiers)
+
+Para facilitar la flexibilidad en diferentes entornos, las dependencias de ADMapper se dividen en extras de `pip`. Esto permite su uso desde escaneos LDAP básicos en entornos restrictivos hasta un toolkit completo con scripts de explotación Kerberos/SMB.
+
+| Extra | Comando pip | Incluye | ¿Multiplataforma? |
 |---|---|---|---|
-| **CORE** | `pip install admapper` | Python puro: ldap3, dnspython, typer, rich, JSON | ✅ Sí — mismo código en los 3 SO |
-| **RECON** | `pip install admapper[recon]` | Impacket como librería + subprocess con `sys.executable` | ✅ Sí* — pip wheel; en Windows a veces hace falta MSVC runtime |
-| **EXTERNAL** | Instalación manual del usuario | hashcat, john, kerbrute, nxc (binarios Go/C) | ⚠️ Depende del SO — **no van en el paquete pip** |
+| *(ninguno)* | `pip install admapper` | **CORE**: typer, rich, prompt-toolkit, ldap3, dnspython | ✅ Sí — código puro Python |
+| `recon` | `pip install "admapper[recon]"` | **CORE** + **RECON** (impacket) | ✅ Sí* — pip wheel; en Windows requiere MSVC runtime ocasionalmente |
+| `full` | `pip install "admapper[full]"` | Igual a `recon` (tier recomendado por defecto) | ✅ Sí |
+| `dev` | `pip install -e ".[dev]"` | + pytest, ruff, bandit | ✅ Sí |
 
-\* Impacket en Windows: funcional para la mayoría de flujos ADMapper; SMB avanzado puede requerir entorno bien configurado (venv activo, red/VPN).
+> [!NOTE]
+> Las dependencias de `pyproject.toml` usan rangos semver compatibles (`>=X,<Y`). Impacket está restringido a `<0.13` para asegurar compatibilidad con su API interna.
 
 ---
 
-## Matriz por comando
+## 3. Matriz de Compatibilidad por Comando
+
+La disponibilidad de las características de ADMapper en cada plataforma depende de la capa mínima del comando:
 
 | Comando | Capa mínima | Runtime | macOS | Linux | Windows |
 |---|---|---|---|---|---|
 | `admapper start` | CORE | Python | ✅ | ✅ | ✅ |
 | `start_unauth` | CORE | dnspython + socket | ✅ | ✅ | ✅ |
 | `enum users` (LDAP) | CORE | ldap3 | ✅ | ✅ | ✅ |
-| `enum users` (SAMR/RID) | RECON | impacket import | ✅ | ✅ | ✅* |
+| `enum users` (SAMR/RID) | RECON | impacket | ✅ | ✅ | ✅* |
 | `asreproast` / `kerberoast` | RECON | impacket subprocess | ✅ | ✅ | ✅* |
 | cracking automático | EXTERNAL | hashcat/john | ✅† | ✅† | ✅† |
 | `spray` (por defecto) | CORE | ldap3 bind | ✅ | ✅ | ✅ |
 | `spray --method kerbrute` | EXTERNAL | kerbrute binary | ✅† | ✅† | ✅† |
 | `creds verify` (LDAP) | CORE | ldap3 | ✅ | ✅ | ✅ |
 | `creds verify` (SMB/KRB) | RECON | impacket | ✅ | ✅ | ✅* |
-| `start_auth` | CORE (+RECON opcional) | ldap3 + JSON | ✅ | ✅ | ✅ |
+| `start_auth` | CORE | ldap3 + JSON | ✅ | ✅ | ✅ |
 
-† = requiere binario instalado y en PATH (o en `.venv/Scripts` en Windows).  
-\* = con venv activo y `pip install impacket`.
-
----
-
-## Qué SÍ es portable (diseño actual)
-
-Estas decisiones ya están hechas para un script Python multiplataforma:
-
-1. **`pathlib.Path` + `Path.home()`** — config en `~/.admapper/` (Windows: `%USERPROFILE%\.admapper\`).
-2. **Sin rutas `/usr/...` en lógica crítica** — solo como candidatos opcionales en `find_wordlist()`.
-3. **Subprocess Impacket con `sys.executable`** — siempre usa el Python/venv activo, no un `python3` hardcodeado.
-4. **`resolve_executable()`** — busca PATH → venv `bin`/`Scripts` → Homebrew / Program Files.
-5. **Spray por LDAP (ldap3)** — no depende de kerbrute; funciona igual en los 3 SO.
-6. **Port scan con `socket`** — stdlib, sin nmap obligatorio.
-7. **Estado en JSON** — sin SQLite ni permisos especiales de SO.
+† = Requiere binario externo instalado en el PATH.  
+\* = Con venv activo y dependencias de `[recon]` instaladas correctamente.
 
 ---
 
-## Qué NO es portable (y no debe prometerse)
+## 4. Herramientas Compañeras (Companion Tools)
 
-| Elemento | Por qué |
-|---|---|
-| hashcat / john | Binarios nativos; GPU/drivers distintos por SO |
-| kerbrute / nxc | Binarios Go/Python separados; el usuario los instala |
-| Wordlists del sistema | `/usr/share/wordlists` solo en Linux/Kali — usar `~/.admapper/wordlists/` |
-| “Funciona sin red” | Necesita reachability al DC (VPN, lab, etc.) — independiente del SO |
-| BloodHound / binario único | Fase futura; hoy es orquestador Python |
-
----
-
-## Instalación recomendada por SO
-
-### macOS (tu entorno)
+Algunos de los recursos avanzados de explotación se instalan de forma aislada a través de `pipx` para evitar conflictos en sus árboles de dependencias directas con Impacket:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,recon]"
-admapper start
-(admapper)> platform   # diagnóstico
+pipx install certipy-ad       # Para explotación de AD CS (ESC1-14)
+pipx install pywhisker        # Para Shadow Credentials
+pipx install netexec          # nxc (Para validación/ejecución remota en SMB/WinRM)
 ```
 
-Opcional: `brew install hashcat john-jumbo` — no bloquea el núcleo.
+---
 
-### Linux (Kali / pentest)
+## 5. Rutas Comunes y Entorno
 
-```bash
-pip install "admapper[recon]"
-# wordlists: /usr/share/wordlists o ~/.admapper/wordlists/
-```
+ADMapper organiza su configuración, wordlists y datos de engagement de forma consistente según el sistema operativo:
+
+| Recurso | macOS / Linux | Windows |
+|---|---|---|
+| Directorio Config | `~/.admapper/` | `%USERPROFILE%\.admapper\` |
+| Wordlists por defecto | `~/.admapper/wordlists/rockyou.txt` | `%USERPROFILE%\.admapper\wordlists\rockyou.txt` |
+| Workspaces (Datos) | `~/.admapper/workspaces/` | `%USERPROFILE%\.admapper\workspaces\` |
+| Historial REPL | `~/.admapper/history` | `%USERPROFILE%\.admapper\history` |
+
+*Nota: Se puede forzar una ruta de workspaces personalizada mediante la opción global `admapper -O <path>`, configurando `set workspaces <path>` en la consola, o con la variable de entorno `$ADMAPPER_WORKSPACES`.*
+
+---
+
+## 6. Instalación por Plataforma
+
+### macOS
+Requiere Xcode Command Line Tools (`xcode-select --install`).
+
+- **Instalación Global (Recomendada via pipx)**:
+  ```bash
+  cd admapper
+  ./scripts/install.sh
+  ```
+- **Instalación para Desarrollo (venv)**:
+  ```bash
+  ./scripts/install.sh --venv
+  source .venv/bin/activate
+  ```
+- **Herramientas de red opcionales (Homebrew)**:
+  ```bash
+  brew install hashcat john-jumbo rust python@3.13
+  # Nota: En Apple Silicon se instalan bajo /opt/homebrew/bin
+  ```
 
 ### Windows
+Requiere Python 3.11+ (marcando "Add Python to PATH" en el instalador).
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install "admapper[recon]"
-admapper start
-```
+- **Instalación en Entorno Virtual**:
+  ```powershell
+  cd admapper
+  python -m venv .venv
+  .\.venv\Scripts\activate
+  pip install -e ".[dev,recon]"
+  ```
+- **Notas de Windows**:
+  - Activar el entorno virtual (`.venv`) antes de correr `admapper start` para cargar Impacket y NetExec desde `.venv\Scripts\`.
+  - Si experimenta problemas de SMB con scripts locales, instale opcionalmente `pywin32`.
 
-Importante en Windows:
-
-- Activar el **venv** antes de `admapper` para que Impacket y NetExec estén en `Scripts\`.
-- `platform` lista qué encuentra en PATH.
-- LDAP spray y `start_unauth` funcionan sin binarios extra.
-
----
-
-## Distribución futura (sin cambiar el modelo)
-
-| Método | Compatibilidad | Notas |
-|---|---|---|
-| `pip install admapper` | ✅ Referencia | PyPI cuando publiquemos |
-| `pipx install admapper` | ✅ Aislado | Bueno para macOS/Linux |
-| `uv tool install` | ✅ Aislado | Alternativa moderna |
-| PyInstaller / Nuitka | ⚠️ Por SO | Un .exe por Windows, .app por macOS — fase posterior |
-| Docker | ✅ Lab | Opcional; no es el camino por defecto |
+### Linux (Kali / Debian / Parrot)
+- **Instalación en Entorno Aislado (venv)**:
+  ```bash
+  sudo apt install python3-venv seclists hashcat john
+  cd admapper
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -e ".[dev,recon]"
+  ```
 
 ---
 
-## Comando de diagnóstico
+## 7. Búsqueda y Resolución de Ejecutables
 
+Al invocar binarios auxiliares (como `nxc`, `certipy`, `faketime`, etc.), ADMapper realiza búsquedas automáticas en el siguiente orden de prioridad:
+1. `PATH` del sistema.
+2. Carpeta `bin`/`Scripts` del Python/venv activo.
+3. Directorios de instalación por defecto del sistema operativo (por ejemplo, `/opt/homebrew/bin` en Apple Silicon de macOS).
+
+Para validar si las herramientas están correctamente mapeadas, ejecute el comando de diagnóstico interactivo:
 ```
 (admapper)> platform
 ```
 
-Muestra: SO, rutas, herramientas EXTERNAL detectadas y matriz de features con tier CORE/RECON/EXTERNAL.
-
 ---
 
-## Resumen para el diseño del proyecto
+## 8. Principios de Portabilidad
 
-> **ADMapper es multiplataforma porque es Python**, no porque empaquete todos los tools de pentest.
->
-> - **Garantizado** con solo pip: CLI, recon LDAP/DNS/TCP, enum LDAP, spray LDAP, verify LDAP, workspaces.
-> - **Con `[recon]`**: SAMR, SMB, roast, verify SMB/Kerberos.
-> - **Opcional externo**: cracking y spray kerbrute/nxc.
->
-> No hace falta código distinto por SO salvo: resolución de PATH, subprocess flags en Windows, y candidatos de wordlist.
+### Qué SÍ es portable (Core Python):
+1. Rutas resueltas via `pathlib.Path` y `Path.home()` (resuelve `%USERPROFILE%` o `/home/` según corresponda).
+2. Detección automática de diccionarios de sistema (`/usr/share/wordlists` en Kali vs rutas locales).
+3. Persistencia basada en archivos JSON estructurados para evitar la necesidad de bases de datos relacionales dependientes del OS.
+
+### Qué NO es portable (External Binaries):
+1. Aceleración por hardware para `hashcat` o `john`.
+2. Mapeos de red o adaptadores VPN (el DC debe ser alcanzable por routing de red estándar).
+3. Entornos Docker corporativos (ADMapper está diseñado para correr nativamente sin Docker obligatoriamente).

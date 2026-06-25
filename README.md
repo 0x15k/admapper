@@ -282,10 +282,8 @@ admapper/
 
 ## Documentation
 
-- **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** — platform-specific details
-- **[docs/PLATFORMS.md](docs/PLATFORMS.md)** — step-by-step installation
-- **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** — dependency breakdown
-- **[docs/PROJECT.md](docs/PROJECT.md)** — project roadmap and phases (source of truth)
+- **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** — platform installation instructions, compatibility tiers, and dependencies
+- **[docs/PROJECT.md](docs/PROJECT.md)** — project blueprint, architecture, roadmaps, and phases (source of truth)
 
 ## License
 

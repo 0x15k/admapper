@@ -2,9 +2,9 @@
 
 > Plan maestro del proyecto. Objetivo: replicar y superar lo que hace [ADScan](https://github.com/ADScanPro/adscan), técnica por técnica, en orden de dependencias.
 
-**Estado:** Fases 3, 8.8 y backlog completadas — OPSEC profiles, DSRM, SID History noPac, PTT, coerce auto-exploit  
+**Estado:** Fases 3, 8.8, 14 (DCSync/postex), PingCastle audits, CLI visual style system, privilege-free clock sync, and worker exception wrapping completed.  
 **Referencia analizada:** ADScan v9.x (código + documentación)  
-**Última actualización:** 2026-06-24
+**Última actualización:** 2026-06-25
 
 ---
 
@@ -170,25 +170,56 @@ Guías: **`docs/COMPATIBILITY.md`** (análisis) · **`docs/PLATFORMS.md`** (inst
 
 ## 3. Arquitectura del proyecto
 
+### Estructura de directorios
+
 ```
 admapper/
-├── admapper/                      # paquete principal
-│   ├── cli/                   # shell interactivo, comandos
-│   ├── core/                  # workspace, creds, config, output
-│   ├── recon/                 # fases 1-2: DNS, LDAP anon, SMB null
-│   ├── enum/                  # fase 3: SAMR, RID, inventario
-│   ├── creds/                 # fases 4-7: roast, spray, verify
-│   ├── collect/               # fase 8+: LDAP auth, grafo, ACLs
-│   ├── attack/                # rutas de ataque, explotación
-│   ├── integrations/          # wrappers NetExec, Impacket, Certipy
-│   └── models/                # dataclasses: User, Host, Credential, Finding
-├── workspaces/                # datos de engagement (gitignored)
-├── tests/
-├── docs/
-│   └── PROJECT.md             # este archivo
+├── admapper/                      # Paquete principal
+│   ├── core/                  # Session, workspace, paths, credentials store, output
+│   ├── models/                # Dataclasses (Credential, UserRecord, …)
+│   ├── methodology/           # Canonical engagement phases (P1–P12)
+│   ├── analysis/              # Operator intel: readiness, vectors, user_match, password rules
+│   ├── cli/                   # Typer entrypoints and shell dispatch
+│   ├── recon/                 # Unauthenticated discovery
+│   ├── enumeration/           # User enumeration (SAMR, LDAP)
+│   ├── creds/                 # Roast, spray, verify, Kerberos skew
+│   ├── auth/                  # Authenticated LDAP/SMB enum, BloodHound export
+│   ├── graph/                 # Attack graph + dashboard UI (ops_payload, ops_html, dashboard_server)
+│   ├── exploit/               # Automated exploit chain
+│   ├── escalate/              # Pivot and next-hop edges
+│   ├── engage/                # Auto-engagement & task execution orchestration
+│   ├── chain/                 # Automated exploit chain analysis
+│   ├── guides/                # Manual technique catalog and pentest book
+│   ├── report/                # Engagement map, export, MITRE Navigator
+│   └── <technique>/           # Módulos específicos: acl, adcs, kerberos, coerce, cves, mssql, postex, wsus, winrm
+├── workspaces/                # engagement data (gitignored)
+├── tests/                     # unit and integration tests
+├── docs/                      # documentation
 ├── pyproject.toml
 └── README.md
 ```
+
+Cada paquete de técnica específica (`<technique>/`) provee típicamente:
+- `analyze.py`: Análisis de hallazgos del workspace basados en artefactos JSON.
+- `catalog.py`: Metadatos de la técnica e identificadores de MITRE ATT&CK.
+- `render.py`: Funciones de renderizado para salida en consola (CLI).
+
+### Flujo de datos
+
+1. **Workspace** (`~/.admapper/workspaces/<name>/` por defecto) contiene únicamente artefactos JSON del engagement activo. Estos datos nunca deben subirse al control de versiones.
+2. Los comandos **Scan/Run** escriben estados serializados como `unauth_scan.json`, `credentials.json`, `auth_inventory.json`, etc.
+3. El motor de **Análisis** consume estos artefactos para construir el payload operativo (`ops_payload`), vectores de ataque y la inteligencia general del engagement.
+4. El comando **Dashboard** (`admapper dashboard` / `admapper g`) expone el servidor local HTTP para la interfaz interactiva web y permite gatillar subprocesses del CLI en tiempo real.
+
+### Fases del Pentest
+
+Mapeadas en un modelo canónico centralizado en `admapper/methodology/unified.py` (Fases P1 a P12). La barra interactiva del frontend expone 9 pasos consolidados mapeados directamente a estas fases.
+
+### Seguridad y Secretos
+
+- Las credenciales y hashes se almacenan en texto plano por diseño en `credentials.json` bajo el workspace del operador (máquina local).
+- Todos los reportes o elementos HTML dinámicos generados (`ad_ops.html`, `attack_graph.html`) deben almacenarse exclusivamente dentro del directorio del workspace para evitar fugas.
+- El servidor de dashboard enmascara los secretos en las transmisiones JSON y en los outputs de la consola. No se deben embeber credenciales crudas en payloads transmitidos al front.
 
 ### Principios de diseño
 
@@ -750,6 +781,7 @@ Para paridad, el catálogo de ADMapper final debe cubrir al menos estas relacion
 | 2026-06-24 | Backlog — `exploit/persistence.py`: `exploit_dsrm_backdoor()` — dump DSRM hash + DsrmAdminLogonBehavior. |
 | 2026-06-24 | Backlog — `exploit/trusts.py`: `exploit_sid_history_nopac()` — SID History via CVE-2021-42278/42287 (noPac). |
 | 2026-06-25 | Auditorías de Postura PingCastle: Stale Systems, GPO Abuse, Stale AdminCount y ESC8 HTTP web enrollment. |
+| 2026-06-25 | CLI Visual Style System (output.py), `--no-color` option, privilege-free LDAP anonymous DC clock sync, and robust subprocess worker error wrapping. |
 
 ---
 
