@@ -28,6 +28,18 @@ _GLOBAL_ACTION_IDS = frozenset(
     {"scan", "cred", "enum", "enum_users", "asreproast", "kerberoast", "spray", "loot", "acls"}
 )
 
+METHOD_LABELS = {
+    "password": "🔑 password",
+    "ntlm_hash": "#️⃣ NTLM hash",
+    "spray": "💨 spray",
+    "kerberoast": "🎫 kerberoast",
+    "asreproast": "🎫 AS-REP roast",
+    "exploit_acl": "⚡ exploit ACL",
+    "dll_hijack": "📦 DLL hijack",
+    "winrm_pth": "#️⃣ WinRM PTH",
+    "certificate": "📜 certificado",
+}
+
 
 def _normalize_account(name: str) -> str:
     base = str(name or "").strip().lower().rstrip("$")
@@ -115,28 +127,15 @@ def build_selectable_identities(
                 "role": role,
                 "selectable": selectable,
                 "cred_valid": cred_valid,
-                "owned": key in owned,
+                "owned": key.rstrip("$") in owned,
                 "detail": detail,
                 "auth_method": auth_method or owned_methods.get(key, ""),
             }
         )
 
-    _METHOD_LABELS = {
-        "password": "🔑 password",
-        "ntlm_hash": "#️⃣ NTLM hash",
-        "spray": "💨 spray",
-        "kerberoast": "🎫 kerberoast",
-        "asreproast": "🎫 AS-REP roast",
-        "exploit_acl": "⚡ exploit ACL",
-        "dll_hijack": "📦 DLL hijack",
-        "winrm_pth": "#️⃣ WinRM PTH",
-        "certificate": "📜 certificado",
-    }
     for user in sorted(owned_users, key=str.lower):
-        if user.endswith("$"):
-            continue
         method_key = owned_methods.get(user.lower(), "")
-        method_label = _METHOD_LABELS.get(method_key, method_key)
+        method_label = METHOD_LABELS.get(method_key, method_key)
         method_part = f" · {method_label}" if method_label else ""
         cred_part = " · cred válida" if user.lower() in valid else " · sin cred verificada"
         add(
@@ -149,8 +148,6 @@ def build_selectable_identities(
         )
 
     for user in sorted(valid - owned):
-        if user.endswith("$"):
-            continue
         add(
             user,
             role="cred_valid",
@@ -173,20 +170,18 @@ def build_selectable_identities(
             detail=f"pista en {str(clue.get('source', ''))[:40]}",
         )
 
-    if ops_progress is not None and ops_progress.exploit:
-        from admapper.creds.common import collect_gained_hashes
-
-        for account, nthash in collect_gained_hashes(ws_path):
-            if not nthash:
-                continue
-            name = account if account.endswith("$") else f"{account}$"
-            add(
-                name,
-                role="machine_pth",
-                selectable="pivot",
-                cred_valid=True,
-                detail="NTLM hash — WinRM Pass-the-Hash (no LDAP password)",
-            )
+    from admapper.creds.common import collect_gained_hashes
+    for account, nthash in collect_gained_hashes(ws_path):
+        if not nthash:
+            continue
+        name = account if account.endswith("$") else f"{account}$"
+        add(
+            name,
+            role="machine_pth",
+            selectable="pivot",
+            cred_valid=True,
+            detail="NTLM hash — WinRM Pass-the-Hash (no LDAP password)",
+        )
 
     if ops_progress is not None and not ops_progress.enum_users:
         return rows
@@ -461,3 +456,20 @@ def filter_intel_for_pivot(
     intel["attack_readiness"] = filtered or vectors[:12]
     intel["identity_focus"] = pivot
     return intel
+
+
+def filter_attack_paths_for_pivot(
+    paths: list[dict[str, Any]],
+    pivot: str,
+) -> list[dict[str, Any]]:
+    """Narrow attack paths to those originating from the active pivot identity."""
+    if not pivot:
+        return paths
+    pl = pivot.lower().rstrip("$")
+    filtered: list[dict[str, Any]] = []
+    for p in paths:
+        src = str(p.get("source") or "").lower()
+        src_label = str(p.get("source_label") or "").lower()
+        if pl in src or pl == src_label.rstrip("$"):
+            filtered.append(p)
+    return filtered

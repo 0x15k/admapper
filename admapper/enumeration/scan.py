@@ -286,4 +286,11 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
             print_info("Manual exploitation guides (BloodHound-style):")
         print_manual_guides_for_keys(result.guides_shown, session=session)
 
+    # Phase 3 — surface roastable targets explicitly after enumeration
+    try:
+        from admapper.enumeration.roastable import detect_roastable_targets
+        detect_roastable_targets(session)
+    except Exception as _roast_exc:
+        print_warning(f"roastable detection skipped: {_roast_exc}")
+
     return result

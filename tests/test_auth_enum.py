@@ -53,6 +53,7 @@ def test_run_auth_enumeration_saves_inventory(tmp_path: Path) -> None:
         patch("admapper.auth.auth_enum.enumerate_smb_authenticated", return_value=smb_result),
         patch("admapper.auth.auth_enum.fetch_lockout_context", return_value=lockout_ctx),
         patch("admapper.auth.auth_enum.print_manual_guide"),
+        patch("admapper.auth.posture.check_security_posture"),
     ):
         result = run_auth_enumeration(session, cred, "10.0.0.1", "corp.local")
 

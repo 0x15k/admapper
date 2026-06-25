@@ -9,6 +9,7 @@ from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth, format_evil_winrm_pth
 from admapper.report.engagement import _load_json
 from admapper.report.engagement_map import _acl_exploit_blocker, loot_clue_rows
+from admapper.graph.identity_lens import METHOD_LABELS
 
 
 def _esc(text: str) -> str:
@@ -116,11 +117,12 @@ def _wire_orphan_nodes(vis_nodes: dict[str, dict], vis_edges: list[dict]) -> Non
 
 
 def _node_color(node: dict[str, Any], *, pivot: str, owned: set[str]) -> str:
-    username = str(node.get("username", "")).lower()
-    name = str(node.get("name", "")).lower()
-    if node.get("owned") or username in owned:
+    username = str(node.get("username", "")).lower().rstrip("$")
+    name = str(node.get("name", "")).lower().rstrip("$")
+    pivot_norm = str(pivot or "").lower().rstrip("$")
+    if node.get("owned") or username in owned or name in owned:
         return "#22c55e"
-    if username == pivot.lower() or name == pivot.lower():
+    if username == pivot_norm or name == pivot_norm:
         return "#f97316"
     if node.get("high_value"):
         return "#ef4444"
@@ -204,18 +206,6 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_METHOD_LABELS = {
-    "password": "🔑 password",
-    "ntlm_hash": "#️⃣ NTLM hash",
-    "spray": "💨 spray",
-    "kerberoast": "🎫 kerberoast",
-    "asreproast": "🎫 AS-REP roast",
-    "exploit_acl": "⚡ exploit ACL",
-    "dll_hijack": "📦 DLL hijack",
-    "winrm_pth": "#️⃣ WinRM PTH",
-    "certificate": "📜 certificado",
-}
-
 
 def build_graph_payload(
     ws_path: Path,
@@ -227,7 +217,7 @@ def build_graph_payload(
     owned_methods: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Collect nodes/edges for vis-network from graph.json + ACLs + escalate."""
-    owned = {u.lower() for u in (owned_users or [])}
+    owned = {u.lower().rstrip("$") for u in (owned_users or [])}
     pivot = pivot_user or (list(owned_users or [])[-1] if owned_users else "")
     graph = _load_json(ws_path / "graph.json") or {"nodes": [], "edges": []}
     acl = _load_json(ws_path / "acl_findings.json") or {}
@@ -271,18 +261,22 @@ def build_graph_payload(
         if username.lower() in _GRAPH_SKIP_USERS:
             continue
         label = username
-        is_owned = bool(node.get("owned")) or username.lower() in owned
+        is_owned = bool(node.get("owned")) or username.lower().rstrip("$") in owned
         if is_owned:
             label = f"★ {label}"
         role = "unknown"
-        ul = username.lower()
-        if ul == pivot.lower():
+        ul = username.lower().rstrip("$")
+        if ul == pivot.lower().rstrip("$"):
             role = "pivot"
         elif is_owned:
             role = "owned"
 
-        method_key = (owned_methods or {}).get(username.lower(), "")
-        method_label = _METHOD_LABELS.get(method_key, method_key) if method_key else ""
+        method_key = (
+            (owned_methods or {}).get(username.lower())
+            or (owned_methods or {}).get(username.lower() + "$")
+            or (owned_methods or {}).get(username.lower().rstrip("$"), "")
+        )
+        method_label = METHOD_LABELS.get(method_key, method_key) if method_key else ""
         status_part = f"COMPROMISED ({method_label})" if is_owned else "UNCOMPROMISED"
         title_lines = [
             f"Type: {node.get('type', 'object').upper()}",

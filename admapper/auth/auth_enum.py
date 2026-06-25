@@ -245,6 +245,14 @@ def run_auth_enumeration(
         manual="bloodhound-python -u user -p pass -d domain -c All -ns <DC>",
     )
 
+    # Phase 8.8 — security posture checks (non-blocking: errors don't fail auth enum)
+    try:
+        from admapper.auth.posture import check_security_posture
+        check_security_posture(session, dc_ip, cred, domain)
+    except Exception as _posture_exc:
+        from admapper.core.output import print_warning as _pw
+        _pw(f"posture checks skipped: {_posture_exc}")
+
     findings = FindingsStore(session.workspaces, ws_name)
     finding_list = [
         Finding(

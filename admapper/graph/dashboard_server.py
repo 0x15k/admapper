@@ -86,6 +86,7 @@ class DashboardContext:
         self.events.put({"type": kind, "line": line, "ts": time.time()})
 
     def refresh_payload(self) -> dict[str, Any]:
+        self._sync_offline_cracked_hashes()
         refresh_workspace_intel(self.ws_path)
         self.progress = OpsProgress.load(self.ws_path)
         self._sync_loot_progress()
@@ -259,6 +260,242 @@ class DashboardContext:
                 if username.lower() not in {u.lower() for u in self.owned_users}:
                     self.owned_users.append(username)
         self.progress.save(self.ws_path)
+
+    def _sync_offline_cracked_hashes(self) -> None:
+        """Scan for offline cracked hashes from John/Hashcat files and update credentials/progress."""
+        loot_dir = self.ws_path / "loot"
+        cracked_files = [
+            loot_dir / "cracked.txt",
+            loot_dir / "hashes.txt.cracked",
+        ]
+        
+        # Check if any cracked files exist
+        has_files = False
+        for f in cracked_files:
+            if f.is_file():
+                has_files = True
+                break
+        if not has_files:
+            return
+
+        # Load all known users to map usernames case-insensitively
+        known_users: dict[str, str] = {}
+        # From state.json
+        state_path = self.ws_path / "state.json"
+        if state_path.is_file():
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                for u in state.get("owned_users") or []:
+                    known_users[u.lower()] = u
+            except Exception:
+                pass
+
+        # From auth_inventory.json
+        inv_path = self.ws_path / "auth_inventory.json"
+        if inv_path.is_file():
+            try:
+                inv = json.loads(inv_path.read_text(encoding="utf-8"))
+                for u in inv.get("users") or []:
+                    name = u.get("username")
+                    if name:
+                        known_users[name.lower()] = name
+            except Exception:
+                pass
+
+        # From credentials.json
+        creds_path = self.ws_path / "credentials.json"
+        if creds_path.is_file():
+            try:
+                cdata = json.loads(creds_path.read_text(encoding="utf-8"))
+                for c in cdata.get("credentials") or []:
+                    name = c.get("username")
+                    if name:
+                        known_users[name.lower()] = name
+            except Exception:
+                pass
+
+        # Map hashes to usernames
+        hash_to_user: dict[str, str] = {}
+        # From kerberoast_hashes.json
+        krb_path = self.ws_path / "kerberoast_hashes.json"
+        if krb_path.is_file():
+            try:
+                data = json.loads(krb_path.read_text(encoding="utf-8"))
+                for h in data.get("hashes") or []:
+                    username = h.get("username")
+                    hashcat = h.get("hashcat")
+                    if username and hashcat:
+                        hash_to_user[hashcat.strip().lower()] = username
+            except Exception:
+                pass
+
+        # From asreproast_hashes.json
+        asrep_path = self.ws_path / "asreproast_hashes.json"
+        if asrep_path.is_file():
+            try:
+                data = json.loads(asrep_path.read_text(encoding="utf-8"))
+                for h in data.get("hashes") or []:
+                    username = h.get("username")
+                    hashcat = h.get("hashcat")
+                    if username and hashcat:
+                        hash_to_user[hashcat.strip().lower()] = username
+            except Exception:
+                pass
+
+        # From exploit_log.json (NTLM hashes)
+        exploit_path = self.ws_path / "exploit_log.json"
+        if exploit_path.is_file():
+            try:
+                data = json.loads(exploit_path.read_text(encoding="utf-8"))
+                for h in data.get("new_hashes") or []:
+                    account = h.get("account")
+                    nthash = h.get("nthash")
+                    if account and nthash:
+                        hash_to_user[nthash.strip().lower()] = account
+            except Exception:
+                pass
+
+        # From credentials.json (NTLM hashes)
+        if creds_path.is_file():
+            try:
+                cdata = json.loads(creds_path.read_text(encoding="utf-8"))
+                for c in cdata.get("credentials") or []:
+                    username = c.get("username")
+                    secret = c.get("secret")
+                    if username and secret and c.get("type") == "ntlm":
+                        hash_to_user[secret.strip().lower()] = username
+            except Exception:
+                pass
+
+        # Parse cracked passwords
+        cracked_creds: dict[str, str] = {} # username -> password
+        import re
+
+        def extract_user_from_krb_hash(line: str) -> str | None:
+            match = re.search(r"\$krb5asrep\$[^$]*\$([^$]+)@", line)
+            if match:
+                return match.group(1)
+            match = re.search(r"\$krb5tgs\$23\$\*[^$]+\$[^$]+\$([^*]+)\*", line)
+            if match:
+                return match.group(1)
+            return None
+
+        for f in cracked_files:
+            if not f.is_file():
+                continue
+            try:
+                lines = f.read_text(encoding="utf-8").splitlines()
+                for line in lines:
+                    line = line.strip()
+                    if not line or ":" not in line:
+                        continue
+                    parts = line.split(":", 1)
+                    key = parts[0].strip()
+                    password = parts[1].strip()
+                    if not key or not password:
+                        continue
+                    
+                    # 1. Direct username check
+                    if key.lower() in known_users:
+                        cracked_creds[known_users[key.lower()]] = password
+                        continue
+                    
+                    # 2. Domain clean check
+                    key_clean = key
+                    if "@" in key_clean:
+                        key_clean = key_clean.split("@", 1)[0]
+                    if "\\" in key_clean:
+                        key_clean = key_clean.split("\\", 1)[1]
+                    if key_clean.lower() in known_users:
+                        cracked_creds[known_users[key_clean.lower()]] = password
+                        continue
+                        
+                    # 3. Direct hash check
+                    if key.lower() in hash_to_user:
+                        cracked_creds[hash_to_user[key.lower()]] = password
+                        continue
+                        
+                    # 4. Kerberos hash parsed user check
+                    parsed_user = extract_user_from_krb_hash(key)
+                    if parsed_user and parsed_user.lower() in known_users:
+                        cracked_creds[known_users[parsed_user.lower()]] = password
+                        continue
+            except Exception:
+                pass
+
+        if not cracked_creds:
+            return
+
+        # Load existing credentials.json
+        creds_data = {"credentials": []}
+        if creds_path.is_file():
+            try:
+                creds_data = json.loads(creds_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        creds_list = creds_data.setdefault("credentials", [])
+        updated = False
+
+        for uname, pwd in cracked_creds.items():
+            # Check if we already have this user in credentials.json
+            found = False
+            for c in creds_list:
+                if str(c.get("username", "")).lower() == uname.lower():
+                    found = True
+                    if c.get("status") != "valid" or c.get("secret") != pwd:
+                        c["secret"] = pwd
+                        c["status"] = "valid"
+                        c["type"] = "password"
+                        updated = True
+                    break
+            if not found:
+                import uuid
+                creds_list.append({
+                    "id": uuid.uuid4().hex[:12],
+                    "username": uname,
+                    "secret": pwd,
+                    "type": "password",
+                    "domain": self.domain,
+                    "status": "valid",
+                    "source": "cracked",
+                })
+                updated = True
+
+        if updated:
+            try:
+                creds_path.write_text(json.dumps(creds_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+
+            # Sync progress and context
+            for uname in cracked_creds:
+                self.progress.remember_owned(uname, method="password")
+                if uname.lower() not in {u.lower() for u in self.owned_users}:
+                    self.owned_users.append(uname)
+                if uname.lower() not in {u.lower() for u in self.progress.verified_users}:
+                    self.progress.verified_users.append(uname)
+
+            try:
+                self.progress.save(self.ws_path)
+            except Exception:
+                pass
+
+            # Update owned users in graph.json and state.json (best-effort)
+            try:
+                from admapper.core.session import Session
+                from admapper.escalate.analyze import mark_user_owned
+                session = Session.bootstrap()
+                session.select_workspace(self.workspace, create=True)
+                for uname in cracked_creds:
+                    if self.ws_path.joinpath("graph.json").is_file():
+                        try:
+                            mark_user_owned(session, uname, refresh=True)
+                        except Exception:
+                            pass
+                session.persist_workspace()
+            except Exception:
+                pass
 
     def _infer_owned_methods(self) -> None:
         """Backfill owned_methods for users that don't have a method yet."""

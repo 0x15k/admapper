@@ -28,6 +28,7 @@ from admapper.graph.identity_lens import (
     filter_actions_for_pivot,
     filter_intel_for_pivot,
     filter_targets_for_pivot,
+    filter_attack_paths_for_pivot,
 )
 from admapper.graph.topology import build_network_topology
 from admapper.models.escalation import EscalationEdge
@@ -390,6 +391,7 @@ def build_ops_payload(
         else {}
     )
     if pivot and identity_lens:
+        attack_paths = filter_attack_paths_for_pivot(attack_paths, pivot)
         engagement_intel = filter_intel_for_pivot(engagement_intel, pivot, identity_lens)
         actions = filter_actions_for_pivot(actions, pivot=pivot)
         pivot_quests = [

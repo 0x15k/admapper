@@ -8,6 +8,7 @@ from admapper.graph.identity_lens import (
     build_selectable_identities,
     filter_actions_for_pivot,
     filter_targets_for_pivot,
+    filter_attack_paths_for_pivot,
 )
 from admapper.models.user import UserRecord
 
@@ -143,3 +144,17 @@ def test_filter_targets_for_pivot() -> None:
     out = filter_targets_for_pivot(targets, pivot="alice")
     assert len(out) == 1
     assert out[0]["target"] == "gmsa1"
+
+
+def test_filter_attack_paths_for_pivot() -> None:
+    paths = [
+        {"source": "alice", "target": "domain_admins", "source_label": "alice"},
+        {"source": "bob", "target": "domain_admins", "source_label": "bob$"},
+        {"source": "carol", "target": "domain_admins", "source_label": "carol"},
+    ]
+    out = filter_attack_paths_for_pivot(paths, pivot="bob")
+    assert len(out) == 1
+    assert out[0]["source"] == "bob"
+
+    out_empty = filter_attack_paths_for_pivot(paths, pivot="")
+    assert len(out_empty) == 3

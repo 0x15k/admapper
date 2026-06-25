@@ -2,9 +2,9 @@
 
 > Plan maestro del proyecto. Objetivo: replicar y superar lo que hace [ADScan](https://github.com/ADScanPro/adscan), técnica por técnica, en orden de dependencias.
 
-**Estado:** Fase 17 (Reporting) completada — proyecto LITE en paridad funcional  
+**Estado:** Fases 3, 8.8 y backlog completadas — OPSEC profiles, DSRM, SID History noPac, PTT, coerce auto-exploit  
 **Referencia analizada:** ADScan v9.x (código + documentación)  
-**Última actualización:** 2026-06-04
+**Última actualización:** 2026-06-24
 
 ---
 
@@ -292,14 +292,16 @@ Las fases están ordenadas por **dependencia**: cada una consume la salida de la
 
 | ID | Tarea | Técnica ADScan equivalente | MITRE | Estado |
 |---|---|---|---|---|
-| 3.1 | Detectar `DONT_REQ_PREAUTH` (UAC 0x400000) vía LDAP | AS-REP target ID | T1558.004 | ⬜ |
-| 3.2 | Detectar cuentas con SPN (excluir krbtgt, cuentas de máquina opcional) | Kerberoast target ID | T1558.003 | ⬜ |
-| 3.3 | Marcar usuarios en `users.json` con flags `asrep_roastable`, `kerberoastable` | Metadata en inventario | — | ⬜ |
-| 3.4 | Detectar `UF_DONT_REQUIRE_PREAUTH` sin LDAP (UserAccountControl vía SAMR) | Fallback SAMR | T1558.004 | ⬜ |
+| 3.1 | Detectar `DONT_REQ_PREAUTH` (UAC 0x400000) vía LDAP | AS-REP target ID | T1558.004 | ✅ |
+| 3.2 | Detectar cuentas con SPN (excluir krbtgt, cuentas de máquina opcional) | Kerberoast target ID | T1558.003 | ✅ |
+| 3.3 | Marcar usuarios en `users.json` con flags `asrep_roastable`, `kerberoastable` | Metadata en inventario | — | ✅ |
+| 3.4 | Detectar `UF_DONT_REQUIRE_PREAUTH` sin LDAP (UserAccountControl vía SAMR) | Fallback SAMR | T1558.004 | ✅ |
 
 **Depende de:** Fase 2  
 **Habilita:** Fases 4, 5  
 **Criterio de done:** Reporte de cuentas roastables sin haber solicitado ningún ticket aún.
+
+> **Implementado:** `admapper/enumeration/roastable.py` — `detect_roastable_targets()` se ejecuta automáticamente al final de `enum users`. Emite `roastable_targets.json` + findings. Tests: `tests/test_roastable.py` (11 casos).
 
 ---
 
@@ -391,12 +393,14 @@ Las fases están ordenadas por **dependencia**: cada una consume la salida de la
 | 8.5 | SMB: GPP cpassword en SYSVOL | GPP passwords | T1552.006 | ✅ |
 | 8.6 | Trust enumeration (dominios externos) | Trust spidering | T1482 | ✅ |
 | 8.7 | ADCS: detectar CA + enumerar certificate templates | ADCS discovery | T1649 | ✅ |
-| 8.8 | Postura: LAPS, SMB signing, NTLMv1, LDAP signing, DA sessions | Misconfig checks | varios | ⬜ |
+| 8.8 | Postura: LAPS, SMB signing, NTLMv1, LDAP signing, DA sessions | Misconfig checks | varios | ✅ |
 | 8.9 | Export BloodHound CE compatible JSON | BH collection | — | ✅ |
 
 **Depende de:** Fase 7  
 **Habilita:** Fases 9–16  
 **Criterio de done:** `start_auth` produce inventario completo + `graph.json` + export BloodHound.
+
+> **Implementado 8.8:** `admapper/auth/posture.py` — `check_security_posture()` se ejecuta automáticamente en `run_auth_enumeration()`. Emite `security_posture.json` + findings. Checks: SMB signing, LAPS, NTLMv1, LDAP signing, DA sessions.
 
 ---
 
@@ -738,6 +742,13 @@ Para paridad, el catálogo de ADMapper final debe cubrir al menos estas relacion
 | 2026-06-04 | Renombrado de ADIR → **ADMapper** (CLI: `admapper`, config: `~/.admapper/`). |
 | 2026-06-04 | Orden: Fase 0 → 1 → 2 → 3 → 4/5/6 → 7 → 8+. Sin saltos. |
 | 2026-06-04 | Benchmark de paridad: ADScan LITE v9.x, 64 técnicas ejecutables. |
+| 2026-06-24 | Fase 3 completada: `roastable.py` — detección pre-ticket de targets AS-REP + Kerberoast + PASSWD_NOTREQD. |
+| 2026-06-24 | Fase 8.8 completada: `posture.py` — LAPS, SMB signing, NTLMv1, LDAP signing, DA sessions checks. |
+| 2026-06-24 | Backlog — `coerce/exploit.py`: motor auto-exploit ntlmrelayx + coercedores (PetitPotam, PrinterBug, DFSCoerce). |
+| 2026-06-24 | Backlog — `core/opsec.py`: OPSEC profiles STEALTH/NORMAL/LAB. CLI: `admapper opsec set <profile>`. Tests: `test_opsec.py`. |
+| 2026-06-24 | Backlog — `exploit/tickets.py`: `inject_ticket()` + `pass_the_ticket()` — PTT cross-platform (KRB5CCNAME / Rubeus). |
+| 2026-06-24 | Backlog — `exploit/persistence.py`: `exploit_dsrm_backdoor()` — dump DSRM hash + DsrmAdminLogonBehavior. |
+| 2026-06-24 | Backlog — `exploit/trusts.py`: `exploit_sid_history_nopac()` — SID History via CVE-2021-42278/42287 (noPac). |
 
 ---
 

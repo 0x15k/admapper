@@ -694,6 +694,15 @@ def web(
     from admapper.core.session import Session
     from admapper.graph.dashboard_server import run_dashboard_server
 
+    # Require explicit target — never silently reuse the last active workspace
+    if not host and not workspace:
+        print_error(
+            "specify a target:\n"
+            "  admapper web -H <DC_IP>          # opens/creates workspace for that IP\n"
+            "  admapper web -w <workspace_name> # opens existing workspace"
+        )
+        raise typer.Exit(1)
+
     session = Session.bootstrap()
     if host:
         ws_name = workspace or default_workspace_name(host)
@@ -703,9 +712,7 @@ def web(
         print_info(f"workspace {ws_name} · target {host.strip()}")
     elif workspace:
         session.select_workspace(workspace, create=False)
-    elif session.workspace is None:
-        print_error("usage: admapper web -H <IP>   or   admapper web -w <workspace>")
-        raise typer.Exit(1)
+
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
     if host and ws.hosts and ws.hosts.strip() != host.strip():
@@ -728,6 +735,7 @@ def web(
         port=port,
         open_browser=open_browser,
     )
+
 
 
 @app.command()
@@ -762,6 +770,15 @@ def dashboard(
     from admapper.graph.dashboard_server import run_dashboard_server
     from admapper.graph.ops_ui import write_ops_html
 
+    # Require explicit target — never silently reuse the last active workspace
+    if not host and not workspace:
+        print_error(
+            "specify a target:\n"
+            "  admapper dashboard -H <DC_IP>          # opens/creates workspace for that IP\n"
+            "  admapper dashboard -w <workspace_name> # opens existing workspace"
+        )
+        raise typer.Exit(1)
+
     session = Session.bootstrap()
     if host:
         ws_name = workspace or default_workspace_name(host)
@@ -771,9 +788,6 @@ def dashboard(
         print_info(f"blackbox → workspace {ws_name} · target {host.strip()}")
     elif workspace:
         session.select_workspace(workspace, create=False)
-    elif session.workspace is None:
-        print_error("blackbox: admapper dashboard -H <IP>   o   admapper dashboard -w <workspace>")
-        raise typer.Exit(1)
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
     if host and ws.hosts and ws.hosts.strip() != host.strip():
@@ -989,6 +1003,69 @@ def exploit(
     except (ValueError, RuntimeError) as exc:
         print_error(str(exc))
         raise typer.Exit(code=1) from exc
+
+
+opsec_app = typer.Typer(help="OPSEC profile management (Stealth / Normal / Lab)")
+app.add_typer(opsec_app, name="opsec")
+
+
+@opsec_app.callback(invoke_without_command=True)
+def opsec_main(
+    ctx: typer.Context,
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+) -> None:
+    """Show current OPSEC profile and settings."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from admapper.core.opsec import print_opsec_status
+
+    session = Session.bootstrap()
+    if workspace:
+        session.select_workspace(workspace, create=False)
+    print_opsec_status(session if session.workspace else None)
+
+
+@opsec_app.command("set")
+def opsec_set(
+    profile: Annotated[
+        str,
+        typer.Argument(help="Profile: stealth | normal | lab"),
+    ],
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace to apply profile to"),
+    ] = None,
+) -> None:
+    """Set OPSEC profile for the active workspace.
+
+    \b
+    stealth  Minimum footprint: delays 3-10s, no spray, no coerce, confirms required
+    normal   Balanced defaults (current ADMapper behaviour)
+    lab      Maximum aggression: no delays, no confirmations (HTB/lab use)
+    """
+    from admapper.core.output import print_error, print_success as _ps
+    from admapper.core.opsec import OpsecProfile, save_workspace_profile, print_opsec_status
+
+    try:
+        p = OpsecProfile(profile.lower())
+    except ValueError:
+        print_error(f"unknown profile '{profile}' — choose: stealth, normal, lab")
+        raise typer.Exit(code=1)
+
+    session = Session.bootstrap()
+    if workspace:
+        session.select_workspace(workspace, create=False)
+    elif session.workspace is None:
+        print_error("no active workspace — use -w <name>")
+        raise typer.Exit(code=1)
+
+    ws_path = session.workspaces.path_for(session.workspace.name)
+    save_workspace_profile(ws_path, p)
+    _ps(f"OPSEC profile set to '{p.upper()}' for workspace '{session.workspace.name}'")
+    print_opsec_status(session)
 
 
 def main() -> None:

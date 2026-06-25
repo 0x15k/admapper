@@ -798,12 +798,23 @@ def build_ops_html(
     }}
 
     function getDisplayQuests() {{
-      if (isInspectingOther()) return [];
+      if (isInspectingOther()) {{
+        const lens = lensForUser(graphFocus);
+        return (lens.missions || []).filter(q => q.verified);
+      }}
       return (OPS.quests || []).filter(q => q.verified);
     }}
 
     function getDisplayAttackPaths() {{
-      if (isInspectingOther()) return [];
+      if (isInspectingOther()) {{
+        const lens = lensForUser(graphFocus);
+        return (lens.outbound_edges || []).map(e => ({{
+          source_label: graphFocus,
+          target_label: e.target,
+          impact: e.severity === 'critical' ? 'critical' : (e.severity === 'high' ? 'high' : 'medium'),
+          steps: [{{ edge_type: e.technique, narrative: e.summary }}]
+        }}));
+      }}
       return OPS.attack_paths || [];
     }}
 
@@ -1514,7 +1525,7 @@ def build_ops_html(
       html += `<p class="sub">Pivot: <strong>${{p.pivot || '—'}}</strong>`;
       if ((p.owned || []).length) html += ` · owned: ${{(p.owned || []).join(', ')}}`;
       html += '</p>';
-      html += `<p class="sub"><strong>${{g.stage_label || '—'}}</strong></p></div>`;
+      html += `<p class="sub"><strong>ETAPA GENERAL: ${{g.stage_label || '—'}}</strong></p></div>`;
 
       const actions = getDisplayActions();
       if (actions.length) {{
@@ -1537,10 +1548,40 @@ def build_ops_html(
       const pivotNow = activePivot();
       const focusNow = graphFocus ? graphFocus.toLowerCase() : '';
       if (lens.username) {{
+        let userStatusLabel = '';
+        if (lens.status) {{
+          let isAdAdmin = false;
+          const uLower = (lens.username || '').toLowerCase();
+          if (uLower === 'administrator' || uLower === 'administrador') {{
+            isAdAdmin = true;
+          }} else if (lens.inventory && lens.inventory.groups) {{
+            isAdAdmin = lens.inventory.groups.some(g => {{
+              const gl = String(g).toLowerCase();
+              return gl.includes('domain admin') || gl.includes('administrador') || gl.includes('enterprise admin') || gl.includes('administrators');
+            }});
+          }}
+
+          if (lens.status === 'owned_ready') {{
+            userStatusLabel = isAdAdmin ? '🏆 Administrador de Dominio (Control Total)' : '⚡ Pivote Activo (Acceso de Red)';
+          }} else if (lens.status === 'owned_no_cred') {{
+            userStatusLabel = '🔑 Acceso Parcial (Falta verificar credencial)';
+          }} else if (lens.status === 'cred_only') {{
+            userStatusLabel = '🔑 Credencial Válida (Disponible para Pivote)';
+          }} else if (lens.status === 'loot_pending') {{
+            userStatusLabel = '🔍 Indicio Descubierto (Pendiente verificar)';
+          }} else if (lens.status === 'machine_pth') {{
+            userStatusLabel = '💻 Cuenta de Máquina / gMSA (WinRM PTH)';
+          }} else {{
+            userStatusLabel = '👤 Usuario del Dominio (No comprometido)';
+          }}
+        }} else {{
+          userStatusLabel = '👤 Usuario del Dominio (No comprometido)';
+        }}
+
         const readOnly = lens.read_only || isInspectingOther();
         const isPivotLens = lens.username.toLowerCase() === pivotNow;
         html += `<div class="objective"><h2>PERFIL · ${{lens.username}}${{readOnly && !isPivotLens ? ' (inspección)' : (isPivotLens ? ' (pivot)' : '')}}</h2>`;
-        html += `<p class="sub">${{lens.status_label || ''}}</p>`;
+        html += `<p class="sub">${{userStatusLabel}}</p>`;
         if (lens.inventory && lens.inventory.dn) html += `<p class="sub mono">${{lens.inventory.dn}}</p>`;
         if (readOnly) {{
           html += '<p class="hl" style="color:var(--warn)">Sin credencial — no es pivot operativo</p>';
@@ -1912,23 +1953,30 @@ def build_ops_html(
       const hashes = OPS.hashes || [];
       const quests = getDisplayQuests();
       let html = '';
-      if (creds.length) {{
+
+      const activeUser = (graphFocus || activePivot() || '').toLowerCase().replace(/\$$/, '');
+      const showAll = !activeUser;
+      const filteredCreds = showAll ? creds : creds.filter(c => (c.user || '').toLowerCase().replace(/\$$/, '') === activeUser);
+      const filteredClues = showAll ? clues : clues.filter(c => (c.user || '').toLowerCase().replace(/\$$/, '') === activeUser);
+      const filteredHashes = showAll ? hashes : hashes.filter(h => (h.account || '').toLowerCase().replace(/\$$/, '') === activeUser);
+
+      if (filteredCreds.length) {{
         html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">Credentials</div>';
-        creds.forEach(c => {{
+        filteredCreds.forEach(c => {{
           const cls = c.status === 'valid' ? 'ok' : 'warn';
           html += noteKv(c.user, c.status, cls);
         }});
         html += '</div>';
       }}
-      if (prog.loot && clues.length) {{
+      if (prog.loot && filteredClues.length) {{
         html += '<div class="note-callout warn"><div class="note-block-label" style="color:var(--warn); margin-top:0">Loot</div>';
-        clues.forEach(c => {{
+        filteredClues.forEach(c => {{
           html += noteKv(c.user, `«${{c.string}}»`, 'warn');
           if (c.source) html += noteKvIndent('archivo', c.source, 'dim');
         }});
         html += '</div>';
       }}
-      if (prog.acls && quests.length && !isInspectingOther()) {{
+      if (prog.acls && quests.length) {{
         html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">PrivEsc / ACL</div>';
         quests.forEach(q => {{
           const st = q.enabled ? 'verificado' : 'bloqueado';
@@ -1937,7 +1985,7 @@ def build_ops_html(
         html += '</div>';
       }}
       const attackPaths = getDisplayAttackPaths();
-      if (attackPaths.length && !isInspectingOther()) {{
+      if (attackPaths.length) {{
         html += '<div class="note-callout danger"><div class="note-block-label" style="color:var(--danger); margin-top:0">Caminos de ataque</div>';
         attackPaths.slice(0, 10).forEach(p => {{
           const sev = (p.impact === 'critical' ? 'danger' : (p.impact === 'high' ? 'warn' : ''));
@@ -1948,9 +1996,9 @@ def build_ops_html(
         }});
         html += '</div>';
       }}
-      if (prog.exploit && hashes.length) {{
+      if (prog.exploit && filteredHashes.length) {{
         html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">Hashes / PTH</div>';
-        hashes.forEach(h => {{
+        filteredHashes.forEach(h => {{
           html += noteKv(h.account, h.nthash, 'ok');
           const pth = (OPS.pth_sessions || []).find(p => p.account === h.account);
           if (pth && pth.winrm_cmd) html += noteKvIndent('winrm', pth.winrm_cmd, 'dim');
