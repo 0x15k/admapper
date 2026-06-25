@@ -10,7 +10,9 @@ from admapper.core.hosts import HostsStore
 from admapper.core.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guide
 from admapper.models.postex_op import PostexOpportunity
+from admapper.models.credential import CredentialStatus
 from admapper.postex.catalog import postex_meta
+
 from admapper.postex.loot_intel import loot_intel_to_dict, scan_loot_directory
 from admapper.postex.task_hijack import (
     analyze_task_hijack,
@@ -106,23 +108,50 @@ def build_postex_opportunities(
             )
         )
 
-    # 14.2–14.4, 14.6, 14.8 — local shell techniques (generic per owned access)
-    if owned:
+    # Get hosts where we have verified admin/WinRM access.
+    # We can infer this by looking at computers in the inventory that match verified credentials or where scan results show ownership.
+    verified_admin_hosts: list[str] = []
+    # If session has verified credentials/hashes matching a machine account or DC WinRM access, map to that host
+    # For target-10-129-245-130, if we have gMSA hash (msa_health$) and we have WinRM access, we target the DC.
+    # Let's extract verified computer names or target IPs from active credentials
+    if session.credentials is not None:
+        for c in session.credentials.list():
+            if c.status == CredentialStatus.VALID:
+                if c.username.endswith("$"):
+                    from admapper.creds.common import resolve_winrm_host_for_account
+                    target_h = resolve_winrm_host_for_account(
+                        c.username,
+                        ws_path,
+                        session.workspace.domain,
+                        fallback_ip=dcs[0] if dcs else None
+                    )
+                    if target_h and target_h not in verified_admin_hosts:
+                        verified_admin_hosts.append(target_h)
+
+    # If no machine account has verified access, but we have general administrative credentials, map to DCs
+    if not verified_admin_hosts and owned:
+        # Fall back to DCs if we have any valid credential to try local shell operations
+        verified_admin_hosts = dcs or (computers[:1] if computers else ["<local_shell>"])
+
+    # 14.2–14.4, 14.6, 14.8 — local shell techniques (only mapped to hosts with admin/shell access)
+    for host in verified_admin_hosts:
         for technique in _LOCAL_SHELL_TECHNIQUES:
             ops.append(
                 _opportunity(
                     technique,
-                    target_host="<local_shell>",
+                    target_host=host,
                     context=cred_context,
-                    detail="Requires interactive shell or SYSTEM on Windows host",
+                    detail=f"Requires interactive shell or SYSTEM on {host}",
                 )
             )
 
     # 14.5 DCSync — from ACL findings
+    dcsync_acl_principals: set[str] = set()
     for finding in (acl_data or {}).get("findings") or []:
         if str(finding.get("right")) != "dcsync":
             continue
         principal = str(finding.get("principal", ""))
+        dcsync_acl_principals.add(principal.lower())
         if owned and principal.lower() not in {u.lower() for u in owned}:
             continue
         target = dcs[0] if dcs else "<DC>"
@@ -134,15 +163,33 @@ def build_postex_opportunities(
                 detail=str(finding.get("summary") or "ACL grants DCSync rights"),
             )
         )
+
+    # Check for historical DCSync failures in exploit_log.json to avoid false positive "ready" state
+    has_failed_dcsync = False
+    exploit_log = _load_json(ws_path / "exploit_log.json") if ws_path else None
+    if exploit_log:
+        for step in exploit_log.get("steps") or []:
+            if step.get("phase") == "dcsync" and step.get("status") == "failed":
+                has_failed_dcsync = True
+
     if not any(o.technique == "dcsync" for o in ops) and owned and dcs:
-        ops.append(
-            _opportunity(
-                "dcsync",
-                target_host=dcs[0],
-                context=cred_context,
-                detail="Try secretsdump if creds are DA-equivalent (paths/ACLs)",
-            )
+        # Determine if we should mark DCSync as Info/Blocked if we have no explicit ACL and/or previous failures
+        op = _opportunity(
+            "dcsync",
+            target_host=dcs[0],
+            context=cred_context,
+            detail="Try secretsdump if creds are DA-equivalent (paths/ACLs)" if not has_failed_dcsync else "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)",
         )
+        if has_failed_dcsync:
+            op.severity = "info"
+        ops.append(op)
+    elif has_failed_dcsync:
+        # Downgrade any active DCSync ops if historical failure is found
+        for o in ops:
+            if o.technique == "dcsync":
+                o.severity = "info"
+                o.detail = "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)"
+
 
     # 14.7 Share loot — SYSVOL/NETLOGON and discovered shares
     shares = list((inventory or {}).get("smb_shares") or [])

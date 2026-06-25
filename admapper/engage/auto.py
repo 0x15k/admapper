@@ -232,13 +232,58 @@ def run_auto_exec(session: Session, *, max_steps: int = 4) -> int:
 
 
 def prepare_auto(session: Session) -> None:
-    """Enable auto mode and sync owned/pivot from intel."""
+    """Enable auto mode, sync owned/pivot from intel, and run blank guest spray if OPSEC=LAB."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
     session.workspace.mode = OperationMode.AUTO
     session.persist_workspace()
     sync_owned_from_intel(session)
     auto_set_pivot(session)
+
+    # Blank password spray check for PASSWD_NOTREQD (Guest) when OPSEC mode is LAB
+    # Check if there is an active LAB opsec policy
+    is_lab = False
+    config_path = session.workspaces.path_for(session.workspace.name) / "security_posture.json"
+    if config_path.is_file():
+        try:
+            cfg = json.loads(config_path.read_text(encoding="utf-8"))
+            if str(cfg.get("opsec_level", "")).lower() == "lab":
+                is_lab = True
+        except Exception:
+            pass
+
+    if is_lab:
+        # Check users for password_not_required
+        users_path = session.workspaces.path_for(session.workspace.name) / "users.json"
+        if users_path.is_file():
+            try:
+                users_data = json.loads(users_path.read_text(encoding="utf-8"))
+                passwd_not_req = [
+                    str(u.get("username", ""))
+                    for u in users_data
+                    if u.get("password_not_required") and u.get("username")
+                ]
+                if passwd_not_req:
+                    print_step(
+                        f"Auto-spraying blank password against PASSWD_NOTREQD accounts: {', '.join(passwd_not_req)}",
+                        source=Tool.ADMAPPER,
+                    )
+                    from admapper.creds.spray import run_spray
+                    try:
+                        run_spray(
+                            session,
+                            password="",
+                            usernames=passwd_not_req,
+                            method="ldap",
+                            dry_run=False,
+                            force=True,
+                            skip_confirm=True,
+                        )
+                    except Exception as e:
+                        print_info(f"Blank spray: {e}")
+            except Exception:
+                pass
+
 
 
 def finalize_auto(session: Session) -> None:

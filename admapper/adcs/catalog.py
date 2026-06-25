@@ -12,6 +12,8 @@ class EscTechnique:
     summary: str
     manual_commands: tuple[str, ...]
     guide_key: str = "adcs_esc"
+    requires_external_listener: bool = False
+
 
 
 ESC_TECHNIQUES: dict[str, EscTechnique] = {
@@ -88,6 +90,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
             "ntlmrelayx.py -t http://<CA>/certsrv/certfnsh.asp --adcs --template <Template>",
             "coerce authentication to relay listener",
         ),
+        requires_external_listener=True,
     ),
     "esc15": EscTechnique(
         key="esc15",
@@ -144,7 +147,9 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
             "ntlmrelayx.py -t 'rpc://<CA>' --adcs --template <Template>",
             "coerce authentication to relay listener",
         ),
+        requires_external_listener=True,
     ),
+
     "esc13": EscTechnique(
         key="esc13",
         title="ESC13 — Issuance policy OID group link",

@@ -76,6 +76,7 @@ def apply_uac_flags(user: UserRecord) -> UserRecord:
         user.asrep_roastable = bool(user.uac & UAC_DONT_REQ_PREAUTH)
         user.password_not_required = bool(user.uac & UAC_PASSWD_NOTREQD)
         user.enabled = not bool(user.uac & UAC_ACCOUNTDISABLE)
-    if user.spns and not user.is_machine_account:
+    if user.spns and not user.is_machine_account and user.username.lower() != "krbtgt":
         user.kerberoastable = True
     return user
+

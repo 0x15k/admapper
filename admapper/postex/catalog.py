@@ -12,6 +12,8 @@ class PostexTechnique:
     summary: str
     manual_commands: tuple[str, ...]
     guide_key: str = "postex_local"
+    requires_external_listener: bool = False
+
 
 
 POSTEX_TECHNIQUES: dict[str, PostexTechnique] = {
