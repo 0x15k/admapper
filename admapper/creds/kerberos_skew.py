@@ -187,10 +187,23 @@ def check_kerberos_with_skew(
     if not faketime:
         return False, None
 
-    for skew in _probe_candidates(
+    # Try to query clock skew via LDAP to append a highly precise candidate
+    ldap_derived_skew = None
+    if dc_ip:
+        from admapper.creds.time_sync import calculate_ldap_clock_skew
+        try:
+            ldap_skew_seconds = calculate_ldap_clock_skew(dc_ip)
+            if ldap_skew_seconds is not None:
+                ldap_derived_skew = seconds_to_faketime_offset(ldap_skew_seconds)
+        except Exception:
+            pass
+
+    candidates = _probe_candidates(
         effective_preferred,
-        step_derived_skew=step_derived_skew,
-    ):
+        step_derived_skew=step_derived_skew or ldap_derived_skew,
+    )
+
+    for skew in candidates:
         if _kerberos_subprocess(domain, username, secret, dc_ip=dc_ip, clock_skew=skew):
             set_clock_skew(skew)
             save_workspace_clock_skew(ws_path, skew, dc_ip=dc_ip)

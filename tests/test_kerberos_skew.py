@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from admapper.creds.kerberos_skew import (
     check_kerberos_with_skew,
@@ -75,3 +75,57 @@ def test_check_kerberos_with_skew_probes_after_system_failure(tmp_path: Path) ->
     assert applied == "+7h"
     assert any(call.kwargs.get("clock_skew") is None for call in mock_krb.call_args_list)
     assert any(call.kwargs.get("clock_skew") == "+7h" for call in mock_krb.call_args_list)
+
+
+def test_query_dc_time_ldap() -> None:
+    from datetime import datetime, timezone
+    from admapper.creds.time_sync import query_dc_time_ldap
+
+    mock_info = MagicMock()
+    mock_info.other = {"currentTime": "20260625233804.0Z"}
+    mock_server = MagicMock()
+    mock_server.info = mock_info
+
+    with (
+        patch("admapper.creds.time_sync.Server", return_value=mock_server),
+        patch("admapper.creds.time_sync.Connection") as mock_conn,
+    ):
+        dc_time = query_dc_time_ldap("10.129.245.130")
+
+    assert dc_time is not None
+    assert dc_time == datetime(2026, 6, 25, 23, 38, 4, tzinfo=timezone.utc)
+
+
+def test_calculate_ldap_clock_skew() -> None:
+    from datetime import datetime, timezone
+    from admapper.creds.time_sync import calculate_ldap_clock_skew
+
+    dc_time = datetime(2026, 6, 25, 23, 38, 4, tzinfo=timezone.utc)
+    local_time = datetime(2026, 6, 25, 16, 38, 4, tzinfo=timezone.utc)
+
+    with (
+        patch("admapper.creds.time_sync.query_dc_time_ldap", return_value=dc_time),
+        patch("admapper.creds.time_sync.datetime") as mock_dt,
+    ):
+        mock_dt.now.return_value = local_time
+        skew = calculate_ldap_clock_skew("10.129.245.130")
+
+    # +7 hours = 25200 seconds
+    assert skew == 25200.0
+
+
+def test_ensure_dc_clock_with_ldap_skew(tmp_path: Path) -> None:
+    from admapper.creds.time_sync import ensure_dc_clock, reset_dc_clock_state
+    reset_dc_clock_state()
+    set_clock_skew(None)
+
+    with (
+        patch("admapper.creds.time_sync.calculate_ldap_clock_skew", return_value=25200.0),
+        patch("admapper.creds.time_sync.sync_time_to_dc", return_value=(False, "sync failed")),
+    ):
+        # Even if sync fails, the LDAP derived clock skew will set and return True
+        res = ensure_dc_clock("10.129.245.130", enabled=True, ws_path=tmp_path)
+
+    assert res is True
+    assert get_clock_skew() == "+7h"
+    set_clock_skew(None)

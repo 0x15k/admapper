@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
+
+from ldap3 import Server, Connection, ALL
+
 
 from admapper.core.platform import is_linux, is_macos, subprocess_run_kwargs
 
@@ -45,6 +49,37 @@ def was_dc_clock_synced(dc_ip: str | None = None) -> bool:
     if dc_ip and str(synced) != str(dc_ip):
         return False
     return not bool(_dc_clock_state.get("unstable"))
+
+
+def query_dc_time_ldap(dc_ip: str, timeout: int = 5) -> datetime | None:
+    """Connect anonymously to target DC over LDAP (port 389) and query Root DSE currentTime."""
+    try:
+        server = Server(dc_ip, port=389, get_info=ALL, connect_timeout=timeout)
+        with Connection(server, auto_bind=True, receive_timeout=timeout) as conn:
+            # ldap3 retrieves Root DSE properties in server.info
+            curr_time = server.info.other.get("currentTime")
+            if curr_time:
+                # GeneralizedTime format (e.g. ['20260625233804.0Z'] or '20260625233804.0Z')
+                raw = curr_time[0] if isinstance(curr_time, list) else curr_time
+                raw = str(raw).strip()
+                # GeneralizedTime parsing: YYYYMMDDHHMMSS[.fractional][Z|+-HHMM]
+                # Most Windows DCs return 'YYYYMMDDHHMMSS.0Z'
+                # Strip fractional seconds and tz suffixes for robust parsing
+                m = re.match(r"^(\d{14})", raw)
+                if m:
+                    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except Exception:
+        pass
+    return None
+
+
+def calculate_ldap_clock_skew(dc_ip: str, timeout: int = 5) -> float | None:
+    """Calculate time difference in seconds between local system clock (UTC) and remote DC (LDAP)."""
+    dc_time = query_dc_time_ldap(dc_ip, timeout)
+    if not dc_time:
+        return None
+    local_time = datetime.now(timezone.utc)
+    return (dc_time - local_time).total_seconds()
 
 
 def _sntp_binary() -> str | None:
@@ -200,6 +235,28 @@ def ensure_dc_clock(
 
     _dc_clock_state["sync_attempts"] = int(_dc_clock_state.get("sync_attempts") or 0) + 1
 
+    # Attempt anonymous LDAP clock skew query as a fallback or if sync_clock is disabled
+    ldap_skew_seconds = None
+    try:
+        ldap_skew_seconds = calculate_ldap_clock_skew(dc_ip)
+    except Exception:
+        pass
+
+    if ldap_skew_seconds is not None:
+        from admapper.creds.kerberos_skew import save_workspace_clock_skew, seconds_to_faketime_offset
+        derived = seconds_to_faketime_offset(ldap_skew_seconds)
+        if not get_clock_skew() and abs(ldap_skew_seconds) > 10:
+            set_clock_skew(derived)
+            save_workspace_clock_skew(ws_path, derived, dc_ip=dc_ip, stepped_seconds=ldap_skew_seconds)
+            from admapper.core.provenance import Tool, print_step
+            print_step(
+                f"reloj del DC detectado vía LDAP (skew: {derived}) — configurando libfaketime automáticamente",
+                source=Tool.FAKETIME,
+            )
+
+    if not enabled:
+        return bool(cached_skew or get_clock_skew())
+
     print_info(f"syncing clock with DC {dc_ip} …")
     ok, detail = sync_time_to_dc(dc_ip)
     if ok:
@@ -228,13 +285,13 @@ def ensure_dc_clock(
                     )
             else:
                 _dc_clock_state["unstable"] = False
-                if not get_clock_skew():
+                if not get_clock_skew() and ldap_skew_seconds is None:
                     set_clock_skew(None)
         else:
-            if not get_clock_skew():
+            if not get_clock_skew() and ldap_skew_seconds is None:
                 set_clock_skew(None)
         _dc_clock_state["synced_dc"] = dc_ip
-        if not _dc_clock_state.get("unstable"):
+        if not _dc_clock_state.get("unstable") and ldap_skew_seconds is None:
             from admapper.creds.kerberos_skew import save_workspace_clock_skew
 
             set_clock_skew(None)
@@ -243,6 +300,9 @@ def ensure_dc_clock(
         return True
 
     print_warning(f"clock sync failed: {detail}")
+    if get_clock_skew():
+        print_info(f"using LDAP-detected clock skew {get_clock_skew()}")
+        return True
     print_info("continuing — Kerberos will auto-probe libfaketime if needed")
     return False
 
