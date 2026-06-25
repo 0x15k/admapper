@@ -141,6 +141,76 @@ def run_escalate_analysis(
 
     enrich_adcs_findings_file(ws_path)
 
+    # Check for shadow admins (stale adminCount)
+    try:
+        from admapper.core.findings import FindingsStore
+        from admapper.models.finding import Finding, FindingSeverity
+        from admapper.graph.catalog import HIGH_VALUE_GROUPS
+
+        inventory_path = ws_path / "auth_inventory.json"
+        if inventory_path.is_file():
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            
+            dn_to_groups = {}
+            for group in inventory.get("groups", []):
+                group_name = str(group.get("name") or "").lower()
+                for member_dn in group.get("members") or []:
+                    dn_to_groups.setdefault(member_dn.lower(), []).append(group_name)
+
+            name_to_dn = {}
+            for group in inventory.get("groups", []):
+                gname = str(group.get("name") or "").lower()
+                gdn = str(group.get("dn") or "").lower()
+                name_to_dn[gname] = gdn
+
+            def get_all_groups_for_dn(dn: str, visited=None) -> set[str]:
+                if visited is None:
+                    visited = set()
+                if dn.lower() in visited:
+                    return set()
+                visited.add(dn.lower())
+                
+                direct_groups = dn_to_groups.get(dn.lower(), [])
+                all_groups = set(direct_groups)
+                for gname in direct_groups:
+                    g_dn = name_to_dn.get(gname)
+                    if g_dn:
+                        all_groups.update(get_all_groups_for_dn(g_dn, visited))
+                return all_groups
+
+            shadow_admins = []
+            for user in inventory.get("users", []):
+                username = str(user.get("username") or "")
+                user_dn = str(user.get("dn") or "")
+                if not username or not user_dn:
+                    continue
+                if username.lower() == "krbtgt":
+                    continue
+                
+                if user.get("admin_count") == 1:
+                    user_groups = get_all_groups_for_dn(user_dn)
+                    has_admin_group = any(g in HIGH_VALUE_GROUPS for g in user_groups)
+                    if not has_admin_group:
+                        shadow_admins.append(username)
+
+            if shadow_admins:
+                findings_store = FindingsStore(session.workspaces, session.workspace.name)
+                findings_store.merge([
+                    Finding(
+                        key="stale_admin_count",
+                        title=f"Stale adminCount 'Shadow Admins' detected ({len(shadow_admins)})",
+                        severity=FindingSeverity.HIGH,
+                        source="escalate",
+                        detail=f"Accounts with adminCount=1 but not in any admin groups: {', '.join(shadow_admins)}",
+                        mitre_id="T1078.002",
+                    )
+                ])
+                if not quiet:
+                    print_warning(f"Detected {len(shadow_admins)} shadow admin accounts with stale adminCount!")
+    except Exception as exc:
+        if not quiet:
+            print_warning(f"Failed stale adminCount check: {exc}")
+
     edges = collect_edges_from_pivot(
         pivot_user=pivot,
         owned_users=list(session.workspace.owned_users),

@@ -26,6 +26,7 @@ class UserRecord:
     bad_pwd_count: int | None = None
     lockout_time: int | None = None
     member_of: list[str] = field(default_factory=list)
+    admin_count: int | None = None
 
     @property
     def is_machine_account(self) -> bool:
@@ -48,6 +49,7 @@ class UserRecord:
             "lockout_time": self.lockout_time,
             "member_of": list(self.member_of),
             "is_machine_account": self.is_machine_account,
+            "admin_count": self.admin_count,
         }
 
     @classmethod
@@ -67,6 +69,7 @@ class UserRecord:
             bad_pwd_count=data.get("bad_pwd_count"),
             lockout_time=data.get("lockout_time"),
             member_of=list(data.get("member_of") or []),
+            admin_count=data.get("admin_count"),
         )
 
 

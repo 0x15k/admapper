@@ -37,6 +37,7 @@ class PostureResult:
     ntlmv1_accepted: bool | None = None     # True = server accepts NTLMv1 (bad)
     ldap_signing_required: bool | None = None  # True = required (good)
     da_sessions: list[dict[str, str]] = field(default_factory=list)  # active DA sessions
+    stale_computers: list[dict[str, Any]] = field(default_factory=list) # stale computer accounts
     errors: list[str] = field(default_factory=list)
 
 
@@ -81,6 +82,9 @@ def check_security_posture(
     # 5. DA sessions
     result.da_sessions = _check_da_sessions(ws_path, dc_ip, cred, domain)
 
+    # 6. Stale computers
+    result.stale_computers = _check_stale_computers(ws_path)
+
     # Print summary
     _print_posture_summary(result)
 
@@ -102,6 +106,7 @@ def check_security_posture(
                 "ntlmv1_accepted": result.ntlmv1_accepted,
                 "ldap_signing_required": result.ldap_signing_required,
                 "da_sessions": result.da_sessions,
+                "stale_computers": result.stale_computers,
                 "errors": result.errors,
             },
             indent=2,
@@ -343,6 +348,46 @@ def _get_da_members(ws_path: Path) -> list[str]:
     return []
 
 
+def _check_stale_computers(ws_path: Path) -> list[dict[str, Any]]:
+    """Identify stale computer accounts with passwords older than 45 days."""
+    inv_path = ws_path / "auth_inventory.json"
+    stale: list[dict[str, Any]] = []
+    if not inv_path.is_file():
+        return stale
+    try:
+        data = json.loads(inv_path.read_text(encoding="utf-8"))
+        computers = data.get("computers") or []
+        import time
+        interval_45_days = 45 * 86400 * 10000000
+        now_filetime = int(time.time() * 10000000) + 116444736000000000
+        for comp in computers:
+            pwd_last_set = comp.get("pwd_last_set")
+            if pwd_last_set is not None:
+                try:
+                    pwd_last_set = int(pwd_last_set)
+                except (ValueError, TypeError):
+                    continue
+                if pwd_last_set == 0:
+                    stale.append({
+                        "name": comp.get("name"),
+                        "dn": comp.get("dn"),
+                        "dns_host": comp.get("dns_host"),
+                        "pwd_last_set": 0,
+                        "reason": "Password never changed"
+                    })
+                elif (now_filetime - pwd_last_set) > interval_45_days:
+                    stale.append({
+                        "name": comp.get("name"),
+                        "dn": comp.get("dn"),
+                        "dns_host": comp.get("dns_host"),
+                        "pwd_last_set": pwd_last_set,
+                        "reason": "Password older than 45 days"
+                    })
+    except Exception:
+        pass
+    return stale
+
+
 # ── Output ─────────────────────────────────────────────────────────────────
 
 def _print_posture_summary(result: PostureResult) -> None:
@@ -364,6 +409,8 @@ def _print_posture_summary(result: PostureResult) -> None:
                  "" if result.ldap_signing_required else "LDAP relay / MitM viable"])
     rows.append(["DA sessions detected", str(len(result.da_sessions)),
                  ", ".join(s["user"] for s in result.da_sessions[:3]) if result.da_sessions else "none"])
+    rows.append(["Stale computers detected", str(len(result.stale_computers)),
+                 ", ".join(str(c["name"]) for c in result.stale_computers[:3]) if result.stale_computers else "none"])
 
     print_table("Security posture", ["check", "status", "detail"], rows)
 
@@ -427,6 +474,17 @@ def _emit_findings(
                 severity=FindingSeverity.HIGH,
                 source="posture",
                 detail=", ".join(s["user"] for s in result.da_sessions[:5]),
+                mitre_id="T1078.002",
+            )
+        )
+    if result.stale_computers:
+        findings.append(
+            Finding(
+                key="stale_computers_detected",
+                title=f"Stale computer accounts ({len(result.stale_computers)}) — potential low-detection pivot targets",
+                severity=FindingSeverity.MEDIUM,
+                source="posture",
+                detail=", ".join(str(c.get("name")) for c in result.stale_computers[:10]),
                 mitre_id="T1078.002",
             )
         )

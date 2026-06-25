@@ -30,6 +30,7 @@ class LdapAuthEnumResult:
     delegations: list[DelegationRecord] = field(default_factory=list)
     trusts: list[TrustRecord] = field(default_factory=list)
     adcs_present: bool = False
+    domain_gplink: str | None = None
     errors: list[str] = field(default_factory=list)
 
 
@@ -62,6 +63,12 @@ def _user_from_entry(entry, sources: list[str]) -> UserRecord | None:
     uac_raw = entry.userAccountControl.value if entry.userAccountControl else None
     uac = int(uac_raw) if uac_raw is not None else None
     spns = _attr_list(entry, "servicePrincipalName")
+    admin_count = None
+    if hasattr(entry, "adminCount") and entry.adminCount:
+        try:
+            admin_count = int(entry.adminCount.value)
+        except (ValueError, TypeError):
+            pass
     user = apply_uac_flags(
         UserRecord(
             username=username,
@@ -71,6 +78,7 @@ def _user_from_entry(entry, sources: list[str]) -> UserRecord | None:
             uac=uac,
             spns=spns,
             member_of=_attr_list(entry, "memberOf"),
+            admin_count=admin_count,
         )
     )
     return user
@@ -155,6 +163,8 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 "operatingSystem",
                 "userAccountControl",
                 "msDS-AllowedToDelegateTo",
+                "pwdLastSet",
+                "lastLogonTimestamp",
             ],
         ):
             name = _attr_str(entry, "sAMAccountName") or ""
@@ -162,6 +172,21 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 continue
             uac_raw = entry.userAccountControl.value if entry.userAccountControl else None
             uac = int(uac_raw) if uac_raw is not None else 0
+            
+            pwd_last_set = None
+            if hasattr(entry, "pwdLastSet") and entry.pwdLastSet:
+                try:
+                    pwd_last_set = int(entry.pwdLastSet.value)
+                except (ValueError, TypeError):
+                    pass
+            
+            last_logon = None
+            if hasattr(entry, "lastLogonTimestamp") and entry.lastLogonTimestamp:
+                try:
+                    last_logon = int(entry.lastLogonTimestamp.value)
+                except (ValueError, TypeError):
+                    pass
+
             computer = ComputerRecord(
                 name=name.rstrip("$"),
                 dn=_attr_str(entry, "distinguishedName"),
@@ -169,6 +194,8 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 operating_system=_attr_str(entry, "operatingSystem"),
                 enabled=not bool(uac & UAC_ACCOUNTDISABLE),
                 unconstrained_delegation=bool(uac & UAC_TRUSTED_FOR_DELEGATION),
+                pwd_last_set=pwd_last_set,
+                last_logon_timestamp=last_logon,
             )
             result.computers.append(computer)
             _collect_delegation_computer(entry, computer.name, result)
@@ -179,12 +206,17 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
         for entry in _search(
             session,
             "(objectClass=organizationalUnit)",
-            ["name", "distinguishedName"],
+            ["name", "distinguishedName", "gPLink"],
         ):
             name = _attr_str(entry, "name") or ""
             if name:
+                gplink = _attr_str(entry, "gPLink")
                 result.ous.append(
-                    OuRecord(name=name, dn=_attr_str(entry, "distinguishedName"))
+                    OuRecord(
+                        name=name,
+                        dn=_attr_str(entry, "distinguishedName"),
+                        gplink=gplink,
+                    )
                 )
     except Exception as exc:
         result.errors.append(f"ous: {exc}")
@@ -209,6 +241,20 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 )
     except Exception as exc:
         result.errors.append(f"gpos: {exc}")
+
+    try:
+        session.conn.search(
+            search_base=session.base_dn,
+            search_filter="(objectClass=domain)",
+            search_scope=SUBTREE,
+            attributes=["distinguishedName", "gPLink"],
+        )
+        if session.conn.entries:
+            entry = session.conn.entries[0]
+            if getattr(entry, "gPLink", None):
+                result.domain_gplink = _attr_str(entry, "gPLink")
+    except Exception as exc:
+        result.errors.append(f"domain_gplink: {exc}")
 
     try:
         for entry in _search(

@@ -106,6 +106,70 @@ def collect_edges_from_pivot(
             continue
         target = str(finding.get("target_name") or finding.get("target_dn") or "")
         right = str(finding.get("right") or "")
+        
+        if finding.get("target_type") == "gpo":
+            gpo_dn = str(finding.get("target_dn") or "")
+            m = re.search(r"({[a-fA-F0-9-]+})", gpo_dn, re.I)
+            gpo_guid = m.group(1) if m else target
+            
+            affected_ou_dns = []
+            for ou in inventory.get("ous", []):
+                ou_gplink = str(ou.get("gplink") or "")
+                if gpo_guid.lower() in ou_gplink.lower():
+                    affected_ou_dns.append(str(ou.get("dn") or "").lower())
+            
+            domain_gplink = str(inventory.get("domain_gplink") or "")
+            link_to_domain = gpo_guid.lower() in domain_gplink.lower()
+            
+            affected_computers = []
+            for comp in inventory.get("computers", []):
+                comp_dn = str(comp.get("dn") or "").lower()
+                comp_name = str(comp.get("name") or "")
+                is_affected = link_to_domain
+                if not is_affected:
+                    for ou_dn in affected_ou_dns:
+                        if comp_dn.endswith(ou_dn):
+                            is_affected = True
+                            break
+                if is_affected:
+                    affected_computers.append(comp_name)
+            
+            for comp in affected_computers:
+                comp_owned = _is_owned(comp, owned)
+                edges.append(
+                    EscalationEdge(
+                        technique="gpo_abuse",
+                        module="acls",
+                        title=f"gpo_abuse → {comp}",
+                        severity=str(finding.get("severity") or "high"),
+                        summary=f"Pivot has write access to GPO linked to {comp}. Inject task to execute commands as SYSTEM.",
+                        target=comp,
+                        op_id=str(finding.get("id") or ""),
+                        ready=not comp_owned,
+                        target_owned=comp_owned,
+                        manual_commands=list(finding.get("manual_commands") or []),
+                        mitre_id="T1484.001",
+                    )
+                )
+            if not affected_computers:
+                target_owned = _is_owned(target, owned)
+                edges.append(
+                    EscalationEdge(
+                        technique="gpo_abuse",
+                        module="acls",
+                        title=f"gpo_abuse → {target}",
+                        severity=str(finding.get("severity") or "high"),
+                        summary=f"Pivot has write access to GPO {target}.",
+                        target=target,
+                        op_id=str(finding.get("id") or ""),
+                        ready=not target_owned,
+                        target_owned=target_owned,
+                        manual_commands=list(finding.get("manual_commands") or []),
+                        mitre_id="T1484.001",
+                    )
+                )
+            continue
+
         target_owned = _is_owned(target, owned)
         edges.append(
             EscalationEdge(

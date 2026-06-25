@@ -99,7 +99,8 @@ def _low_priv_enrollment_from_sd(entry) -> bool:
 def _web_enrollment_from_servers(raw: str | None) -> bool:
     if not raw:
         return False
-    return bool(re.search(r"https?://", raw, re.IGNORECASE))
+    # ESC8 requires unencrypted HTTP web enrollment
+    return "http://" in raw.lower()
 
 
 def enumerate_adcs(session: LdapSession) -> AdcsEnumResult:

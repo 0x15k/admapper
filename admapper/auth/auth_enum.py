@@ -221,7 +221,10 @@ def run_auth_enumeration(
         smb_shares=result.smb.shares,
         adcs_present=result.ldap.adcs_present,
         errors=result.ldap.errors + ([result.smb.error] if result.smb.error else []),
-        extra={"smb_signing_required": result.smb.signing_required},
+        extra={
+            "smb_signing_required": result.smb.signing_required,
+            "domain_gplink": result.ldap.domain_gplink,
+        },
     )
     result.inventory_path = str(inv_path)
     print_ok("inventario guardado → auth_inventory.json", source=Tool.ADMAPPER)

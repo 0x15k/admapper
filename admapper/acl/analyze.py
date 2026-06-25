@@ -69,6 +69,7 @@ def _load_member_of(session: Session) -> list[str]:
 
 def _match_findings(
     *,
+    session: Session,
     principal: Any,
     owned_username: str,
     target: Any,
@@ -81,6 +82,18 @@ def _match_findings(
     if owner_right:
         meta = abuse_right(owner_right)
         via = principal.sid_to_name.get(parsed_sd.owner_sid, owned_username)
+        summary = meta.exploit_summary
+        manual_commands = list(meta.manual_commands)
+        if target.object_type == "gpo":
+            import re
+            m = re.search(r"({[a-fA-F0-9-]+})", target.dn, re.I)
+            gpo_guid = m.group(1) if m else target.name
+            summary = f"Write access to GPO {target.name} ({gpo_guid}). Can inject immediate tasks/scripts to compromise targets."
+            from admapper.exploit.gpo_abuse import generate_gpo_abuse_commands
+            try:
+                manual_commands = generate_gpo_abuse_commands(session, gpo_id=gpo_guid)
+            except Exception:
+                pass
         findings.append(
             AclAbuseFinding(
                 right=owner_right,
@@ -92,8 +105,8 @@ def _match_findings(
                 target_type=target.object_type,
                 severity=meta.severity,
                 mitre_id=meta.mitre_id,
-                summary=meta.exploit_summary,
-                manual_commands=list(meta.manual_commands),
+                summary=summary,
+                manual_commands=manual_commands,
             )
         )
 
@@ -105,6 +118,18 @@ def _match_findings(
             if right == "dcsync_partial":
                 continue
             meta = abuse_right(right)
+            summary = meta.exploit_summary
+            manual_commands = list(meta.manual_commands)
+            if target.object_type == "gpo":
+                import re
+                m = re.search(r"({[a-fA-F0-9-]+})", target.dn, re.I)
+                gpo_guid = m.group(1) if m else target.name
+                summary = f"Write access to GPO {target.name} ({gpo_guid}). Can inject immediate tasks/scripts to compromise targets."
+                from admapper.exploit.gpo_abuse import generate_gpo_abuse_commands
+                try:
+                    manual_commands = generate_gpo_abuse_commands(session, gpo_id=gpo_guid)
+                except Exception:
+                    pass
             findings.append(
                 AclAbuseFinding(
                     right=right,
@@ -116,8 +141,8 @@ def _match_findings(
                     target_type=target.object_type,
                     severity=meta.severity,
                     mitre_id=meta.mitre_id,
-                    summary=meta.exploit_summary,
-                    manual_commands=list(meta.manual_commands),
+                    summary=summary,
+                    manual_commands=manual_commands,
                 )
             )
     return findings
@@ -256,6 +281,7 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
                     continue
 
                 matched = _match_findings(
+                    session=session,
                     principal=principal,
                     owned_username=owned,
                     target=target,

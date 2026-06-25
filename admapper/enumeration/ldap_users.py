@@ -14,6 +14,7 @@ _USER_ATTRS = [
     "servicePrincipalName",
     "description",
     "distinguishedName",
+    "adminCount",
 ]
 
 
@@ -78,6 +79,12 @@ def enumerate_users_ldap(
             uac = _parse_uac(entry.userAccountControl.value if entry.userAccountControl else None)
             raw_spns = entry.servicePrincipalName.values if entry.servicePrincipalName else None
             spns = _parse_spns(raw_spns)
+            admin_count = None
+            if hasattr(entry, "adminCount") and entry.adminCount:
+                try:
+                    admin_count = int(entry.adminCount.value)
+                except (ValueError, TypeError):
+                    pass
             user = apply_uac_flags(
                 UserRecord(
                     username=username,
@@ -86,6 +93,7 @@ def enumerate_users_ldap(
                     dn=str(entry.distinguishedName) if entry.distinguishedName else None,
                     uac=uac,
                     spns=spns,
+                    admin_count=admin_count,
                 )
             )
             result.users.append(user)

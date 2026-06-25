@@ -37,6 +37,8 @@ class ComputerRecord:
     operating_system: str | None = None
     enabled: bool = True
     unconstrained_delegation: bool = False
+    pwd_last_set: int | None = None
+    last_logon_timestamp: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +48,8 @@ class ComputerRecord:
             "operating_system": self.operating_system,
             "enabled": self.enabled,
             "unconstrained_delegation": self.unconstrained_delegation,
+            "pwd_last_set": self.pwd_last_set,
+            "last_logon_timestamp": self.last_logon_timestamp,
         }
 
     @classmethod
@@ -57,6 +61,8 @@ class ComputerRecord:
             operating_system=data.get("operating_system"),
             enabled=bool(data.get("enabled", True)),
             unconstrained_delegation=bool(data.get("unconstrained_delegation")),
+            pwd_last_set=data.get("pwd_last_set"),
+            last_logon_timestamp=data.get("last_logon_timestamp"),
         )
 
 
@@ -64,13 +70,18 @@ class ComputerRecord:
 class OuRecord:
     name: str
     dn: str | None = None
+    gplink: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "dn": self.dn}
+        return {"name": self.name, "dn": self.dn, "gplink": self.gplink}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> OuRecord:
-        return cls(name=str(data.get("name", "")), dn=data.get("dn"))
+        return cls(
+            name=str(data.get("name", "")),
+            dn=data.get("dn"),
+            gplink=data.get("gplink"),
+        )
 
 
 @dataclass

@@ -156,6 +156,13 @@ def build_acl_targets(
                     ["top", "person", "organizationalPerson", "user", "computer"],
                 )
 
+        for gpo in inventory.get("gpos", []):
+            dn = str(gpo.get("dn", ""))
+            name = str(gpo.get("name", ""))
+            display_name = str(gpo.get("display_name", ""))
+            if dn and name:
+                add_target(dn, display_name or name, "gpo", ["top", "groupPolicyContainer"])
+
     if len(targets) < max_targets:
         session.conn.search(
             search_base=session.base_dn,

@@ -129,3 +129,91 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
     nxt = pick_next_edge(edges)
     assert nxt is not None
     assert nxt.technique == "dll_hijack_scheduled_task"
+
+
+def test_escalate_gpo_abuse_edge(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "auth_inventory.json").write_text(
+        """
+        {
+          "users": [
+            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=corp,DC=local"}
+          ],
+          "computers": [
+            {"name": "srv01", "dn": "CN=srv01,OU=Servers,DC=corp,DC=local"}
+          ],
+          "ous": [
+            {"name": "Servers", "dn": "OU=Servers,DC=corp,DC=local", "gplink": "[LDAP://CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local;0]"}
+          ],
+          "gpos": [
+            {"name": "{abc-123}", "dn": "CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local", "display_name": "VulnerableGPO"}
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    (ws / "acl_findings.json").write_text(
+        """
+        {
+          "findings": [{
+            "id": "acl-001",
+            "principal": "attacker",
+            "right": "genericwrite",
+            "target_dn": "CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local",
+            "target_name": "VulnerableGPO",
+            "target_type": "gpo",
+            "severity": "high",
+            "summary": "Write access to GPO VulnerableGPO"
+          }]
+        }
+        """,
+        encoding="utf-8",
+    )
+    edges = collect_edges_from_pivot(
+        pivot_user="attacker",
+        owned_users=["attacker"],
+        ws_path=ws,
+        domain="corp.local",
+    )
+    gpo_edges = [e for e in edges if e.technique == "gpo_abuse"]
+    assert len(gpo_edges) == 1
+    assert gpo_edges[0].target == "srv01"
+
+
+def test_escalate_stale_admin_count_shadow_admin(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    from unittest.mock import MagicMock, patch
+    session = MagicMock()
+    session.workspace.name = "lab"
+    session.workspace.domain = "corp.local"
+    session.workspace.owned_users = ["attacker"]
+    session.workspaces.path_for.return_value = ws
+    (ws / "auth_inventory.json").write_text(
+        """
+        {
+          "users": [
+            {"username": "shadow_user", "dn": "CN=shadow,CN=Users,DC=corp,DC=local", "admin_count": 1},
+            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=corp,DC=local"}
+          ],
+          "groups": [
+            {"name": "Domain Admins", "dn": "CN=Domain Admins,CN=Users,DC=corp,DC=local", "members": []}
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    from admapper.escalate.analyze import run_escalate_analysis
+    findings = []
+    class MockFindingsStore:
+        def __init__(self, workspaces, ws_name):
+            pass
+        def merge(self, new_findings):
+            findings.extend(new_findings)
+            return new_findings
+    with patch("admapper.escalate.analyze.FindingsStore", MockFindingsStore):
+        run_escalate_analysis(session, pivot_user="attacker", quiet=True)
+    assert len(findings) == 1
+    assert findings[0].key == "stale_admin_count"
+    assert "shadow_user" in findings[0].detail
