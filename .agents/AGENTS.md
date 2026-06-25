@@ -26,3 +26,16 @@ This document provides project-scoped rules, architecture guidelines, and logic 
 - Graph views switch dynamically between `[All]`, `[High Value]`, `[Compromised]`, and `[Attack Path Only]`.
 - The `krbtgt` account is explicitly excluded from standard Kerberoasting path listings as it cannot be roasted in standard ways.
 - In `LAB` opsec mode, accounts flagged as `PASSWD_NOTREQD` (e.g. Guest) are automatically sprayed with a blank password during initial rounds.
+
+## 5. CLI Ergonomics, Parameter Consistency & JSON Outputs
+- **CLI Command Aliases**:
+  - Hidden sub-typer aliases are registered for main sub-typers (`px` for `postex` and `esc` for `escalate`).
+  - Hidden command aliases are registered for main commands (`r` for `run` and `g` for `graph`).
+- **Workspace/Target Flag Consistency**:
+  - Target host (`-H`/`--host`), domain (`-d`/`--domain`), and workspace (`-w`/`--workspace`) parameters are consistent across all subcommands.
+  - Workspace lookup is handled dynamically by `_session_with_workspace(workspace, host, domain)` in `admapper/cli/main.py`.
+- **Structured JSON Outputs**:
+  - Main callbacks and `show` commands under `postex` and `escalate` support a `--json` output flag.
+  - When `--json` is specified, the command invokes the underlying analyzer in `quiet` mode (suppressing console info/warning prints) and outputs the clean serialized JSON payload to `stdout`.
+- **Dashboard API Consistency**:
+  - Backend API JSON payload parsing endpoints (`/api/scan`, `/api/run`, `/api/pivot`, `/api/winrm`) support alternative parameter names matching standard CLI flags (`host`/`ip_dc`/`user`/`username`/`p`/`password`).

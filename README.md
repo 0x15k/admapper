@@ -39,6 +39,8 @@ After install, `admapper` is available globally (via pipx):
 ```bash
 # Full automated engagement — just IP + creds
 admapper run -H 10.10.10.100 -u john -p 'Password1!'
+# Or via the short alias 'r':
+admapper r -H 10.10.10.100 -u john -p 'Password1!'
 
 # Check installation health
 admapper doctor
@@ -51,10 +53,36 @@ admapper doctor
 ```bash
 # Full pipeline: recon → attack → escalation
 admapper run -H <DC_IP> -u <user> -p '<pass>'
+# Or using the short alias 'r':
+admapper r -H <DC_IP> -u <user> -p '<pass>'
 
 # Specify domain explicitly (optional — auto-detected)
-admapper run -H 10.10.10.100 -u admin -p 'P@ss' -d corp.local
+admapper r -H 10.10.10.100 -u admin -p 'P@ss' -d corp.local
 ```
+
+### Playbook & Escalation Analysis
+
+ADMapper supports built-in playbook and escalation sub-typers with clean commands, aliases, and automated scriptability:
+
+- **Post-Exploitation Playbook** (`admapper postex` or alias `admapper px`):
+  - View post-exploitation opportunities: `admapper px -w <workspace>` (or resolve workspace via `-H <ip>` / `-d <domain>`)
+  - Remote WinRM scan for task hijack: `admapper px scan -H <WinRM_IP>`
+  - View details of an opportunity: `admapper px show <op_id>`
+  - Automatically deploy task hijack payload: `admapper px run --op <op_id>`
+  
+- **Escalation Path Analysis** (`admapper escalate` or alias `admapper esc`):
+  - View escalation status (next hop): `admapper esc` or `admapper esc show`
+  - Mark an account as compromised: `admapper esc mark <user>`
+  - Change the active pivot node: `admapper esc pivot <user>`
+
+- **Scriptability (`--json` output)**:
+  For automated scripting and tools integration, pass the `--json` option to the main or show commands under postex/escalate. This silences terminal logging and returns clean structured JSON to stdout:
+  ```bash
+  admapper px -w target-10-129-245-130 --json
+  admapper px show postex-001 --json
+  admapper esc -w target-10-129-245-130 --json
+  admapper esc show --json
+  ```
 
 ### Interactive Mode
 
