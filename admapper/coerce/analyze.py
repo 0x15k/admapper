@@ -40,6 +40,7 @@ def _opportunity(
         relay_target=relay_target,
         detail=detail,
         manual_commands=list(meta.manual_commands),
+        requires_external_listener=True,
     )
 
 
@@ -47,11 +48,7 @@ def _dc_hosts(session: Session) -> list[str]:
     if session.workspace is None:
         return []
     hosts = HostsStore(session.workspaces, session.workspace.name).list()
-    return [
-        h.address
-        for h in hosts
-        if h.is_domain_controller and h.address
-    ]
+    return [h.address for h in hosts if h.is_domain_controller and h.address]
 
 
 def _unconstrained_listeners(inventory: dict[str, Any]) -> list[str]:
@@ -135,8 +132,7 @@ def build_coerce_opportunities(
     has_rbcd_path = any(
         o.get("technique") in {"rbcd", "shadow_credentials"} for o in krb_ops
     ) or any(
-        o.get("right") in {"genericwrite", "genericall"}
-        and o.get("target_type") == "computer"
+        o.get("right") in {"genericwrite", "genericall"} and o.get("target_type") == "computer"
         for o in acl_findings
     )
     relay_viable = smb_signing is False or smb_signing is None

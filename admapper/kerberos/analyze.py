@@ -58,6 +58,8 @@ def _opportunity(
         detail=detail,
         owned_relevant=owned_relevant,
         manual_commands=list(meta.manual_commands),
+        requires_external_listener=technique
+        in {"unconstrained_delegation", "delegation_coerce_capture"},
     )
 
 

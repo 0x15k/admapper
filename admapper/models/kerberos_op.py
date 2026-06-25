@@ -19,6 +19,7 @@ class KerberosOpportunity:
     owned_relevant: bool = False
     manual_commands: list[str] = field(default_factory=list)
     id: str = ""
+    requires_external_listener: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,5 +35,6 @@ class KerberosOpportunity:
             "summary": self.summary,
             "detail": self.detail,
             "owned_relevant": self.owned_relevant,
+            "requires_external_listener": self.requires_external_listener,
             "manual_commands": list(self.manual_commands),
         }

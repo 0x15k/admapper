@@ -80,16 +80,28 @@ postex_app = typer.Typer(
     no_args_is_help=False,
 )
 app.add_typer(postex_app, name="postex")
+app.add_typer(postex_app, name="px", hidden=True)
 
 
-def _session_with_workspace(workspace: str | None) -> Session:
+def _session_with_workspace(
+    workspace: str | None = None,
+    host: str | None = None,
+    domain: str | None = None,
+) -> Session:
     from admapper.core.output import print_error
+    from admapper.core.discovery import default_workspace_name
 
     session = Session.bootstrap()
     if workspace:
         session.select_workspace(workspace, create=False)
-    elif session.workspace is None:
-        print_error("no active workspace — use: admapper run -H <ip> ... or postex -w <name>")
+    elif host:
+        ws_name = default_workspace_name(host)
+        session.select_workspace(ws_name, create=False)
+    elif domain:
+        session.select_workspace(domain, create=False)
+
+    if session.workspace is None:
+        print_error("no active workspace — use: admapper run -H <ip> ... or specify -w <name> / -H <ip>")
         raise typer.Exit(code=1)
     return session
 
@@ -101,6 +113,18 @@ def postex_main(
         str | None,
         typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
     ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output pure JSON format"),
+    ] = False,
 ) -> None:
     """Build post-ex playbook from workspace intel (loot hints + optional postex_scan.json)."""
     if ctx.invoked_subcommand is not None:
@@ -108,11 +132,22 @@ def postex_main(
     from admapper.core.output import print_error
     from admapper.postex.analyze import run_postex_analysis
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
-        run_postex_analysis(session)
+        res = run_postex_analysis(session, quiet=json_output)
+        if json_output:
+            import json
+            from pathlib import Path
+            if res.output_path and Path(res.output_path).is_file():
+                typer.echo(Path(res.output_path).read_text(encoding="utf-8").strip())
+            else:
+                typer.echo(json.dumps([o.to_dict() for o in res.opportunities], indent=2))
     except (ValueError, RuntimeError) as exc:
-        print_error(str(exc))
+        if json_output:
+            import json
+            typer.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            print_error(str(exc))
         raise typer.Exit(code=1) from exc
 
 
@@ -126,12 +161,16 @@ def postex_scan(
         str | None,
         typer.Option("--host", "-H", help="WinRM target (default: gMSA/computer host from hash)"),
     ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
 ) -> None:
     """Remote WinRM scan: COM scheduled tasks + DLL hijack detection from loot intel."""
     from admapper.core.output import print_error
     from admapper.postex.analyze import run_postex_analysis
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, domain=domain)
     try:
         run_postex_analysis(session, remote_scan=True, remote_host=host)
     except (ValueError, RuntimeError) as exc:
@@ -141,6 +180,7 @@ def postex_scan(
 
 escalate_app = typer.Typer(help="Marcar owned, pivot y siguiente hop de escalada")
 app.add_typer(escalate_app, name="escalate")
+app.add_typer(escalate_app, name="esc", hidden=True)
 
 
 @escalate_app.callback(invoke_without_command=True)
@@ -150,14 +190,61 @@ def escalate_main(
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
     ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output pure JSON format"),
+    ] = False,
 ) -> None:
     """Muestra estado de escalada (siguiente hop)."""
     if ctx.invoked_subcommand is not None:
         return
-    from admapper.escalate.analyze import run_escalate_analysis
+    escalate_show(workspace=workspace, host=host, domain=domain, json_output=json_output)
 
-    session = _session_with_workspace(workspace)
-    run_escalate_analysis(session)
+
+@escalate_app.command("show")
+def escalate_show(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output pure JSON format"),
+    ] = False,
+) -> None:
+    """Muestra estado de escalada (siguiente hop)."""
+    from admapper.escalate.analyze import run_escalate_analysis
+    from admapper.core.output import print_error
+
+    session = _session_with_workspace(workspace, host=host, domain=domain)
+    try:
+        state = run_escalate_analysis(session, quiet=json_output)
+        if json_output:
+            import json
+            typer.echo(json.dumps(state.to_dict(), indent=2, sort_keys=True))
+    except (ValueError, RuntimeError) as exc:
+        if json_output:
+            import json
+            typer.echo(json.dumps({"error": str(exc)}, indent=2))
+        else:
+            print_error(str(exc))
+        raise typer.Exit(code=1) from exc
 
 
 @escalate_app.command("mark")
@@ -166,6 +253,14 @@ def escalate_mark(
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
     ] = None,
     no_refresh: Annotated[
         bool,
@@ -176,7 +271,7 @@ def escalate_mark(
     from admapper.core.output import print_error
     from admapper.escalate.analyze import mark_user_owned
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
         mark_user_owned(session, user, refresh=not no_refresh)
     except (ValueError, RuntimeError) as exc:
@@ -191,12 +286,20 @@ def escalate_pivot(
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
     ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
 ) -> None:
     """Cambia el pivot sin añadir a owned."""
     from admapper.core.output import print_error
     from admapper.escalate.analyze import run_escalate_analysis, set_pivot_user
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
         set_pivot_user(session, user)
         run_escalate_analysis(session, pivot_user=user)
@@ -212,26 +315,46 @@ def postex_show(
         str | None,
         typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
     ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output pure JSON format"),
+    ] = False,
 ) -> None:
     """Show one post-ex opportunity with manual commands."""
     from admapper.core.output import print_error, print_info
     from admapper.postex.analyze import get_postex_op
     from admapper.postex.render import print_postex_detail
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     detail = get_postex_op(session, op_id)
     if detail is None:
-        print_error(f"post-ex opportunity not found: {op_id} — run: admapper postex -w <workspace>")
-        path = session.workspaces.path_for(session.workspace.name) / "postex_ops.json"
-        if path.is_file():
+        if json_output:
             import json
+            typer.echo(json.dumps({"error": f"post-ex opportunity not found: {op_id}"}, indent=2))
+        else:
+            print_error(f"post-ex opportunity not found: {op_id} — run: admapper postex -w <workspace>")
+            path = session.workspaces.path_for(session.workspace.name) / "postex_ops.json"
+            if path.is_file():
+                import json
 
-            data = json.loads(path.read_text(encoding="utf-8"))
-            ids = [str(o.get("id", "")) for o in data.get("opportunities") or [] if o.get("id")]
-            if ids:
-                print_info(f"Available ids: {', '.join(ids)}")
+                data = json.loads(path.read_text(encoding="utf-8"))
+                ids = [str(o.get("id", "")) for o in data.get("opportunities") or [] if o.get("id")]
+                if ids:
+                    print_info(f"Available ids: {', '.join(ids)}")
         raise typer.Exit(code=1)
-    print_postex_detail(detail)
+    if json_output:
+        import json
+        typer.echo(json.dumps(detail, indent=2))
+    else:
+        print_postex_detail(detail)
 
 
 @postex_app.command("deploy")
@@ -239,6 +362,14 @@ def postex_deploy(
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
     ] = None,
     op_id: Annotated[
         str | None,
@@ -265,7 +396,7 @@ def postex_deploy(
     from admapper.core.output import print_error
     from admapper.postex.deploy import deploy_dll_hijack
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
         deploy_dll_hijack(
             session,
@@ -286,6 +417,14 @@ def postex_run(
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP or CIDR"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
     ] = None,
     op_id: Annotated[
         str | None,
@@ -332,7 +471,7 @@ def postex_run(
     from admapper.postex.payload import PayloadMode
     from admapper.postex.runner import run_dll_hijack
 
-    session = _session_with_workspace(workspace)
+    session = _session_with_workspace(workspace, host=host, domain=domain)
     payload_arch = normalize_arch(arch) if arch else None
     payload_mode: PayloadMode = "enroll" if mode.lower() == "enroll" else "shell"
     try:
@@ -519,6 +658,71 @@ def run(
     )
 
 
+@app.command("r", hidden=True)
+def run_alias(
+    host: Annotated[str, typer.Option("--host", "-H", help="Target IP or CIDR")],
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: derived from host)"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Override inferred domain (optional)"),
+    ] = None,
+    user: Annotated[str | None, typer.Option("--user", "-u", help="Domain username")] = None,
+    password: Annotated[str | None, typer.Option("--password", "-p", help="Password")] = None,
+    full: Annotated[
+        bool,
+        typer.Option("--full", help="Pipeline completo (enum, cves, mssql, …)"),
+    ] = False,
+    minimal: Annotated[
+        bool,
+        typer.Option("--minimal", help="Solo auth + show (sin analyst)"),
+    ] = False,
+    clock_skew: Annotated[
+        str | None,
+        typer.Option(
+            "--clock-skew",
+            help="Kerberos clock offset for libfaketime (e.g. '+7h'). Auto-detected if omitted.",
+        ),
+    ] = None,
+    no_sync: Annotated[
+        bool,
+        typer.Option("--no-sync", help="Skip automatic clock sync with the DC"),
+    ] = False,
+    no_hosts_sync: Annotated[
+        bool,
+        typer.Option(
+            "--no-hosts-sync",
+            help="Do not update /etc/hosts (default: auto-add DC FQDN via sudo)",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option("-v", "--verbose", help="Full phase output, guides, and scenario report"),
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Chain owned/pivot, postex scan, and wired escalate steps"),
+    ] = False,
+) -> None:
+    """Alias for run."""
+    run(
+        host=host,
+        workspace=workspace,
+        domain=domain,
+        user=user,
+        password=password,
+        full=full,
+        minimal=minimal,
+        clock_skew=clock_skew,
+        no_sync=no_sync,
+        no_hosts_sync=no_hosts_sync,
+        verbose=verbose,
+        auto=auto,
+    )
+
+
 @app.command()
 def analyst(
     workspace: Annotated[
@@ -660,6 +864,34 @@ def graph(
         domain=session.workspace.domain,
         pivot_user=session.workspace.pivot_user,
         owned_users=list(session.workspace.owned_users or []),
+    )
+
+
+@app.command("g", hidden=True)
+def graph_alias(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh", help="Re-run paths analysis before showing graph"),
+    ] = False,
+    web: Annotated[
+        bool,
+        typer.Option("--web/--ascii", help="Generate interactive HTML (default) or ASCII terminal"),
+    ] = True,
+    serve: Annotated[
+        bool,
+        typer.Option("--serve", help="Start local HTTP server for attack_graph.html"),
+    ] = False,
+) -> None:
+    """Alias for graph."""
+    graph(
+        workspace=workspace,
+        refresh=refresh,
+        web=web,
+        serve=serve,
     )
 
 

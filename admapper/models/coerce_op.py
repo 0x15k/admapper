@@ -30,6 +30,7 @@ class CoerceOpportunity:
             "source_host": self.source_host,
             "listener_host": self.listener_host,
             "relay_target": self.relay_target,
+            "requires_external_listener": self.requires_external_listener,
             "detail": self.detail,
             "manual_commands": list(self.manual_commands),
         }

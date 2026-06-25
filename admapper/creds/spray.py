@@ -115,25 +115,48 @@ def run_spray(
     if not dc_ip:
         raise ValueError("no DC with LDAP/Kerberos — run start_unauth first")
 
-    if not password:
-        raise ValueError("spray requires a password argument")
+    # Blank passwords are allowed only in LAB opsec mode and for PASSWD_NOTREQD accounts.
+    is_blank_spray = password == ""
 
     history = SprayHistoryStore(session.workspaces, session.workspace.name)
-    if history.password_already_sprayed(password) and not force:
+    if history.password_already_sprayed(password) and not (force or is_blank_spray):
         raise ValueError(
-            "password already sprayed in this workspace — use --force to repeat "
-            "(lockout risk)"
+            "password already sprayed in this workspace — use --force to repeat (lockout risk)"
         )
 
     eligible, skipped, policy, _ = _prepare_users(session, dc_ip, usernames)
-    if not eligible:
-        raise ValueError("no eligible users after lockout filtering")
+
+    # LAB mode: restrict blank spray to PASSWD_NOTREQD accounts only
+    if is_blank_spray:
+        if session.opsec_profile.name.lower() != "lab":
+            raise ValueError("blank-password spray is only allowed in LAB opsec mode")
+        users_store = UsersStore(session.workspaces, session.workspace.name)
+        inventory = users_store.list()
+        by_name = {u.username.lower(): u for u in inventory}
+        blank_eligible = [
+            u
+            for u in eligible
+            if "PASSWD_NOTREQD" in by_name.get(u.lower(), UserRecord(username=u)).flags
+        ]
+        if not blank_eligible:
+            print_warning("no PASSWD_NOTREQD users eligible for blank-password spray")
+            return SprayResult(
+                domain=domain,
+                dc_ip=dc_ip,
+                password="",
+                method="blank-skipped",
+                users_tested=0,
+                skipped=skipped,
+                policy=policy,
+            )
+        print_info(
+            "LAB mode — blank-password spray against "
+            f"{len(blank_eligible)} PASSWD_NOTREQD account(s)"
+        )
+        eligible = blank_eligible
 
     policy_text = _format_policy(policy)
-    confirm_msg = (
-        f"Spray password against {len(eligible)} users @ {dc_ip}? "
-        f"Policy: {policy_text}"
-    )
+    confirm_msg = f"Spray password against {len(eligible)} users @ {dc_ip}? Policy: {policy_text}"
     if not skip_confirm and not confirm(
         confirm_msg,
         level=ConfirmLevel.DANGER if policy.lockout_enabled else ConfirmLevel.WARN,
@@ -310,4 +333,24 @@ def run_spray_variations(
         if result.hits:
             print_success("hit found — stopping variation spray early")
             break
+
+    # LAB mode: also attempt blank password against PASSWD_NOTREQD accounts
+    if session.opsec_profile.name.lower() == "lab" and (
+        not results or not any(r.hits for r in results)
+    ):
+        print_info("LAB opsec — attempting blank password against PASSWD_NOTREQD accounts")
+        try:
+            blank_result = run_spray(
+                session,
+                "",
+                usernames=usernames,
+                method="ldap",
+                dry_run=dry_run,
+                force=force,
+                skip_confirm=True,
+            )
+            results.append(blank_result)
+        except ValueError as exc:
+            print_warning(str(exc))
+
     return results

@@ -175,6 +175,10 @@ def spray_password(
 
     method: auto | ldap | kerbrute | nxc
     """
+    # Blank passwords only work over LDAP; Kerberos/NXC reject empty plaintext.
+    if password == "":
+        return spray_ldap(dc_ip, domain, users, password), "ldap", None
+
     if method == "ldap":
         return spray_ldap(dc_ip, domain, users, password), "ldap", None
 

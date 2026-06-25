@@ -114,6 +114,7 @@ def run_escalate_analysis(
     session: Session,
     *,
     pivot_user: str | None = None,
+    quiet: bool = False,
 ) -> EscalationState:
     if session.workspace is None:
         raise RuntimeError("no active workspace")
@@ -124,7 +125,8 @@ def run_escalate_analysis(
     if removed:
         session.workspace.owned_users = clean
         session.persist_workspace()
-        print_warning(f"removed bogus owned entries: {', '.join(removed)}")
+        if not quiet:
+            print_warning(f"removed bogus owned entries: {', '.join(removed)}")
 
     domain = session.workspace.domain or ""
     ws_path = session.workspaces.path_for(session.workspace.name)
@@ -132,7 +134,8 @@ def run_escalate_analysis(
 
     from admapper.core.verbosity import print_phase
 
-    print_phase(f"Escalation analysis — pivot: {pivot}")
+    if not quiet:
+        print_phase(f"Escalation analysis — pivot: {pivot}")
 
     from admapper.adcs.enrich import enrich_adcs_findings_file
 
@@ -164,7 +167,7 @@ def run_escalate_analysis(
 
     from admapper.core.verbosity import is_verbose
 
-    if is_verbose():
+    if is_verbose() and not quiet:
         print_escalation_state(state)
         print_manual_guide("escalate", session=session)
     return state

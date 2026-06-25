@@ -1002,16 +1002,16 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
             body = _read_json_body(self)
 
             if path == "/api/scan":
-                ip = str(body.get("ip") or "").strip()
+                ip = str(body.get("host") or body.get("ip") or body.get("ip_dc") or "").strip()
                 self._start_background(lambda: ctx.run_scan(ip=ip or None))
                 return
 
             if path == "/api/run":
                 self._start_background(
                     lambda: ctx.run_auth(
-                        str(body.get("username", "")).strip(),
-                        str(body.get("password", "")),
-                        str(body.get("ip", "")).strip() or None,
+                        str(body.get("username") or body.get("user") or body.get("u") or "").strip(),
+                        str(body.get("password") or body.get("p") or ""),
+                        str(body.get("host") or body.get("ip") or "").strip() or None,
                     )
                 )
                 return
@@ -1030,9 +1030,9 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
                 return
 
             if path == "/api/pivot":
-                user = str(body.get("username", "")).strip()
+                user = str(body.get("user") or body.get("username") or "").strip()
                 if not user:
-                    _json_response(self, 400, {"error": "username required"})
+                    _json_response(self, 400, {"error": "username/user required"})
                     return
                 try:
                     ctx.set_pivot(user)
@@ -1044,9 +1044,9 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
                 return
 
             if path == "/api/winrm":
-                account = str(body.get("account", "")).strip()
+                account = str(body.get("account") or body.get("user") or body.get("username") or "").strip()
                 if not account:
-                    _json_response(self, 400, {"error": "account required"})
+                    _json_response(self, 400, {"error": "account/user required"})
                     return
                 self._start_background(lambda: ctx.run_winrm_pth(account))
                 return

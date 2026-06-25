@@ -108,17 +108,14 @@ def detect_esc_vulnerabilities(
 
         # ESC9 — CT_FLAG_NO_SECURITY_EXTENSION + auth EKU
         enrollment_flags = getattr(template, "enrollment_flags", 0) or 0
-        if (
-            enrollment_flags & CT_FLAG_NO_SECURITY_EXTENSION
-            and _has_auth_eku(template)
-        ):
+        if enrollment_flags & CT_FLAG_NO_SECURITY_EXTENSION and _has_auth_eku(template):
             findings.append(
                 _finding(
                     "esc9",
                     template=name,
                     ca_name=default_ca,
                     detail="CT_FLAG_NO_SECURITY_EXTENSION set + client auth EKU — "
-                           "exploitable with GenericWrite + weak StrongCertificateBindingEnforcement",
+                    "exploitable with GenericWrite + weak StrongCertificateBindingEnforcement",
                 )
             )
 
@@ -131,7 +128,7 @@ def detect_esc_vulnerabilities(
                     template=name,
                     ca_name=default_ca,
                     detail=f"issuance policy OID(s) present: {issuance_policies[:3]} — "
-                           "check msDS-OIDToGroupLink for effective group membership",
+                    "check msDS-OIDToGroupLink for effective group membership",
                 )
             )
 
@@ -170,7 +167,7 @@ def detect_esc_vulnerabilities(
                 "esc11",
                 ca_name=service.name,
                 detail=f"IF_ENFORCEENCRYPTICERTREQUEST not set on {service.dns_host} — "
-                       "NTLM relay to MS-ICPR RPC interface possible",
+                "NTLM relay to MS-ICPR RPC interface possible",
             )
             finding.requires_external_listener = True
             findings.append(finding)

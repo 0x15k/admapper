@@ -83,6 +83,7 @@ class AdcsFinding:
             "summary": self.summary,
             "detail": self.detail,
             "manual_commands": list(self.manual_commands),
+            "requires_external_listener": self.requires_external_listener,
             "principal": self.principal,
             "prerequisites_met": self.prerequisites_met,
         }

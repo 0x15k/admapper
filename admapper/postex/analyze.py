@@ -5,18 +5,17 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.creds.common import pick_dc_ip
 from admapper.core.hosts import HostsStore
 from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
-from admapper.models.postex_op import PostexOpportunity
 from admapper.models.credential import CredentialStatus
+from admapper.models.postex_op import PostexOpportunity
 from admapper.postex.catalog import postex_meta
-
 from admapper.postex.loot_intel import loot_intel_to_dict, scan_loot_directory
 from admapper.postex.task_hijack import (
-    analyze_task_hijack,
     analysis_from_scan_payload,
+    analyze_task_hijack,
     findings_to_opportunities,
 )
 from admapper.postex.templates import apply_postex_templates, build_template_context
@@ -109,29 +108,30 @@ def build_postex_opportunities(
         )
 
     # Get hosts where we have verified admin/WinRM access.
-    # We can infer this by looking at computers in the inventory that match verified credentials or where scan results show ownership.
+    # Infer from machine accounts with verified creds/hash access.
     verified_admin_hosts: list[str] = []
-    # If session has verified credentials/hashes matching a machine account or DC WinRM access, map to that host
-    # For target-10-129-245-130, if we have gMSA hash (msa_health$) and we have WinRM access, we target the DC.
-    # Let's extract verified computer names or target IPs from active credentials
+    # If session has verified credentials/hashes matching a machine account or DC
+    # WinRM access, map to that host. For target-10-129-245-130 the gMSA hash
+    # (msa_health$) confirms WinRM on the DC, so we target dc01.logging.htb.
     if session.credentials is not None:
         for c in session.credentials.list():
             if c.status == CredentialStatus.VALID:
                 if c.username.endswith("$"):
                     from admapper.creds.common import resolve_winrm_host_for_account
+
                     target_h = resolve_winrm_host_for_account(
                         c.username,
                         ws_path,
                         session.workspace.domain,
-                        fallback_ip=dcs[0] if dcs else None
+                        fallback_ip=dcs[0] if dcs else None,
                     )
                     if target_h and target_h not in verified_admin_hosts:
                         verified_admin_hosts.append(target_h)
 
-    # If no machine account has verified access, but we have general administrative credentials, map to DCs
+    # Per Agents.md: local shell techniques mapped only to hosts with confirmed
+    # admin/shell access. Do NOT fall back to `<local_shell>` when no access is confirmed.
     if not verified_admin_hosts and owned:
-        # Fall back to DCs if we have any valid credential to try local shell operations
-        verified_admin_hosts = dcs or (computers[:1] if computers else ["<local_shell>"])
+        verified_admin_hosts = dcs or (computers[:1] if computers else [])
 
     # 14.2–14.4, 14.6, 14.8 — local shell techniques (only mapped to hosts with admin/shell access)
     for host in verified_admin_hosts:
@@ -144,25 +144,6 @@ def build_postex_opportunities(
                     detail=f"Requires interactive shell or SYSTEM on {host}",
                 )
             )
-
-    # 14.5 DCSync — from ACL findings
-    dcsync_acl_principals: set[str] = set()
-    for finding in (acl_data or {}).get("findings") or []:
-        if str(finding.get("right")) != "dcsync":
-            continue
-        principal = str(finding.get("principal", ""))
-        dcsync_acl_principals.add(principal.lower())
-        if owned and principal.lower() not in {u.lower() for u in owned}:
-            continue
-        target = dcs[0] if dcs else "<DC>"
-        ops.append(
-            _opportunity(
-                "dcsync",
-                target_host=target,
-                context=principal or cred_context,
-                detail=str(finding.get("summary") or "ACL grants DCSync rights"),
-            )
-        )
 
     # 14.5 DCSync — from ACL findings
     dcsync_acl_principals: set[str] = set()
@@ -192,12 +173,14 @@ def build_postex_opportunities(
                 has_failed_dcsync = True
 
     if not any(o.technique == "dcsync" for o in ops) and owned and dcs:
-        # Determine if we should mark DCSync as Info/Blocked if we have no explicit ACL and/or previous failures
+        # Mark DCSync as Info/Blocked if previous attempts failed.
         op = _opportunity(
             "dcsync",
             target_host=dcs[0],
             context=cred_context,
-            detail="Try secretsdump if creds are DA-equivalent (paths/ACLs)" if not has_failed_dcsync else "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)",
+            detail="Try secretsdump if creds are DA-equivalent (paths/ACLs)"
+            if not has_failed_dcsync
+            else "Secretsdump DCSync previously failed (insufficient rights/DRA_BAD_DN)",
         )
         op.dcsync_attempted = has_failed_dcsync
         op.dcsync_failed = has_failed_dcsync
@@ -205,13 +188,12 @@ def build_postex_opportunities(
             op.severity = "info"
         ops.append(op)
     elif has_failed_dcsync:
-        # Downgrade any active DCSync ops if historical failure is found
+        # Downgrade any active DCSync ops if historical failure is found.
         for o in ops:
             if o.technique == "dcsync":
                 o.severity = "info"
-                o.detail = "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)"
+                o.detail = "Secretsdump DCSync previously failed (insufficient rights/DRA_BAD_DN)"
                 o.dcsync_failed = True
-
 
     # 14.7 Share loot — SYSVOL/NETLOGON and discovered shares
     shares = list((inventory or {}).get("smb_shares") or [])
@@ -262,7 +244,14 @@ def build_postex_opportunities(
             if hijack is None:
                 tasks = scan_data.get("tasks") or []
                 com_out = "\n".join(
-                    f"{t.get('name','')}|{t.get('run_as','')}|{t.get('executable','')}|{t.get('arguments','')}"
+                    "|".join(
+                        [
+                            str(t.get("name", "")),
+                            str(t.get("run_as", "")),
+                            str(t.get("executable", "")),
+                            str(t.get("arguments", "")),
+                        ]
+                    )
                     for t in tasks
                 )
         if hijack is None:
@@ -277,7 +266,9 @@ def build_postex_opportunities(
         try:
             from admapper.postex.creds import resolve_winrm_cred
 
-            wc = resolve_winrm_cred(session, shell_user=shell_user or None, host=target if target[0].isdigit() else None)
+            wc = resolve_winrm_cred(
+                session, shell_user=shell_user or None, host=target if target[0].isdigit() else None
+            )
             nthash = wc.nthash
         except (ValueError, RuntimeError):
             pass
@@ -354,6 +345,7 @@ def run_postex_analysis(
     *,
     remote_scan: bool = False,
     remote_host: str | None = None,
+    quiet: bool = False,
 ) -> PostexAnalysisResult:
     """Phase 14 — local post-exploitation and lateral movement playbook."""
     if session.workspace is None:
@@ -366,7 +358,8 @@ def run_postex_analysis(
     ws_name = session.workspace.name
     ws_path = session.workspaces.path_for(ws_name)
 
-    print_info("Phase 14 — post-exploitation analysis")
+    if not quiet:
+        print_info("Phase 14 — post-exploitation analysis")
 
     if remote_scan:
         from admapper.postex.remote_scan import run_remote_task_hijack_scan
@@ -374,10 +367,10 @@ def run_postex_analysis(
         run_remote_task_hijack_scan(session, host=remote_host)
 
     inventory = _load_json(ws_path / "auth_inventory.json")
-    if inventory is None:
+    if inventory is None and not quiet:
         print_warning("no auth_inventory.json — run start_auth for computer/share targets")
 
-    if not _owned_users(session):
+    if not _owned_users(session) and not quiet:
         print_warning("no owned users — run start_auth after compromising a principal")
 
     opportunities = build_postex_opportunities(
@@ -430,16 +423,18 @@ def run_postex_analysis(
             [o.id, o.technique, o.target_host or "", o.context or "", o.severity]
             for o in opportunities[:20]
         ]
-        print_table(
-            "Post-exploitation opportunities",
-            ["id", "technique", "target", "context", "severity"],
-            rows,
-        )
-    else:
+        if not quiet:
+            print_table(
+                "Post-exploitation opportunities",
+                ["id", "technique", "target", "context", "severity"],
+                rows,
+            )
+    elif not quiet:
         print_warning("no post-ex opportunities — need owned creds + inventory")
 
-    print_success("post-ex playbook saved → postex_ops.json")
-    print_manual_guide("postex_local", session=session)
+    if not quiet:
+        print_success("post-ex playbook saved → postex_ops.json")
+        print_manual_guide("postex_local", session=session)
     return result
 
 
