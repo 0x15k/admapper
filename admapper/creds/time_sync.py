@@ -19,6 +19,7 @@ _dc_clock_state: dict[str, object] = {
     "unstable": False,
     "last_step_seconds": None,
     "sync_attempts": 0,
+    "sync_enabled": True,
 }
 
 
@@ -29,6 +30,7 @@ def reset_dc_clock_state() -> None:
         unstable=False,
         last_step_seconds=None,
         sync_attempts=0,
+        sync_enabled=True,
     )
 
 
@@ -188,7 +190,7 @@ def sync_time_to_dc(dc_ip: str, *, timeout: int = 30) -> tuple[bool, str]:
 def ensure_dc_clock(
     dc_ip: str | None,
     *,
-    enabled: bool = True,
+    enabled: bool | None = None,
     ws_path: str | Path | None = None,
     force: bool = False,
 ) -> bool:
@@ -198,6 +200,11 @@ def ensure_dc_clock(
     Called by scan/run/exploit/verify — operator should not sync the clock manually.
     On failure or unstable VM clocks, Kerberos paths fall back to libfaketime auto-probe.
     """
+    if enabled is not None:
+        _dc_clock_state["sync_enabled"] = enabled
+    else:
+        enabled = _dc_clock_state.get("sync_enabled", True)
+
     from admapper.core.output import print_info, print_success, print_warning
     from admapper.core.platform import get_clock_skew, set_clock_skew
     from admapper.creds.kerberos_skew import apply_workspace_clock_skew
@@ -206,8 +213,6 @@ def ensure_dc_clock(
         return False
 
     cached_skew = apply_workspace_clock_skew(ws_path)
-    if not enabled:
-        return bool(cached_skew)
 
     explicit_skew = get_clock_skew()
     if cached_skew:
