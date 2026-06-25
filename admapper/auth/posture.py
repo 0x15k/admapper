@@ -396,9 +396,9 @@ def _print_posture_summary(result: PostureResult) -> None:
 
     def _status(val: bool | None, good_if_true: bool = True) -> str:
         if val is None:
-            return "unknown"
+            return "[dim]unknown[/dim]"
         ok = val if good_if_true else not val
-        return "✅ ok" if ok else "⚠️  RISK"
+        return "[bold green]✅ ok[/bold green]" if ok else "[bold red]⚠️  RISK[/bold red]"
 
     # SMB signing check (runs natively)
     smb_detail = ""

@@ -55,7 +55,17 @@ def _global_options(
             help="DC IP only — black-box recon (no credentials). Same as: admapper scan --ip-dc <ip>",
         ),
     ] = None,
+    no_color: Annotated[
+        bool,
+        typer.Option(
+            "--no-color",
+            help="Disable colored console output",
+        ),
+    ] = False,
 ) -> None:
+    if no_color:
+        from admapper.core.output import set_no_color
+        set_no_color(True)
     set_cli_workspaces_root(Path(workspaces_root) if workspaces_root else None)
     if ctx.invoked_subcommand is None and not ip_dc:
         from admapper.cli.banner import print_workflow_banner
