@@ -121,21 +121,29 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
                 continue
             print_warning(err)
         if auth_result.kerberos is False and not is_compact():
+            from admapper.core.platform import get_clock_skew
             from admapper.creds.time_sync import suggest_time_sync
 
-            step_seconds = get_last_ntp_step_seconds()
-            if is_clock_unstable() and step_seconds is not None:
-                print_warning(vm_time_sync_warning(step_seconds))
-            print_warning(f"fix clock skew: {suggest_time_sync(dc_ip)}")
-            if not resolve_faketime():
+            current_skew = get_clock_skew()
+            if current_skew:
                 print_warning(
-                    f"or per-command offset: {faketime_install_hint()} then --clock-skew '+7h'"
+                    f"Kerberos auth failed (using clock skew {current_skew}). "
+                    "Confirm the credentials are correct."
                 )
-            elif kerberos_only:
-                print_warning(
-                    "Protected Users need Kerberos — install libfaketime if missing, "
-                    "or run: admapper exploit --clock-skew '+7h'"
-                )
+            else:
+                step_seconds = get_last_ntp_step_seconds()
+                if is_clock_unstable() and step_seconds is not None:
+                    print_warning(vm_time_sync_warning(step_seconds))
+                print_warning(f"fix clock skew: {suggest_time_sync(dc_ip)}")
+                if not resolve_faketime():
+                    print_warning(
+                        f"or per-command offset: {faketime_install_hint()} then --clock-skew '+7h'"
+                    )
+                elif kerberos_only:
+                    print_warning(
+                        "Protected Users need Kerberos — install libfaketime if missing, "
+                        "or run: admapper exploit --clock-skew '+7h'"
+                    )
 
     return CredentialVerifyResult(
         credential=updated,

@@ -392,6 +392,7 @@ def _check_stale_computers(ws_path: Path) -> list[dict[str, Any]]:
 
 def _print_posture_summary(result: PostureResult) -> None:
     rows: list[list[str]] = []
+    nxc_missing = not bool(resolve_nxc())
 
     def _status(val: bool | None, good_if_true: bool = True) -> str:
         if val is None:
@@ -399,14 +400,40 @@ def _print_posture_summary(result: PostureResult) -> None:
         ok = val if good_if_true else not val
         return "✅ ok" if ok else "⚠️  RISK"
 
-    rows.append(["SMB signing required", _status(result.smb_signing),
-                 "" if result.smb_signing else "relay-friendly — NTLM relay viable"])
-    rows.append(["LAPS deployed", _status(result.laps_deployed),
-                 f"{result.laps_covered_count} computer(s) covered" if result.laps_deployed else "local admin reuse risk"])
-    rows.append(["NTLMv1 accepted", _status(result.ntlmv1_accepted, good_if_true=False),
-                 "relay to RC4 / downgrade" if result.ntlmv1_accepted else ""])
-    rows.append(["LDAP signing required", _status(result.ldap_signing_required),
-                 "" if result.ldap_signing_required else "LDAP relay / MitM viable"])
+    # SMB signing check (runs natively)
+    smb_detail = ""
+    if result.smb_signing is None:
+        smb_detail = "check failed/timed out"
+    elif not result.smb_signing:
+        smb_detail = "relay-friendly — NTLM relay viable"
+    rows.append(["SMB signing required", _status(result.smb_signing), smb_detail])
+
+    # LAPS check (runs natively)
+    laps_detail = ""
+    if result.laps_deployed is None:
+        laps_detail = "local admin reuse risk (read/schema search failed)"
+    elif result.laps_deployed:
+        laps_detail = f"{result.laps_covered_count} computer(s) covered"
+    else:
+        laps_detail = "local admin reuse risk"
+    rows.append(["LAPS deployed", _status(result.laps_deployed), laps_detail])
+
+    # NTLMv1 check (depends on NetExec/nxc)
+    ntlm_detail = ""
+    if result.ntlmv1_accepted is None:
+        ntlm_detail = "skipped (NetExec/nxc missing)" if nxc_missing else "check failed/timed out"
+    elif result.ntlmv1_accepted:
+        ntlm_detail = "relay to RC4 / downgrade"
+    rows.append(["NTLMv1 accepted", _status(result.ntlmv1_accepted, good_if_true=False), ntlm_detail])
+
+    # LDAP signing check (depends on NetExec/nxc, falls back to native bind)
+    ldap_detail = ""
+    if result.ldap_signing_required is None:
+        ldap_detail = "skipped (NetExec/nxc missing)" if nxc_missing else "check failed/timed out"
+    elif not result.ldap_signing_required:
+        ldap_detail = "LDAP relay / MitM viable"
+    rows.append(["LDAP signing required", _status(result.ldap_signing_required), ldap_detail])
+
     rows.append(["DA sessions detected", str(len(result.da_sessions)),
                  ", ".join(s["user"] for s in result.da_sessions[:3]) if result.da_sessions else "none"])
     rows.append(["Stale computers detected", str(len(result.stale_computers)),
