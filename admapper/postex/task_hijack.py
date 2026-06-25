@@ -184,21 +184,22 @@ def analyze_task_hijack(
         elif not writable:
             severity = "high"
 
-        analysis.findings.append(
-            TaskHijackFinding(
-                task_name=task.name,
-                run_as_user=run_as,
-                executable=exe,
-                arguments=task.arguments,
-                drop_path=drop_path,
-                payload_zip=zip_name,
-                payload_dll=dll_name,
-                writable=writable,
-                target_arch=arch,
-                evidence=evidence,
-                severity=severity,
+        if writable:
+            analysis.findings.append(
+                TaskHijackFinding(
+                    task_name=task.name,
+                    run_as_user=run_as,
+                    executable=exe,
+                    arguments=task.arguments,
+                    drop_path=drop_path,
+                    payload_zip=zip_name,
+                    payload_dll=dll_name,
+                    writable=writable,
+                    target_arch=arch,
+                    evidence=evidence,
+                    severity=severity,
+                )
             )
-        )
 
     if not analysis.findings:
         run_as = guess_run_as_from_log(monitor_log) or guess_run_as_from_log(com_task_output)
@@ -219,21 +220,22 @@ def analyze_task_hijack(
         if writable:
             evidence.append(f"remote: {drop_path} writable by current principal")
         severity = "critical" if writable and run_as != "unknown" else "high"
-        analysis.findings.append(
-            TaskHijackFinding(
-                task_name=task_name,
-                run_as_user=run_as or "unknown",
-                executable="",
-                arguments="",
-                drop_path=drop_path,
-                payload_zip=zip_name,
-                payload_dll=dll_name,
-                writable=writable,
-                target_arch=arch,
-                evidence=evidence,
-                severity=severity,
+        if writable:
+            analysis.findings.append(
+                TaskHijackFinding(
+                    task_name=task_name,
+                    run_as_user=run_as or "unknown",
+                    executable="",
+                    arguments="",
+                    drop_path=drop_path,
+                    payload_zip=zip_name,
+                    payload_dll=dll_name,
+                    writable=writable,
+                    target_arch=arch,
+                    evidence=evidence,
+                    severity=severity,
+                )
             )
-        )
     return analysis
 
 

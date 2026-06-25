@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from admapper.core.platform import resolve_executable
-
-
-def resolve_certipy() -> str | None:
-    return resolve_executable(["certipy", "certipy-ad"])
+from admapper.core.platform import resolve_certipy
 
 
 def certipy_install_hint() -> str:

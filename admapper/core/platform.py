@@ -114,6 +114,10 @@ def resolve_kerbrute() -> str | None:
     return resolve_executable(["kerbrute"])
 
 
+def resolve_certipy() -> str | None:
+    return resolve_executable(["certipy", "certipy-ad"])
+
+
 def resolve_nxc() -> str | None:
     return resolve_executable(["nxc", "netexec"])
 

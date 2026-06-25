@@ -117,3 +117,61 @@ def test_run_adcs_analysis_writes_artifacts(tmp_path: Path) -> None:
     assert result.findings
     assert (tmp_path / "ws" / "lab" / "adcs_findings.json").is_file()
     assert (tmp_path / "ws" / "lab" / "adcs_inventory.json").is_file()
+
+    golden = next(f for f in result.findings if f.esc == "golden_cert")
+    assert golden.severity == "info"
+    assert golden.prerequisites_met is False
+
+
+def test_golden_cert_with_ca_admin_rights(tmp_path: Path) -> None:
+    from admapper.acl.enum import PrincipalContext
+
+    manager = WorkspaceManager(tmp_path / "ws")
+    session = Session(config=GlobalConfig(), workspaces=manager)
+    session.select_workspace("lab")
+    session.set_domain("corp.local")
+    session.workspace.owned_users = ["jsmith"]
+    session.persist_workspace()
+    HostsStore(manager, "lab").merge(
+        [HostRecord(address="10.0.0.1", open_ports=[389], is_domain_controller=True)]
+    )
+    store = CredentialStore(manager, "lab")
+    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    store.mark_status(cred.id, CredentialStatus.VALID)
+
+    # Enrollment service with manage_ca rights for jsmith
+    services = [
+        EnrollmentServiceRecord(
+            name="corp-CA",
+            dns_host="dc01.corp.local",
+            security_aces=[
+                {
+                    "trustee_sid": "S-1-5-21-1111-2222-3333-1001",
+                    "rights": ["manage_ca"],
+                }
+            ],
+        )
+    ]
+    enum_result = AdcsEnumResult(
+        enrollment_services=services,
+        templates=[],
+    )
+
+    p_ctx = PrincipalContext(
+        username="jsmith",
+        user_dn=None,
+        user_sid="S-1-5-21-1111-2222-3333-1001",
+    )
+
+    mock_ldap = MagicMock()
+    with (
+        patch("admapper.adcs.analyze.open_ldap_session", return_value=(mock_ldap, None)),
+        patch("admapper.adcs.analyze.enumerate_adcs", return_value=enum_result),
+        patch("admapper.adcs.analyze.resolve_principal_context", return_value=p_ctx),
+        patch("admapper.adcs.analyze.print_manual_guide"),
+    ):
+        result = run_adcs_analysis(session)
+
+    golden = next(f for f in result.findings if f.esc == "golden_cert")
+    assert golden.severity == "critical"
+    assert golden.prerequisites_met is True

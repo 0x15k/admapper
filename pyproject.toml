@@ -34,6 +34,7 @@ dependencies = [
     "ldap3>=2.9,<3.0",
     "networkx>=3.0",
     "impacket>=0.12,<0.14",
+    "setuptools<71",
 ]
 
 [project.optional-dependencies]

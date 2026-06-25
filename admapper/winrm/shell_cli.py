@@ -53,7 +53,7 @@ def _warn_protected_user_winrm(*, domain: str, username: str, dc_ip: str) -> Non
     if not is_protected_user(username, {username.lower()}):
         return
     print_error(f"{username} is a Protected User — Kerberos WinRM to DC often fails.")
-    machine = _machine_hash_hint(dc)
+    machine = _machine_hash_hint(dc_ip)
     if machine:
         from admapper.creds.common import format_admapper_winrm_pth
 
@@ -63,7 +63,7 @@ def _warn_protected_user_winrm(*, domain: str, username: str, dc_ip: str) -> Non
             nthash=nthash,
             domain=domain,
             ws_path=None,
-            fallback_ip=dc if dc and dc[0].isdigit() else None,
+            fallback_ip=dc_ip if dc_ip and dc_ip[0].isdigit() else None,
         )
         print_success("Usa el hash de máquina del workspace en su host WinRM:")
         print_info(f"  {cmd}")
@@ -86,6 +86,7 @@ def run_winrm_shell(
     clock_skew: str | None,
     sync_clock: bool = True,
     verbose: bool = False,
+    auto: bool = False,
 ) -> None:
     if nthash:
         if not host:
@@ -143,7 +144,8 @@ def run_winrm_shell(
             if result.returncode != 0:
                 raise typer.Exit(result.returncode)
             print_success(f"WinRM OK ({result.shell})")
-            _auto_mark_owned(domain=domain, username=username, dc_ip=dc)
+            if auto:
+                _auto_mark_owned(domain=domain, username=username, dc_ip=dc)
         else:
             client.interactive_shell()
             _auto_mark_owned(domain=domain, username=username, dc_ip=dc)

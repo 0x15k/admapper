@@ -234,12 +234,11 @@ def parse_security_descriptor(
     merged: list[ParsedAce] = []
     seen: set[tuple[str, str]] = set()
     for ace in aces:
-        rights = [r for r in ace.rights if r != "dcsync_partial"]
-        if "dcsync_partial" in ace.rights:
-            other = trustees_dcsync.get(ace.trustee_sid, set())
-            if "dcsync" in other or GUID_GET_CHANGES in (ace.object_type or ""):
-                if "dcsync" not in rights:
-                    rights.append("dcsync")
+        rights = [r for r in ace.rights if r not in ("dcsync", "dcsync_partial")]
+        other = trustees_dcsync.get(ace.trustee_sid, set())
+        if "dcsync" in other and "dcsync_partial" in other:
+            if "dcsync" not in rights:
+                rights.append("dcsync")
         for right in rights:
             key = (ace.trustee_sid, right)
             if key in seen:

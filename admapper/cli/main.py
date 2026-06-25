@@ -1165,6 +1165,7 @@ def winrm(
     ] = None,
     no_sync: Annotated[bool, typer.Option("--no-sync", help="Skip automatic clock sync with the DC")] = False,
     verbose: Annotated[bool, typer.Option("-v", "--verbose", help="Show kvno/klist and auth attempts")] = False,
+    auto: Annotated[bool, typer.Option("--auto", help="Automatically mark compromised user as owned in the active workspace and run graph analysis")] = False,
 ) -> None:
     """WinRM shell — Kerberos via pypsrp, or Pass-the-Hash via nxc (--hash, no --dc-ip)."""
     from pathlib import Path
@@ -1207,6 +1208,7 @@ def winrm(
         clock_skew=clock_skew,
         sync_clock=not no_sync,
         verbose=verbose,
+        auto=auto,
     )
 
 

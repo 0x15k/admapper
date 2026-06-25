@@ -141,6 +141,32 @@ def run_adcs_analysis(session: Session, *, cred_id: str | None = None) -> AdcsAn
                 f"for {', '.join(p.username for p in principals[:3])}"
             )
 
+    # Validate CA permissions for Golden Certificate severity
+    has_ca_admin_rights = False
+    principal_sids_set = set()
+    for principal in principals:
+        principal_sids_set.update(principal.all_sids)
+
+    for service in enum_result.enrollment_services:
+        for ace_dict in service.security_aces or []:
+            sid = str(ace_dict.get("trustee_sid") or "")
+            rights = list(ace_dict.get("rights") or [])
+            if sid in principal_sids_set:
+                if any(r in rights for r in ("manage_ca", "manage_certificates", "genericall")):
+                    has_ca_admin_rights = True
+                    break
+        if has_ca_admin_rights:
+            break
+
+    for f in findings:
+        if f.esc == "golden_cert":
+            if has_ca_admin_rights:
+                f.severity = "critical"
+                f.prerequisites_met = True
+            else:
+                f.severity = "info"
+                f.prerequisites_met = False
+
     certipy = resolve_certipy()
     if certipy:
         print_info(f"certipy available: {certipy}")

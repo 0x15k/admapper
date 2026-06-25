@@ -169,7 +169,7 @@ def test_intel_from_com_tasks_extracts_zip_dll_run_as() -> None:
     assert intel.task_name_hint == "Update Check"
     assert "ProgramData" in intel.drop_path
 
-    analysis = analyze_task_hijack(loot=None, com_task_output=com, acl_output="")
+    analysis = analyze_task_hijack(loot=None, com_task_output=com, acl_output="(WD)")
     assert len(analysis.findings) == 1
     assert analysis.findings[0].run_as_user == "jaylee.clifton"
     assert analysis.findings[0].payload_zip == "Settings_Update.zip"

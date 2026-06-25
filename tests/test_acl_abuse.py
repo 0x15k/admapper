@@ -178,3 +178,38 @@ def test_run_acl_analysis_writes_findings(tmp_path: Path, trustee_sid: str) -> N
     assert result.findings
     assert result.findings[0].right == "genericall"
     assert (tmp_path / "ws" / "lab" / "acl_findings.json").is_file()
+
+
+def test_parse_dcsync_requires_both_rights(trustee_sid: str) -> None:
+    from admapper.acl.rights import GUID_GET_CHANGES, GUID_GET_CHANGES_ALL, ADS_RIGHT_DS_CONTROL_ACCESS
+
+    # 1. Only GetChangesAll (GUID_GET_CHANGES_ALL) -> No DCSync finding
+    sd1 = _empty_sd()
+    sd1["Dacl"].aces.append(
+        _build_object_ace(
+            trustee_sid,
+            privguid=GUID_GET_CHANGES_ALL,
+            access_mask=ADS_RIGHT_DS_CONTROL_ACCESS,
+        )
+    )
+    parsed1 = parse_security_descriptor(sd1.getData(), object_classes=["top", "domain"])
+    assert not any(ace.trustee_sid == trustee_sid and "dcsync" in ace.rights for ace in parsed1.aces)
+
+    # 2. Both GetChanges and GetChangesAll -> DCSync finding
+    sd2 = _empty_sd()
+    sd2["Dacl"].aces.append(
+        _build_object_ace(
+            trustee_sid,
+            privguid=GUID_GET_CHANGES,
+            access_mask=ADS_RIGHT_DS_CONTROL_ACCESS,
+        )
+    )
+    sd2["Dacl"].aces.append(
+        _build_object_ace(
+            trustee_sid,
+            privguid=GUID_GET_CHANGES_ALL,
+            access_mask=ADS_RIGHT_DS_CONTROL_ACCESS,
+        )
+    )
+    parsed2 = parse_security_descriptor(sd2.getData(), object_classes=["top", "domain"])
+    assert any(ace.trustee_sid == trustee_sid and "dcsync" in ace.rights for ace in parsed2.aces)
