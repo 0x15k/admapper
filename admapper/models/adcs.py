@@ -69,6 +69,7 @@ class AdcsFinding:
     cert_auth_viable: bool | None = None
     wsus_chain_step: bool | None = None
     eku_summary: str = ""
+    requires_external_listener: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = {

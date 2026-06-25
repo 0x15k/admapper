@@ -16,6 +16,8 @@ class PostexOpportunity:
     detail: str = ""
     manual_commands: list[str] = field(default_factory=list)
     id: str = ""
+    dcsync_attempted: bool = False
+    dcsync_failed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -28,5 +30,7 @@ class PostexOpportunity:
             "target_host": self.target_host,
             "context": self.context,
             "detail": self.detail,
+            "dcsync_attempted": self.dcsync_attempted,
+            "dcsync_failed": self.dcsync_failed,
             "manual_commands": list(self.manual_commands),
         }

@@ -148,13 +148,13 @@ def detect_esc_vulnerabilities(
 
     for service in enrollment_services:
         if service.web_enrollment:
-            findings.append(
-                _finding(
-                    "esc8",
-                    ca_name=service.name,
-                    detail=f"web enrollment @ {service.dns_host}",
-                )
+            finding = _finding(
+                "esc8",
+                ca_name=service.name,
+                detail=f"web enrollment @ {service.dns_host}",
             )
+            finding.requires_external_listener = True
+            findings.append(finding)
         flags = service.enrollment_flags or 0
         if flags & EDITF_ATTRIBUTESUBJECTALTNAME2:
             findings.append(
@@ -166,14 +166,14 @@ def detect_esc_vulnerabilities(
             )
         # ESC11 — RPC enrollment without encryption enforcement
         if not (flags & IF_ENFORCEENCRYPTICERTREQUEST):
-            findings.append(
-                _finding(
-                    "esc11",
-                    ca_name=service.name,
-                    detail=f"IF_ENFORCEENCRYPTICERTREQUEST not set on {service.dns_host} — "
-                           "NTLM relay to MS-ICPR RPC interface possible",
-                )
+            finding = _finding(
+                "esc11",
+                ca_name=service.name,
+                detail=f"IF_ENFORCEENCRYPTICERTREQUEST not set on {service.dns_host} — "
+                       "NTLM relay to MS-ICPR RPC interface possible",
             )
+            finding.requires_external_listener = True
+            findings.append(finding)
 
     # Golden cert intel — AD CS present with CA
     if enrollment_services:

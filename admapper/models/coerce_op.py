@@ -17,6 +17,7 @@ class CoerceOpportunity:
     detail: str = ""
     manual_commands: list[str] = field(default_factory=list)
     id: str = ""
+    requires_external_listener: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {

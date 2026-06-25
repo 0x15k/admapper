@@ -164,6 +164,25 @@ def build_postex_opportunities(
             )
         )
 
+    # 14.5 DCSync — from ACL findings
+    dcsync_acl_principals: set[str] = set()
+    for finding in (acl_data or {}).get("findings") or []:
+        if str(finding.get("right")) != "dcsync":
+            continue
+        principal = str(finding.get("principal", ""))
+        dcsync_acl_principals.add(principal.lower())
+        if owned and principal.lower() not in {u.lower() for u in owned}:
+            continue
+        target = dcs[0] if dcs else "<DC>"
+        op = _opportunity(
+            "dcsync",
+            target_host=target,
+            context=principal or cred_context,
+            detail=str(finding.get("summary") or "ACL grants DCSync rights"),
+        )
+        op.dcsync_attempted = False
+        ops.append(op)
+
     # Check for historical DCSync failures in exploit_log.json to avoid false positive "ready" state
     has_failed_dcsync = False
     exploit_log = _load_json(ws_path / "exploit_log.json") if ws_path else None
@@ -180,6 +199,8 @@ def build_postex_opportunities(
             context=cred_context,
             detail="Try secretsdump if creds are DA-equivalent (paths/ACLs)" if not has_failed_dcsync else "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)",
         )
+        op.dcsync_attempted = has_failed_dcsync
+        op.dcsync_failed = has_failed_dcsync
         if has_failed_dcsync:
             op.severity = "info"
         ops.append(op)
@@ -189,6 +210,7 @@ def build_postex_opportunities(
             if o.technique == "dcsync":
                 o.severity = "info"
                 o.detail = "Secretsdump DCSync previously failed (insufficient rights/DRSUAPI blocked)"
+                o.dcsync_failed = True
 
 
     # 14.7 Share loot — SYSVOL/NETLOGON and discovered shares
