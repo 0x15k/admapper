@@ -434,12 +434,16 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         intel = intel_from_com_tasks(com_out)
 
     if intel is not None:
-        monitor_path = intel.monitor_log_path or f"{intel.drop_path.rstrip('\\')}\\Logs\\monitor.log"
+        drop_base = intel.drop_path.rstrip("\\") if intel.drop_path else ""
+        monitor_path = intel.monitor_log_path or (
+            f"{drop_base}\\Logs\\monitor.log" if drop_base else ""
+        )
         acl_scripts: list[tuple[str, str]] = []
         if not monitor_log.strip():
             acl_scripts.append(("monitor.log", _ps_monitor_log(monitor_path)))
-        if not skip_slow_remote:
-            acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))
+        # Always check ACL: monitor.log presence does not prove the drop path
+        # is writable, which is required to land the payload.
+        acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))
     elif scenario is not None:
         intel = scenario_to_hijack_intel(scenario)
         acl_scripts = ()

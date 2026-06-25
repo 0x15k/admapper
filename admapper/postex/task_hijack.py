@@ -156,6 +156,18 @@ def analyze_task_hijack(
     dll_name = intel.payload_dll
     drop_path = intel.drop_path
 
+    # If we have strong loot hints but no remote ACL proof, still surface a
+    # high-severity finding so the operator can verify with postex scan.
+    strong_loot_hints = bool(
+        loot
+        and (
+            bool(loot.zip_dll_refs)
+            or bool(loot.dll_hijack_refs)
+            or (bool(intel.payload_zip) and bool(intel.payload_dll))
+        )
+        and drop_path
+    )
+
     seen_findings: set[str] = set()
     for task in candidate_tasks:
         run_as = task.run_as or guess_run_as_from_log(monitor_log) or "unknown"
@@ -177,14 +189,20 @@ def analyze_task_hijack(
             evidence.append("remote: monitor log references zip/dll load path")
         if writable:
             evidence.append(f"remote: {drop_path} writable by current principal")
+        if not writable and strong_loot_hints:
+            evidence.append(
+                "loot: zip+dll+drop path detected — verify ACL with postex scan"
+            )
 
         severity = "high"
         if writable and run_as != "unknown":
             severity = "critical"
-        elif not writable:
+        elif not writable and strong_loot_hints:
             severity = "high"
+        elif not writable:
+            severity = "info"
 
-        if writable:
+        if writable or strong_loot_hints:
             analysis.findings.append(
                 TaskHijackFinding(
                     task_name=task.name,
@@ -217,10 +235,12 @@ def analyze_task_hijack(
         evidence = []
         if monitor_log:
             evidence.append("remote: monitor log references zip/dll load path")
-        if writable:
-            evidence.append(f"remote: {drop_path} writable by current principal")
+        if strong_loot_hints:
+            evidence.append(
+                "loot: zip+dll+drop path detected — verify ACL with postex scan"
+            )
         severity = "critical" if writable and run_as != "unknown" else "high"
-        if writable:
+        if writable or strong_loot_hints:
             analysis.findings.append(
                 TaskHijackFinding(
                     task_name=task_name,

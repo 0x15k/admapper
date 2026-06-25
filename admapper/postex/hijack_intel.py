@@ -304,18 +304,28 @@ def extract_hijack_intel(
     zip_name = zip_name or "payload.zip"
     dll_name = dll_name or "payload.dll"
     if not drop_path:
-        corpus_text = "\n".join(corpus)
-        if "UpdateMonitor" in corpus_text or "settings_update" in corpus_text.lower():
-            drop_path = r"C:\ProgramData\UpdateMonitor"
-        elif zip_name and "UpdateMonitor" in corpus_text:
-            drop_path = r"C:\ProgramData\UpdateMonitor"
-        else:
-            drop_path = r"C:\ProgramData"
-
-    if not task_hint:
-        corpus_text = "\n".join(corpus)
-        if "UpdateMonitor" in corpus_text or "Settings_Update" in corpus_text:
-            task_hint = "Update Check"
+        # prefer a directory mentioned in the same line as the zip
+        for line in corpus:
+            z, _ = _pick_zip_dll(line)
+            if z:
+                for path_match in _WIN_PATH_RE.finditer(line):
+                    path = path_match.group(1).rstrip(".")
+                    if z.lower() in path.lower():
+                        drop_path = _drop_path_from_zip_path(path, z)
+                        break
+                if drop_path:
+                    break
+        if not drop_path:
+            for line in corpus:
+                for path_match in _WIN_PATH_RE.finditer(line):
+                    path = path_match.group(1).rstrip(".")
+                    if dll_name and dll_name.lower() in path.lower():
+                        drop_path = path.rsplit("\\", 1)[0]
+                        break
+                if drop_path:
+                    break
+    if not drop_path:
+        drop_path = r"C:\ProgramData"
 
     com_filter = task_hint or (zip_name.split(".")[0] if zip_name else None)
 

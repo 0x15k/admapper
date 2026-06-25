@@ -261,6 +261,8 @@ def build_postex_opportunities(
                 monitor_log=monitor_log,
                 acl_output=acl_out,
             )
+        domain = session.workspace.domain if session.workspace else ""
+        ws_name = session.workspace.name if session.workspace else ""
         ctx = shell_user or cred_context
         nthash: str | None = None
         try:
@@ -272,8 +274,6 @@ def build_postex_opportunities(
             nthash = wc.nthash
         except (ValueError, RuntimeError):
             pass
-        domain = session.workspace.domain if session.workspace else ""
-        ws_name = session.workspace.name if session.workspace else ""
         ops.extend(
             findings_to_opportunities(
                 hijack,
