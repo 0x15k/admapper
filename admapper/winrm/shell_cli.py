@@ -13,7 +13,10 @@ from admapper.winrm.deps import winrm_deps_hint
 
 
 def _workspace_paths_for_dc(dc_ip: str) -> list[Path]:
-    slug = f"target-{dc_ip.replace('.', '-')}"
+    from admapper.support.discovery import default_workspace_name
+
+    slug = default_workspace_name(dc_ip)
+    legacy_slug = f"target-{dc_ip.replace('.', '-')}"
     bases = [
         Path.cwd() / "workspaces",
         Path.home() / ".admapper" / "workspaces",
@@ -23,9 +26,10 @@ def _workspace_paths_for_dc(dc_ip: str) -> list[Path]:
     for base in bases:
         if not base.is_dir():
             continue
-        candidate = base / slug
-        if candidate.is_dir():
-            found.append(candidate)
+        for s in (slug, legacy_slug):
+            candidate = base / s
+            if candidate.is_dir():
+                found.append(candidate)
         for ws in sorted(base.iterdir()):
             if ws.is_dir() and (ws / "exploit_log.json").is_file():
                 found.append(ws)
@@ -171,11 +175,14 @@ def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
 
         session = Session.bootstrap()
         # Locate workspace for this target
-        slug = f"target-{dc_ip.replace('.', '-')}" if dc_ip and dc_ip[0].isdigit() else None
+        from admapper.support.discovery import default_workspace_name
+
+        slug = default_workspace_name(dc_ip) if dc_ip else None
+        legacy_slug = f"target-{dc_ip.replace('.', '-')}" if dc_ip and dc_ip[0].isdigit() else None
         ws_name: str | None = None
         if slug:
             for name in session.workspaces.list_workspaces():
-                if slug in name:
+                if slug in name or (legacy_slug and legacy_slug in name):
                     ws_name = name
                     break
         if not ws_name:

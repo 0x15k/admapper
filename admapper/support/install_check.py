@@ -168,11 +168,15 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
         )
     )
     if active_root == default_user_workspaces_root():
+        if find_repo_root():
+            desc = "Default: <repo>/workspaces (inside repo — git-ignored)"
+        else:
+            desc = "Default: ~/.admapper/workspaces (outside repo)"
         issues.append(
             InstallIssue(
                 "info",
                 "workspaces_default",
-                "Default: ~/.admapper/workspaces (outside repo — safe for git)",
+                desc,
                 None,
             )
         )

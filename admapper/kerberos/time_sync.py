@@ -68,9 +68,7 @@ def query_dc_time_ldap(dc_ip: str, timeout: int = 5) -> datetime | None:
                 # Strip fractional seconds and tz suffixes for robust parsing
                 m = re.match(r"^(\d{14})", raw)
                 if m:
-                    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(
-                        tzinfo=UTC
-                    )
+                    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
     except Exception:
         pass
     return None

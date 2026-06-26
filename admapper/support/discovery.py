@@ -15,8 +15,11 @@ if TYPE_CHECKING:
 
 def default_workspace_name(host: str) -> str:
     """Derive a stable workspace name from a target IP/CIDR."""
-    token = re.sub(r"[^a-zA-Z0-9]+", "-", host.strip()).strip("-").lower()
-    return f"target-{token}" if token else "default"
+    host = host.strip()
+    token = re.sub(r"[^a-zA-Z0-9._-]+", "-", host)
+    token = re.sub(r"^[^a-zA-Z0-9]+", "", token)
+    token = token.rstrip("._-").lower()
+    return token if token else "default"
 
 
 def _load_json(path: Path) -> dict | None:

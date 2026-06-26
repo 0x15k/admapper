@@ -182,7 +182,7 @@ def analyze_task_hijack(
             if loot.dll_hijack_refs:
                 evidence.append(loot.dll_hijack_refs[0][:160])
         if monitor_log:
-            evidence.append("remote: monitor log references zip/dll load path")
+            evidence.append("remote: service log references zip/dll load path")
         if writable:
             evidence.append(f"remote: {drop_path} writable by current principal")
         if not writable and strong_loot_hints:
@@ -228,7 +228,7 @@ def analyze_task_hijack(
                 break
         evidence = []
         if monitor_log:
-            evidence.append("remote: monitor log references zip/dll load path")
+            evidence.append("remote: service log references zip/dll load path")
         if strong_loot_hints:
             evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
         severity = "critical" if writable and run_as != "unknown" else "high"

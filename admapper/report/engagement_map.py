@@ -63,8 +63,12 @@ def loot_clue_rows(ws_path: Path) -> list[dict[str, str]]:
         if not user:
             continue
         match = best.get(user.lower())
+        password = str(item.get("password", ""))
         if match and str(match.get("status")) == "valid":
             state = "verified"
+            verified_pwd = str(match.get("password", ""))
+            if verified_pwd:
+                password = verified_pwd
         elif match:
             state = str(match.get("status", "unverified"))
         else:
@@ -72,7 +76,7 @@ def loot_clue_rows(ws_path: Path) -> list[dict[str, str]]:
         clues.append(
             {
                 "user": user,
-                "string": str(item.get("password", "")),
+                "string": password,
                 "source": str(item.get("source_file", "")),
                 "confidence": str(item.get("confidence", "")),
                 "pattern": str(item.get("pattern", "")),
@@ -319,7 +323,7 @@ def build_engagement_map(
             lines.append("  │ " + " │ ".join(cells) + " │")
         lines.append("  └" + "┴".join("─" * w for w in col_w) + "┘")
         lines.append(
-            "  * string from file = clue — operator decides what to spray/verify (creds add / verify)"
+            "  * string from file = clue — operator decides what to spray/verify"
         )
 
     lines.extend(_hash_section_lines(ws_path, domain=domain))

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any, TYPE_CHECKING
 
 import json
 import re
@@ -29,16 +30,19 @@ if TYPE_CHECKING:
     from admapper.support.session import Session
 
 
-_MONITOR_LOG_PATHS: tuple[str, ...] = (
-    r"C:\ProgramData\{name}\Logs\monitor.log",
-    r"C:\ProgramData\{name}\monitor.log",
-    r"C:\ProgramData\{name}\logs\monitor.log",
+_SERVICE_LOG_PATHS: tuple[str, ...] = (
+    r"C:\ProgramData\{name}\Logs\app.log",
+    r"C:\ProgramData\{name}\Logs\service.log",
+    r"C:\ProgramData\{name}\Logs\error.log",
+    r"C:\ProgramData\{name}\app.log",
+    r"C:\ProgramData\{name}\service.log",
 )
 
 
-def _monitor_log_candidates(drop_path: str) -> list[str]:
+# Generates potential service log paths; environment-agnostic
+def _service_log_candidates(drop_path: str) -> list[str]:
     base = drop_path.rstrip("\\/").split("\\")[-1]
-    return [p.format(name=base) for p in _MONITOR_LOG_PATHS]
+    return [p.format(name=base) for p in _SERVICE_LOG_PATHS]
 
 
 # Fast targeted queries before full schtasks /query (slow via evil-winrm)
@@ -131,34 +135,24 @@ def _cmd_type_file(path: str) -> str:
 def _local_monitor_from_loot(loot_dir, *, drop_path: str = "") -> str:
     if not loot_dir.is_dir():
         return ""
-    for path in sorted(loot_dir.rglob("monitor.log")):
-        if path.is_file():
-            try:
-                return path.read_text(encoding="utf-8", errors="replace").strip()
-            except OSError:
-                continue
     drop_hints = {drop_path.lower().rstrip("\\/")} if drop_path else set()
-    for path in sorted(loot_dir.rglob("*")):
+    for path in sorted(loot_dir.rglob("*.log")):
         if not path.is_file():
             continue
-        name = path.name.lower()
         in_drop = any(h in str(path).lower() for h in drop_hints)
-        if name in ("app.log", "monitor.log") or in_drop:
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            if _has_hijack_payload_hint(text):
-                return text.strip()
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if in_drop or _has_hijack_payload_hint(text):
+            return text.strip()
     return ""
-
 
 def _monitor_usable(monitor_log: str) -> bool:
     text = _clean_monitor_log(monitor_log)
     if not text:
         return False
-    return bool(_has_hijack_payload_hint(text) or re.search(r"ProgramData\\.*\.zip", text, re.I))
-
+    return bool(_has_hijack_payload_hint(text) or re.search(r"ProgramData[/\\].*\.zip", text, re.I))
 
 def _intel_sufficient(
     intel,
@@ -238,14 +232,20 @@ def _enumerate_scheduled_tasks(
     return merged, "+".join(methods)
 
 
-def _ps_discover_monitor_logs() -> str:
+# Generic: searches any *.log or *.txt modified in last 30 days — not tied to monitor.log
+def _ps_discover_error_logs() -> str:
     return (
-        "Get-ChildItem -Path $env:ProgramData -Filter monitor.log -Recurse "
-        "-ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName"
+        "Get-ChildItem -Path $env:ProgramData -Recurse "
+        "-Include *.log,*.txt -ErrorAction SilentlyContinue "
+        "| Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-30) "
+        "  -and $_.Length -gt 0 } "
+        "| Sort-Object LastWriteTime -Descending "
+        "| Select-Object -First 5 -ExpandProperty FullName"
     )
 
 
-def _monitor_candidate_paths(intel) -> list[str]:
+# Fallback paths for logs; environment-agnostic check
+def _service_candidate_paths(intel) -> list[str]:
     paths: list[str] = []
     seen: set[str] = set()
 
@@ -259,17 +259,19 @@ def _monitor_candidate_paths(intel) -> list[str]:
         _add(intel.monitor_log_path)
     if intel and intel.drop_path:
         base = intel.drop_path.rstrip("\\/")
-        for suffix in (r"\Logs\monitor.log", r"\logs\monitor.log", r"\monitor.log"):
+        for suffix in (r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
+               r"\app.log", r"\service.log"):
             _add(base + suffix)
-        for candidate in _monitor_log_candidates(intel.drop_path):
+        for candidate in _service_log_candidates(intel.drop_path):
             _add(candidate)
     return paths
 
 
-def _probe_monitor_logs(client: WinRMClient, intel=None) -> str:
+# Probes for service logs generically; environment-agnostic
+def _probe_service_logs(client: WinRMClient, intel=None) -> str:
     discovered: list[str] = []
     try:
-        proc = client.execute(_ps_discover_monitor_logs(), shell="powershell")
+        proc = client.execute(_ps_discover_error_logs(), shell="powershell")
         for line in (proc.stdout or "").splitlines():
             path = line.strip()
             if path.lower().endswith(".log") and ":\\" in path:
@@ -277,17 +279,17 @@ def _probe_monitor_logs(client: WinRMClient, intel=None) -> str:
     except WinRMError:
         pass
 
-    for path in [*discovered, *_monitor_candidate_paths(intel)]:
+    for path in [*discovered, *_service_candidate_paths(intel)]:
         for script, shell in (
             (_cmd_type_file(path), "cmd"),
-            (_ps_monitor_log(path), "powershell"),
+            (_ps_service_log(path), "powershell"),
         ):
             try:
                 proc = client.execute(script, shell=shell)
                 text = _clean_monitor_log((proc.stdout or "").strip())
                 if text and _monitor_usable(text):
                     print_ok(
-                        f"monitor.log ({path}): {len(text.splitlines())} line(s)",
+                        f"service log ({path}): {len(text.splitlines())} line(s)",
                         source=Tool.ADMAPPER,
                     )
                     return text
@@ -296,7 +298,7 @@ def _probe_monitor_logs(client: WinRMClient, intel=None) -> str:
     return ""
 
 
-def _ps_monitor_log(path: str) -> str:
+def _ps_service_log(path: str) -> str:
     safe = path.replace("'", "''")
     return f"if(Test-Path -LiteralPath '{safe}'){{Get-Content -LiteralPath '{safe}' -Tail 25}}"
 
@@ -392,15 +394,15 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
 
     intel = extract_hijack_intel(loot)
 
-    print_info("post-ex: reading monitor.log …")
-    monitor_log = _probe_monitor_logs(client, intel)
+    print_info("post-ex: reading service logs …")
+    monitor_log = _probe_service_logs(client, intel)
     if not monitor_log:
         monitor_log = _local_monitor_from_loot(
             ws_path / "loot", drop_path=intel.drop_path if intel else ""
         )
         if monitor_log:
             print_ok(
-                f"monitor.log (local loot): {len(monitor_log.splitlines())} line(s)",
+                f"service log (local loot): {len(monitor_log.splitlines())} line(s)",
                 source=Tool.ADMAPPER,
             )
     monitor_log = _clean_monitor_log(monitor_log)
@@ -424,7 +426,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
             result.errors.append(msg)
             print_warning(msg)
     else:
-        print_ok("DLL-hijack intel (monitor.log/loot) — skipping schtasks", source=Tool.ADMAPPER)
+        print_ok("DLL-hijack intel (service log/loot) — skipping schtasks", source=Tool.ADMAPPER)
 
     if intel is None:
         intel = extract_hijack_intel(loot, monitor_log=monitor_log, com_task_output=com_out)
@@ -464,8 +466,8 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         )
         acl_scripts = []
         if not monitor_log.strip():
-            acl_scripts.append(("monitor.log", _ps_monitor_log(monitor_path)))
-        # Always check ACL: monitor.log presence does not prove the drop path
+            acl_scripts.append(("service log", _ps_service_log(monitor_path)))
+        # Always check ACL: log presence does not prove the drop path
         # is writable, which is required to land the payload.
         acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))
 
@@ -473,7 +475,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         try:
             proc = client.execute(script, shell="powershell")
             text = (proc.stdout or "").strip()
-            if label == "monitor.log":
+            if label == "service log":
                 monitor_log = text
             else:
                 acl_out = text

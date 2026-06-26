@@ -10,16 +10,9 @@ _ZIP_NAME_RE = re.compile(r"([\w.-]+\.zip)", re.IGNORECASE)
 _DLL_NAME_RE = re.compile(r"([\w.-]+\.dll)", re.IGNORECASE)
 _RUN_AS_RE = re.compile(r"(?:[\w.-]+\\)([\w$.-]+)", re.IGNORECASE)
 _TASK_NAME_RE = re.compile(r"Task \[([^\]]+)\]", re.IGNORECASE)
-_MONITOR_LOCAL_ZIP_RE = re.compile(
-    r"No payload found locally:\s*(.+?)\.\s*$",
-    re.IGNORECASE,
-)
-_MONITOR_LOADER_RE = re.compile(
-    r"Loading plugin loader:\s*(\S+)",
-    re.IGNORECASE,
-)
-_MONITOR_CORE_ZIP_RE = re.compile(
-    r"Core did not find file\s+(\S+\.zip)",
+# Environment-agnostic regex for generic DLL load failure parsing
+_ERROR_LOAD_RE = re.compile(
+    r"(?:loading plugin|core did not find file|no payload found locally):\s*(.+?)(?:\.\s*$|$)",
     re.IGNORECASE,
 )
 _DLL_HIJACK_LINE_RE = re.compile(
@@ -28,33 +21,28 @@ _DLL_HIJACK_LINE_RE = re.compile(
 )
 
 
-def _intel_from_monitor_lines(
+# Generic parser for service log lines; environment-agnostic
+def _intel_from_service_lines(
     lines: list[str],
 ) -> tuple[str | None, str | None, str | None, str | None]:
-    """Parse a generic monitor.log → zip, dll, drop_path, monitor_log_path."""
-    zip_name = dll_name = drop_path = monitor_log_path = None
+    """Parse generic service log lines → zip, dll, drop_path, service_log_path."""
+    zip_name = dll_name = drop_path = service_log_path = None
     for line in lines:
-        local = _MONITOR_LOCAL_ZIP_RE.search(line)
-        if local:
-            full = local.group(1).strip()
-            z, _ = _pick_zip_dll(full)
+        match = _ERROR_LOAD_RE.search(line)
+        if match:
+            full = match.group(1).strip()
+            z, d = _pick_zip_dll(full)
             if z:
                 zip_name = zip_name or z
                 drop_path = drop_path or _drop_path_from_zip_path(full, z)
-        core = _MONITOR_CORE_ZIP_RE.search(line)
-        if core:
-            zip_name = zip_name or core.group(1)
-        loader = _MONITOR_LOADER_RE.search(line)
-        if loader:
-            dll_path = loader.group(1).strip()
-            d_match = _DLL_NAME_RE.search(dll_path)
-            if d_match:
-                dll_name = dll_name or d_match.group(1)
+            if d:
+                dll_name = dll_name or d
+                
         for path_match in _WIN_PATH_RE.finditer(line):
             path = path_match.group(1).rstrip(".")
             if path.lower().endswith(".log"):
-                monitor_log_path = monitor_log_path or path
-    return zip_name, dll_name, drop_path, monitor_log_path
+                service_log_path = service_log_path or path
+    return zip_name, dll_name, drop_path, service_log_path
 
 
 @dataclass(frozen=True)
@@ -264,7 +252,7 @@ def extract_hijack_intel(
     drop_path = monitor_log_path = None
 
     if monitor_log:
-        mz, md, mdrop, mlog = _intel_from_monitor_lines(monitor_log.splitlines())
+        mz, md, mdrop, mlog = _intel_from_service_lines(monitor_log.splitlines())
         zip_name = zip_name or mz
         dll_name = dll_name or md
         drop_path = drop_path or mdrop

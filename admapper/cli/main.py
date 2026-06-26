@@ -45,7 +45,7 @@ def _global_options(
             "--workspaces-root",
             "-O",
             envvar=WORKSPACES_ENV_VAR,
-            help="Engagement data directory (default: ~/.admapper/workspaces)",
+            help="Data directory (default: <repo>/workspaces or ~/.admapper/workspaces)",
         ),
     ] = None,
     ip_dc: Annotated[
@@ -946,7 +946,7 @@ def web(
             "-H",
             "--host",
             "--ip",
-            help="Target IP (creates workspace target-<ip>)",
+            help="Target IP (creates workspace named after the target IP/host)",
         ),
     ] = None,
     workspace: Annotated[
@@ -1051,7 +1051,7 @@ def dashboard(
             "-H",
             "--host",
             "--ip",
-            help="Target IP — blackbox start (creates workspace target-<ip>)",
+            help="Target IP — blackbox start (creates workspace named after the target IP/host)",
         ),
     ] = None,
     workspace: Annotated[

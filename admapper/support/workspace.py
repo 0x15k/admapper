@@ -37,14 +37,34 @@ class WorkspaceManager:
 
     def path_for(self, name: str) -> Path:
         safe_name = _validate_workspace_name(name)
-        return self.root / safe_name
+        primary = self.root / safe_name
+        if (primary / "state.json").is_file():
+            return primary
+
+        from admapper.support.platform import user_config_dir
+
+        global_root = user_config_dir() / "workspaces"
+        global_path = global_root / safe_name
+        if (global_path / "state.json").is_file():
+            return global_path
+
+        return primary
 
     def list_workspaces(self) -> list[str]:
-        if not self.root.is_dir():
-            return []
-        return sorted(
-            p.name for p in self.root.iterdir() if p.is_dir() and (p / "state.json").is_file()
-        )
+        found = set()
+        if self.root.is_dir():
+            for p in self.root.iterdir():
+                if p.is_dir() and (p / "state.json").is_file():
+                    found.add(p.name)
+
+        from admapper.support.platform import user_config_dir
+
+        global_root = (user_config_dir() / "workspaces").resolve()
+        if global_root.is_dir() and global_root != self.root.resolve():
+            for p in global_root.iterdir():
+                if p.is_dir() and (p / "state.json").is_file():
+                    found.add(p.name)
+        return sorted(found)
 
     def exists(self, name: str) -> bool:
         return (self.path_for(name) / "state.json").is_file()

