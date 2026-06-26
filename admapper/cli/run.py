@@ -5,9 +5,9 @@ if __name__ == "__main__":
         "Do not run this file directly.\n\n"
         "  pip install -e \".[dev]\"\n"
         "  admapper run -H <ip> -u <user> -p '<pass>'\n\n"
-        "Kali (PEP 668 — use venv, not system pip):\n"
-        "  bash scripts/kali-setup.sh /compartido/admapper\n"
-        "  source ~/admapper-venv/bin/activate\n\n"
+        "Kali/Linux (PEP 668 — use venv, not system pip):\n"
+        "  ./scripts/install.sh --venv\n"
+        "  source .venv/bin/activate\n\n"
         "Or without installing:\n"
         "  python3 -m admapper.cli.main run -H <ip> ..."
     )
