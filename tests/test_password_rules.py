@@ -29,7 +29,7 @@ def test_filename_year_mismatch_inference() -> None:
         {
             "user": "svc_user",
             "string": "Welcome2025",
-            "source": "Logs/IdentitySync_Trace_20260219.log",
+            "source": "Logs/identity_sync_trace_20260219.log",
             "confidence": "medium",
             "verify_state": "unverified",
         }
@@ -50,7 +50,7 @@ def test_no_raw_password_list_in_output() -> None:
         {
             "user": "svc_user",
             "string": "Welcome2026",
-            "source": "Logs/IdentitySync_Trace_20260219.log",
+            "source": "Logs/identity_sync_trace_20260219.log",
             "confidence": "medium",
             "verify_state": "unverified",
         }
@@ -75,7 +75,7 @@ def test_loot_clue_rows_feed_rules(tmp_path: Path) -> None:
                     {
                         "username": "svc_user",
                         "password": "Welcome2026",
-                        "source_file": "Logs/IdentitySync_Trace_20260219.log",
+                        "source_file": "Logs/identity_sync_trace_20260219.log",
                         "confidence": "medium",
                     }
                 ]

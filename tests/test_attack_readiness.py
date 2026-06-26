@@ -31,7 +31,7 @@ def _base_ws(tmp_path: Path) -> Path:
                     UserRecord(
                         username="svc",
                         enabled=True,
-                        dn="CN=svc,DC=lab,DC=local",
+                        dn="CN=svc,DC=target,DC=example",
                     ).to_dict(),
                     UserRecord(
                         username="krbtgt",
@@ -58,8 +58,8 @@ def _base_ws(tmp_path: Path) -> Path:
                 "parsed_credentials": [
                     {
                         "username": "svc",
-                        "password": "Em3rg3ncy2025",
-                        "source_file": "Logs/Trace_20260219.log",
+                        "password": "StaticPlaceholder2025",
+                        "source_file": "Logs/trace_20260219.log",
                     }
                 ]
             }

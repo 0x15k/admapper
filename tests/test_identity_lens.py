@@ -30,8 +30,8 @@ def _ws(tmp_path: Path) -> Path:
         json.dumps(
             {
                 "users": [
-                    UserRecord(username="alice", enabled=True, dn="CN=alice,DC=lab,DC=local").to_dict(),
-                    UserRecord(username="bob", enabled=True, dn="CN=bob,DC=lab,DC=local").to_dict(),
+                    UserRecord(username="alice", enabled=True, dn="CN=alice,DC=target,DC=example").to_dict(),
+                    UserRecord(username="bob", enabled=True, dn="CN=bob,DC=target,DC=example").to_dict(),
                     UserRecord(username="carol", enabled=True, kerberoastable=True).to_dict(),
                 ]
             }

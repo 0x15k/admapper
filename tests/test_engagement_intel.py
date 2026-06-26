@@ -33,13 +33,13 @@ def _ws_with_inventory(tmp_path: Path) -> Path:
                         enabled=True,
                         kerberoastable=True,
                         spns=["HTTP/dc"],
-                        dn="CN=alice,DC=lab,DC=local",
+                        dn="CN=alice,DC=target,DC=example",
                     ).to_dict(),
                     UserRecord(
                         username="bob",
                         enabled=True,
                         asrep_roastable=True,
-                        dn="CN=bob,DC=lab,DC=local",
+                        dn="CN=bob,DC=target,DC=example",
                     ).to_dict(),
                     UserRecord(username="DC01$", enabled=True).to_dict(),
                 ]
