@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
-from admapper.graph.ops_state import (
+from admapper.dashboard.ops_state import (
     _valid_cred_users,
     collect_identity_capabilities,
     collect_verified_missions,
 )
 from admapper.report.engagement import _load_json
-from admapper.graph.ops_progress import OpsProgress, filtered_loot_clues
+from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
 from admapper.report.scenario import _access_matrix_rows
 
 

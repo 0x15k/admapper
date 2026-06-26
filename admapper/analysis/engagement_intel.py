@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
-from admapper.graph.ops_state import collect_identity_capabilities
+from admapper.dashboard.ops_state import collect_identity_capabilities
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
-from admapper.graph.ops_progress import filtered_loot_clues
+from admapper.dashboard.ops_progress import filtered_loot_clues
 
 from admapper.analysis.attack_readiness import build_attack_readiness
 from admapper.analysis.password_rules import analyze_password_clues

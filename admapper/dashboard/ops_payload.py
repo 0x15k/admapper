@@ -20,8 +20,8 @@ from admapper.report.engagement_map import _acl_exploit_blocker
 from admapper.report.scenario import _best_cred_per_user
 from admapper.guides.pentest_book import build_pentest_book
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
-from admapper.graph.ops_progress import OpsProgress, filtered_loot_clues
-from admapper.graph.ops_state import build_objective_ops_state
+from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
+from admapper.dashboard.ops_state import build_objective_ops_state
 from admapper.graph.identity_lens import (
     build_identity_lens,
     build_selectable_identities,
@@ -30,9 +30,9 @@ from admapper.graph.identity_lens import (
     filter_targets_for_pivot,
     filter_attack_paths_for_pivot,
 )
-from admapper.graph.topology import build_network_topology
+from admapper.dashboard.topology import build_network_topology
 from admapper.models.escalation import EscalationEdge
-from admapper.graph.web import build_graph_payload
+from admapper.dashboard.web import build_graph_payload
 
 
 def _esc(text: str) -> str:

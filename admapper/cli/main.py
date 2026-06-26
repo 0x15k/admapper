@@ -843,7 +843,7 @@ def graph(
             print_error(str(exc))
             raise typer.Exit(1) from exc
     if web:
-        from admapper.graph.web import write_attack_graph_html
+        from admapper.dashboard.web import write_attack_graph_html
 
         out = write_attack_graph_html(
             ws_path,
@@ -878,7 +878,7 @@ def graph(
             except KeyboardInterrupt:
                 httpd.shutdown()
         return
-    from admapper.graph.show import print_attack_graph
+    from admapper.dashboard.show import print_attack_graph
 
     print_attack_graph(
         ws_path,
@@ -945,7 +945,7 @@ def web(
     from admapper.support.discovery import default_workspace_name
     from admapper.support.output import print_error, print_info
     from admapper.support.session import Session
-    from admapper.graph.dashboard_server import run_dashboard_server
+    from admapper.dashboard.dashboard_server import run_dashboard_server
 
     # Require explicit target — never silently reuse the last active workspace
     if not host and not workspace:
@@ -1050,8 +1050,8 @@ def dashboard(
     from admapper.support.discovery import default_workspace_name
     from admapper.support.output import print_error, print_info
     from admapper.support.session import Session
-    from admapper.graph.dashboard_server import run_dashboard_server
-    from admapper.graph.ops_ui import write_ops_html
+    from admapper.dashboard.dashboard_server import run_dashboard_server
+    from admapper.dashboard.ops_ui import write_ops_html
 
     # Require explicit target — never silently reuse the last active workspace
     if not host and not workspace:

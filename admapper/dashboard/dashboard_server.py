@@ -34,10 +34,10 @@ def _server_log(msg: str) -> None:
         pass
 
 
-from admapper.graph.ops_progress import OpsProgress
-from admapper.graph.dashboard_html import build_dashboard_html
-from admapper.graph.ops_ui import build_ops_payload
-from admapper.graph.terminal_filter import TerminalFilter
+from admapper.dashboard.ops_progress import OpsProgress
+from admapper.dashboard.dashboard_html import build_dashboard_html
+from admapper.dashboard.ops_ui import build_ops_payload
+from admapper.dashboard.terminal_filter import TerminalFilter
 from admapper.analysis.user_match import refresh_workspace_intel
 
 
@@ -677,7 +677,7 @@ class DashboardContext:
                 return
 
         auth_ok = self._run_workspace_script(
-            "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
+            "from admapper.dashboard.dashboard_auth import run_dashboard_credential_auth\n"
             f"run_dashboard_credential_auth(session, username={username!r}, password={password!r}, domain={self.domain!r})\n",
             label=f"authenticate as {username}",
         )

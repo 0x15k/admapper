@@ -20,7 +20,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
         ensure_workspace_skew(ws_path)
         refresh_workspace_intel(ws_path)
         if args and args[0].lower() == "show":
-            from admapper.graph.web import write_attack_graph_html
+            from admapper.dashboard.web import write_attack_graph_html
 
             out = write_attack_graph_html(
                 ws_path,
@@ -33,7 +33,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
             print_info(f"abrir: {out.resolve().as_uri()}")
             return True
         from admapper.graph.analyze import run_graph_analysis
-        from admapper.graph.web import write_attack_graph_html
+        from admapper.dashboard.web import write_attack_graph_html
 
         try:
             run_graph_analysis(session)

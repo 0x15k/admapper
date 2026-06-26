@@ -146,7 +146,7 @@ def run_brief(
         owned_users=list(session.workspace.owned_users or []),
         pivot_user=session.workspace.pivot_user,
     )
-    from admapper.graph.web import write_attack_graph_html
+    from admapper.dashboard.web import write_attack_graph_html
 
     graph_html = write_attack_graph_html(
         ws_path,
@@ -160,7 +160,7 @@ def run_brief(
     else:
         print_info(f"grafo → file://{graph_html.resolve()}")
     if is_verbose():
-        from admapper.graph.show import print_attack_graph
+        from admapper.dashboard.show import print_attack_graph
 
         print_attack_graph(
             ws_path,

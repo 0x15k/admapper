@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.graph.ops_payload import _esc, build_ops_payload
+from admapper.dashboard.ops_payload import _esc, build_ops_payload
 
 def build_ops_html(
     ws_path: Path,

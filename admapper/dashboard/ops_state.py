@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 
 if TYPE_CHECKING:
-    from admapper.graph.ops_progress import OpsProgress
+    from admapper.dashboard.ops_progress import OpsProgress
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
 
