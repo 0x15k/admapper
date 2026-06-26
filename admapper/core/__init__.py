@@ -1,8 +1,8 @@
-from admapper.core.config import GlobalConfig, load_config, save_config
-from admapper.core.credentials import CredentialStore
-from admapper.core.paths import default_workspaces_root, global_config_path
-from admapper.core.session import Session
-from admapper.core.workspace import WorkspaceManager
+from admapper.stores.credentials import CredentialStore
+from admapper.support.config import GlobalConfig, load_config, save_config
+from admapper.support.paths import default_workspaces_root, global_config_path
+from admapper.support.session import Session
+from admapper.support.workspace import WorkspaceManager
 
 __all__ = [
     "CredentialStore",

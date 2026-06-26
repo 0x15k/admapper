@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 
 def print_chain_detail(chain: dict[str, Any]) -> None:

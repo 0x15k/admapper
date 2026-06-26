@@ -4,10 +4,10 @@ import shlex
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands import creds, escalate, graph, meta, modules, postex, recon
-from admapper.core.output import print_error
+from admapper.support.output import print_error
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _HANDLERS = (
     meta.handle,

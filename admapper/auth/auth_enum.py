@@ -9,11 +9,11 @@ from admapper.auth.bloodhound_export import export_bloodhound_minimal
 from admapper.auth.ldap_enum import LdapAuthEnumResult, enumerate_ldap_authenticated
 from admapper.auth.ldap_session import open_ldap_session
 from admapper.auth.smb_enum import SmbAuthEnumResult, enumerate_smb_authenticated
-from admapper.core.auth_inventory import AuthInventoryStore
-from admapper.core.findings import FindingsStore
-from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
-from admapper.core.users import UsersStore
+from admapper.stores.auth_inventory import AuthInventoryStore
+from admapper.stores.findings import FindingsStore
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
+from admapper.stores.users import UsersStore
 from admapper.creds.common import apply_cracked_credentials
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context
 from admapper.guides.render import print_manual_guide
@@ -22,7 +22,7 @@ from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.spray import DomainLockoutPolicy
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -134,8 +134,8 @@ def run_auth_enumeration(
     ws_name = session.workspace.name  # type: ignore[union-attr]
     result = AuthEnumResult()
 
-    from admapper.core.phases import phase_banner
-    from admapper.core.verbosity import print_phase
+    from admapper.support.phases import phase_banner
+    from admapper.support.verbosity import print_phase
 
     print_phase(phase_banner("p06", detail=f"authenticated LDAP enum @ {dc_ip}"))
     ws_path = str(session.workspaces.path_for(ws_name))
@@ -148,7 +148,7 @@ def run_auth_enumeration(
         result.ldap = enumerate_ldap_authenticated(ldap_session)
     finally:
         ldap_session.close()
-    from admapper.core.provenance import Tool, print_ok, print_warn
+    from admapper.support.provenance import Tool, print_ok, print_warn
 
     print_ok(
         f"LDAP: {len(result.ldap.users)} users, {len(result.ldap.groups)} groups, "
@@ -253,7 +253,7 @@ def run_auth_enumeration(
         from admapper.auth.posture import check_security_posture
         check_security_posture(session, dc_ip, cred, domain)
     except Exception as _posture_exc:
-        from admapper.core.output import print_warning as _pw
+        from admapper.support.output import print_warning as _pw
         _pw(f"posture checks skipped: {_posture_exc}")
 
     findings = FindingsStore(session.workspaces, ws_name)

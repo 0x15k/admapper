@@ -4,7 +4,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from admapper.core.platform import resolve_impacket_script, subprocess_run_kwargs
+from admapper.support.platform import resolve_impacket_script, subprocess_run_kwargs
 
 
 class TicketError(RuntimeError):
@@ -64,7 +64,7 @@ def write_krb5_conf(path: Path, *, domain: str, dc_ip: str) -> None:
 
 
 def _mit_bin(name: str) -> str | None:
-    from admapper.core.platform import resolve_mit_krb5_bin
+    from admapper.support.platform import resolve_mit_krb5_bin
 
     return resolve_mit_krb5_bin(name)
 
@@ -95,7 +95,7 @@ def _mit_kinit_env(
     kdestroy = _mit_bin("kdestroy")
 
     if not kinit:
-        from admapper.core.platform import mit_krb5_install_hint
+        from admapper.support.platform import mit_krb5_install_hint
 
         raise TicketError(f"MIT krb5 not found — run: {mit_krb5_install_hint()}")
 
@@ -110,7 +110,7 @@ def _mit_kinit_env(
     if kdestroy:
         subprocess.run([kdestroy], env=env, capture_output=True, check=False)
 
-    from admapper.core.platform import get_clock_skew, wrap_command_with_clock_skew
+    from admapper.support.platform import get_clock_skew, wrap_command_with_clock_skew
 
     skew = clock_skew or get_clock_skew()
     kinit_cmd = wrap_command_with_clock_skew([kinit, principal], clock_skew=skew)
@@ -158,11 +158,11 @@ def mit_kinit(
     """Acquire TGT + HTTP/WSMAN tickets for all likely WinRM SPN hostnames."""
     kvno = _mit_bin("kvno")
     if not kvno:
-        from admapper.core.platform import mit_krb5_install_hint
+        from admapper.support.platform import mit_krb5_install_hint
 
         raise TicketError(f"MIT krb5 not found — run: {mit_krb5_install_hint()}")
 
-    from admapper.core.platform import get_clock_skew, wrap_command_with_clock_skew
+    from admapper.support.platform import get_clock_skew, wrap_command_with_clock_skew
 
     env = _mit_kinit_env(
         username=username,
@@ -221,7 +221,7 @@ def impacket_tickets(
 
     def _run(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         if clock_skew and not env:
-            from admapper.core.platform import wrap_command_with_clock_skew
+            from admapper.support.platform import wrap_command_with_clock_skew
 
             cmd = wrap_command_with_clock_skew(cmd, clock_skew=clock_skew)
         return subprocess.run(

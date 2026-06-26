@@ -103,7 +103,7 @@ def print_section(title: str) -> None:
 
 
 def print_table(title: str, columns: list[str], rows: list[list[str]]) -> None:
-    from admapper.core.verbosity import is_compact
+    from admapper.support.verbosity import is_compact
 
     if is_compact():
         _print_table_compact(title, columns, rows)

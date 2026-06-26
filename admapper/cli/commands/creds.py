@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands._helpers import parse_cred_type, require_workspace
-from admapper.core.output import print_error, print_success, print_table, print_warning
+from admapper.support.output import print_error, print_success, print_table, print_warning
 from admapper.models.credential import CredentialType
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
@@ -46,7 +46,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
             secret = args[2]
             domain: str | None = session.workspace.domain if session.workspace else None
             if not domain:
-                from admapper.core.discovery import resolve_domain
+                from admapper.support.discovery import resolve_domain
 
                 domain = resolve_domain(session)
                 if domain and session.workspace:

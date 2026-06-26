@@ -10,7 +10,7 @@ from admapper.adcs.constants import CT_FLAG_MACHINE_TYPE
 from admapper.adcs.eku import template_profile_from_inventory
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _ENROLL_FAILURE_RE = re.compile(
     r"(?i)(user context template conflicts|denied by|access is denied|"

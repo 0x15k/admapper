@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.auth_checks import load_protected_users
 from admapper.creds.common import collect_gained_hashes, format_evil_winrm_pth
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges

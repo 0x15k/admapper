@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def run_followon_analysis(session: Session, *, new_user: str | None = None) -> None:

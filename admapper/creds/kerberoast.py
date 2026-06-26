@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.core.findings import FindingsStore
-from admapper.core.kerberos_hashes import TgsHashStore
-from admapper.core.output import (
+from admapper.stores.findings import FindingsStore
+from admapper.stores.kerberos_hashes import TgsHashStore
+from admapper.support.output import (
     ConfirmLevel,
     confirm,
     print_info,
@@ -17,8 +17,8 @@ from admapper.core.output import (
     print_table,
     print_warning,
 )
-from admapper.core.platform import resolve_impacket_script, run_command, tool_install_hint
-from admapper.core.users import UsersStore
+from admapper.support.platform import resolve_impacket_script, run_command, tool_install_hint
+from admapper.stores.users import UsersStore
 from admapper.creds.common import (
     apply_cracked_credentials,
     pick_dc_ip,
@@ -32,7 +32,7 @@ from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.hash_record import TgsHash
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _TGS_HASHCAT_RE = re.compile(r"^\$krb5tgs\$[^\s]+$")
 _HASHCAT_MODE_TGS = 13100

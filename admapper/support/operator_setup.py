@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from admapper.core.platform import is_macos, resolve_faketime
+from admapper.support.platform import is_macos, resolve_faketime
 
 
 def _gssapi_installed() -> bool:

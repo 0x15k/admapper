@@ -5,8 +5,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from admapper.core.output import print_error, print_info, print_success, print_warning
-from admapper.core.platform import resolve_executable, subprocess_run_kwargs
+from admapper.support.output import print_error, print_info, print_success, print_warning
+from admapper.support.platform import resolve_executable, subprocess_run_kwargs
 from admapper.postex.evil_winrm_output import extract_winrm_command_body
 from admapper.winrm.client import WinRMClient, WinRMError
 

@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.core.findings import FindingsStore
-from admapper.core.hashes import AsRepHashStore
-from admapper.core.output import (
+from admapper.stores.findings import FindingsStore
+from admapper.support.hashes import AsRepHashStore
+from admapper.support.output import (
     ConfirmLevel,
     confirm,
     print_info,
@@ -18,8 +18,8 @@ from admapper.core.output import (
     print_table,
     print_warning,
 )
-from admapper.core.platform import resolve_impacket_script, run_command, tool_install_hint
-from admapper.core.users import UsersStore
+from admapper.support.platform import resolve_impacket_script, run_command, tool_install_hint
+from admapper.stores.users import UsersStore
 from admapper.creds.common import apply_cracked_credentials, pick_dc_ip, username_from_kerberos_hash
 from admapper.creds.crack import crack_with_hashcat, crack_with_john, find_wordlist
 from admapper.guides.render import print_manual_guide
@@ -27,7 +27,7 @@ from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.hash_record import AsRepHash
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _ASREP_HASHCAT_RE = re.compile(r"^\$krb5asrep\$[^\s]+$")
 

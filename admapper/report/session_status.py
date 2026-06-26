@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from typing import TYPE_CHECKING
 
 from admapper.report.scenario import (
@@ -13,7 +13,7 @@ from admapper.report.scenario import (
 )
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def _dc_info(ws_path: Path, hosts: str | None) -> tuple[str, str]:
@@ -93,7 +93,7 @@ def build_session_status_lines(
 def print_session_status(session: Session) -> None:
     """Print Session Manager dashboard for active workspace."""
     if session.workspace is None:
-        from admapper.core.output import print_error
+        from admapper.support.output import print_error
 
         print_error("no active workspace — run: set workspace <name>")
         return

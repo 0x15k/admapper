@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands import dispatch
-from admapper.core.discovery import default_workspace_name, ensure_domain
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.discovery import default_workspace_name, ensure_domain
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.models.workspace import OperationMode
 from admapper.recon.unauth import run_unauth_scan
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 _HOSTS_POLL_INTERVAL = 3   # seconds between checks
@@ -57,7 +57,7 @@ def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
             print_info(hint)
         return
 
-    from admapper.core.system_hosts import (
+    from admapper.support.system_hosts import (
         HostsSyncStatus,
         ensure_system_hosts_entry,
         format_hosts_sync_message,
@@ -190,7 +190,7 @@ def sync_dc_engagement(
     dispatch(session, f"set hosts {ip}")
     session.persist_workspace()
 
-    from admapper.core.output import print_info, print_success
+    from admapper.support.output import print_info, print_success
     from admapper.creds.time_sync import ensure_dc_clock
 
     ws_path = session.workspaces.path_for(ws_name)
@@ -243,7 +243,7 @@ def scan_engagement(
     except ValueError:
         print_warning("domain not inferred — PTR/LDAP may be restricted; set domain manually if known")
 
-    from admapper.core.dashboard_mode import effective_sync_clock, effective_sync_hosts
+    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.time_sync import ensure_dc_clock
 
     sync_clock = effective_sync_clock(sync_clock)

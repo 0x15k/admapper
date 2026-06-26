@@ -4,12 +4,12 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from admapper.core.hosts import HostsStore
+from admapper.stores.hosts import HostsStore
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import CredentialStatus
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def domain_to_base_dn(domain: str) -> str:

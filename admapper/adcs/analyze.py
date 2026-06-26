@@ -10,14 +10,14 @@ from admapper.adcs.certipy import certipy_install_hint, resolve_certipy
 from admapper.adcs.enum import enumerate_adcs
 from admapper.acl.enum import resolve_principal_context
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.adcs import AdcsFinding
 from admapper.models.credential import Credential, CredentialStatus
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass

@@ -4,8 +4,8 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import resolve_dc_fqdn
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 from admapper.escalate.render import print_escalation_state
@@ -13,7 +13,7 @@ from admapper.guides.render import print_manual_guide
 from admapper.models.escalation import EscalationEdge, EscalationState
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def resolve_pivot_user(session: Session) -> str:
@@ -59,7 +59,7 @@ def mark_user_owned(
     refresh: bool = True,
 ) -> None:
     """BloodHound-style: mark owned, set pivot, refresh outbound edges."""
-    from admapper.core.owned import is_valid_owned_username
+    from admapper.support.owned import is_valid_owned_username
 
     if not is_valid_owned_username(username):
         raise ValueError(f"invalid owned username (parser artifact?): {username}")
@@ -89,7 +89,7 @@ def run_pivot_refresh(session: Session, pivot_user: str) -> None:
     """Re-run analysis modules relevant to the current pivot (step-by-step)."""
     print_info(f"refreshing intel for pivot {pivot_user} …")
 
-    from admapper.core.output import print_warning
+    from admapper.support.output import print_warning
 
     steps = [
         ("paths", "admapper.graph.analyze", "run_graph_analysis"),
@@ -120,7 +120,7 @@ def run_escalate_analysis(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.owned import sanitize_owned_users
+    from admapper.support.owned import sanitize_owned_users
 
     clean, removed = sanitize_owned_users(list(session.workspace.owned_users))
     if removed:
@@ -133,7 +133,7 @@ def run_escalate_analysis(
     ws_path = session.workspaces.path_for(session.workspace.name)
     pivot = pivot_user or resolve_pivot_user(session)
 
-    from admapper.core.verbosity import print_phase
+    from admapper.support.verbosity import print_phase
 
     if not quiet:
         print_phase(f"Escalation analysis — pivot: {pivot}")
@@ -144,7 +144,7 @@ def run_escalate_analysis(
 
     # Check for shadow admins (stale adminCount)
     try:
-        from admapper.core.findings import FindingsStore
+        from admapper.stores.findings import FindingsStore
         from admapper.models.finding import Finding, FindingSeverity
         from admapper.graph.catalog import HIGH_VALUE_GROUPS
 
@@ -236,7 +236,7 @@ def run_escalate_analysis(
     out = ws_path / "escalate.json"
     out.write_text(json.dumps(state.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    from admapper.core.verbosity import is_verbose
+    from admapper.support.verbosity import is_verbose
 
     if is_verbose() and not quiet:
         print_escalation_state(state)
@@ -276,8 +276,8 @@ def get_escalation_state(session: Session) -> dict[str, Any] | None:
 
 def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
     """Execute the next (or specified) escalation edge when wired."""
-    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-    from admapper.core.output import print_error
+    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.support.output import print_error
     from admapper.models.workspace import OperationMode
 
     if session.workspace and session.workspace.mode == OperationMode.AUTO:

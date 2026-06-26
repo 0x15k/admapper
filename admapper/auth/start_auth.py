@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from admapper.auth.auth_enum import run_auth_enumeration
 from admapper.auth.ldap_context import fetch_authenticated_user_context
-from admapper.core.findings import FindingsStore
-from admapper.core.graph import GraphStore
-from admapper.core.output import (
+from admapper.stores.findings import FindingsStore
+from admapper.stores.graph import GraphStore
+from admapper.support.output import (
     ConfirmLevel,
     confirm,
     print_info,
@@ -22,7 +22,7 @@ from admapper.models.credential import Credential, CredentialStatus
 from admapper.models.finding import Finding, FindingSeverity
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -77,7 +77,7 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.discovery import ensure_domain
+    from admapper.support.discovery import ensure_domain
 
     domain = ensure_domain(session, announce=False)
 
@@ -95,7 +95,7 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
         print_warning("start_auth cancelado")
         return AuthStartResult(credential=cred, owned_user=cred.username)
 
-    from admapper.core.verbosity import print_phase
+    from admapper.support.verbosity import print_phase
 
     print_phase(f"Phase 7 — credential gate @ {dc_ip}")
     if cred.status != CredentialStatus.VALID:
@@ -109,7 +109,7 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
 
     graph_store = GraphStore(session.workspaces, ws_name)
     graph_store.mark_user_owned(domain, cred.username, cred_id=cred.id)
-    from admapper.core.provenance import Tool, print_ok
+    from admapper.support.provenance import Tool, print_ok
 
     print_ok(
         f"owned marked: {domain}\\{cred.username} → graph.json",

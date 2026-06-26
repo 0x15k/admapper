@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from admapper.core.output import print_success, print_warning
+from admapper.support.output import print_success, print_warning
 from admapper.escalate.edges import collect_edges_from_pivot, sort_edges
 from admapper.report.engagement import _load_json
 

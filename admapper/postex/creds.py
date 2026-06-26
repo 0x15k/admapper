@@ -8,7 +8,7 @@ from admapper.creds.common import pick_dc_ip, resolve_winrm_host_for_account
 from admapper.models.credential import CredentialStatus, CredentialType
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass(frozen=True)

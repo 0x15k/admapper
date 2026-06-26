@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from admapper.core.compatibility import distribution_summary, feature_matrix
-from admapper.core.output import print_info, print_table, print_warning
-from admapper.core.platform import ensure_user_dirs, inspect_tools, user_config_dir
+from admapper.support.compatibility import distribution_summary, feature_matrix
+from admapper.support.output import print_info, print_table, print_warning
+from admapper.support.platform import ensure_user_dirs, inspect_tools, user_config_dir
 
 _TOOL_TIERS = {
     "impacket": "recon",
@@ -17,8 +17,8 @@ _TOOL_TIERS = {
 
 def print_platform_report() -> None:
     """Show OS, distribution model, feature tiers, and optional tools."""
-    from admapper.core.install_check import collect_install_issues
-    from admapper.core.paths import find_repo_root, is_package_source_dir
+    from admapper.support.install_check import collect_install_issues
+    from admapper.support.paths import find_repo_root, is_package_source_dir
 
     ensure_user_dirs()
 

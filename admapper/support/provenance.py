@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 
 
 class Tool(StrEnum):
@@ -29,7 +29,7 @@ def print_manual(cmd: str) -> None:
 def _maybe_manual(cmd: str | None) -> None:
     """Manual fallbacks only in verbose mode — default output stays methodology-focused."""
     if cmd:
-        from admapper.core.verbosity import is_verbose
+        from admapper.support.verbosity import is_verbose
 
         if is_verbose():
             print_manual(cmd)

@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 
 from admapper.auth.ldap_enum import enumerate_ldap_authenticated
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.core.credentials import CredentialStore
-from admapper.core.findings import FindingsStore
-from admapper.core.hosts import HostsStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
-from admapper.core.users import UsersStore
+from admapper.stores.credentials import CredentialStore
+from admapper.stores.findings import FindingsStore
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
+from admapper.stores.users import UsersStore
 from admapper.enumeration.ldap_users import enumerate_users_ldap
 from admapper.enumeration.rid_cycle import cycle_rids
 from admapper.enumeration.samr import enumerate_users_samr
@@ -21,7 +21,7 @@ from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.user import UserRecord
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _SENSITIVE_DESC = re.compile(
     r"password|passwd|pwd|credential|secret|ntlm|passwort|contrase",
@@ -112,8 +112,8 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
     if not targets:
         raise ValueError("no DC candidates — run start_unauth first or set hosts")
 
-    from admapper.core.phases import phase_banner
-    from admapper.core.verbosity import print_phase
+    from admapper.support.phases import phase_banner
+    from admapper.support.verbosity import print_phase
 
     print_phase(phase_banner("p03", detail=f"user enumeration on {', '.join(targets)}"))
     collected: list[UserRecord] = []
@@ -280,7 +280,7 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
 
     result.guides_shown = sorted(set(guides_to_show))
     if result.guides_shown:
-        from admapper.core.verbosity import is_verbose
+        from admapper.support.verbosity import is_verbose
 
         if is_verbose():
             print_info("Manual exploitation guides (BloodHound-style):")

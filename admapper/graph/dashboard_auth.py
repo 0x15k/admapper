@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_success
+from admapper.support.output import print_success
 from admapper.creds.common import pick_dc_ip
 from admapper.creds.time_sync import ensure_dc_clock
 from admapper.creds.verify import run_credential_verify
@@ -12,7 +12,7 @@ from admapper.escalate.analyze import mark_user_owned, set_pivot_user
 from admapper.models.credential import Credential, CredentialStatus
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def run_dashboard_credential_auth(
@@ -26,7 +26,7 @@ def run_dashboard_credential_auth(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.discovery import ensure_domain
+    from admapper.support.discovery import ensure_domain
     from admapper.recon.ldap_probe import discover_domain_from_bind
 
     resolved_domain = domain or session.workspace.domain
@@ -78,7 +78,7 @@ def _workspace_target_ip(session: Session) -> str:
     hosts = (session.workspace.hosts or "").strip()
     if hosts:
         return hosts.split()[0]
-    from admapper.core.hosts import HostsStore
+    from admapper.stores.hosts import HostsStore
 
     for h in HostsStore(session.workspaces, session.workspace.name).list():
         if h.address:

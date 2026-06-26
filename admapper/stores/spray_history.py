@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.core.workspace import WorkspaceManager
+from admapper.support.workspace import WorkspaceManager
 from admapper.models.spray import SprayAttempt
 
 

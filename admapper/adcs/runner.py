@@ -6,15 +6,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.adcs.analyze import get_adcs_finding
-from admapper.core.platform import resolve_certipy
+from admapper.support.platform import resolve_certipy
 from admapper.adcs.enroll import build_local_enroll_powershell
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import Credential, CredentialType
 from admapper.postex.pe_arch import TargetArch
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass

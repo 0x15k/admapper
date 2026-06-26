@@ -4,7 +4,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 
-from admapper.core.platform import run_command, tool_install_hint
+from admapper.support.platform import run_command, tool_install_hint
 from admapper.models.ad_object import GppCredential
 from admapper.models.credential import Credential, CredentialType
 
@@ -71,7 +71,7 @@ def _enumerate_gpp(
     timeout: int = 120,
 ) -> tuple[list[GppCredential], str | None]:
     """GPP via nxc (impacket 0.12+ removed GetGPPPassword example script)."""
-    from admapper.core.platform import resolve_nxc
+    from admapper.support.platform import resolve_nxc
 
     nxc = resolve_nxc()
     if not nxc:

@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.graph.build import enrich_graph_from_inventory, node_display_name
 from admapper.graph.opportunity_paths import build_opportunity_paths
 from admapper.graph.paths import AttackPath, find_attack_paths
@@ -13,7 +13,7 @@ from admapper.graph.quick_wins import QuickWin, collect_quick_wins
 from admapper.guides.render import print_manual_guide
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass

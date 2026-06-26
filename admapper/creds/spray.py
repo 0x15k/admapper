@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.core.findings import FindingsStore
-from admapper.core.output import (
+from admapper.stores.findings import FindingsStore
+from admapper.support.output import (
     ConfirmLevel,
     confirm,
     print_info,
@@ -13,8 +13,8 @@ from admapper.core.output import (
     print_table,
     print_warning,
 )
-from admapper.core.spray_history import SprayHistoryStore
-from admapper.core.users import UsersStore
+from admapper.stores.spray_history import SprayHistoryStore
+from admapper.stores.users import UsersStore
 from admapper.creds.common import apply_cracked_credentials, pick_dc_ip
 from admapper.creds.policy import (
     apply_lockout_states,
@@ -29,7 +29,7 @@ from admapper.models.spray import DomainLockoutPolicy, SprayAttempt
 from admapper.models.user import UserRecord
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass

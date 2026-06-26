@@ -8,8 +8,8 @@ import typer
 from admapper import __version__
 from admapper.cli.run import run_engagement
 from admapper.cli.shell import run_shell
-from admapper.core.paths import WORKSPACES_ENV_VAR, set_cli_workspaces_root
-from admapper.core.session import Session
+from admapper.support.paths import WORKSPACES_ENV_VAR, set_cli_workspaces_root
+from admapper.support.session import Session
 
 app = typer.Typer(
     name="admapper",
@@ -64,7 +64,7 @@ def _global_options(
     ] = False,
 ) -> None:
     if no_color:
-        from admapper.core.output import set_no_color
+        from admapper.support.output import set_no_color
         set_no_color(True)
     set_cli_workspaces_root(Path(workspaces_root) if workspaces_root else None)
     if ctx.invoked_subcommand is None and not ip_dc:
@@ -79,7 +79,7 @@ def _global_options(
         try:
             scan_engagement(session, ip_dc=ip_dc, sync_clock=True)
         except (ValueError, RuntimeError) as exc:
-            from admapper.core.output import print_error
+            from admapper.support.output import print_error
 
             print_error(str(exc))
             raise typer.Exit(code=1) from exc
@@ -98,8 +98,8 @@ def _session_with_workspace(
     host: str | None = None,
     domain: str | None = None,
 ) -> Session:
-    from admapper.core.discovery import default_workspace_name
-    from admapper.core.output import print_error
+    from admapper.support.discovery import default_workspace_name
+    from admapper.support.output import print_error
 
     session = Session.bootstrap()
     if workspace:
@@ -150,7 +150,7 @@ def postex_main(
     """Build post-ex playbook from workspace intel (loot hints + optional postex_scan.json)."""
     if ctx.invoked_subcommand is not None:
         return
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.postex.analyze import run_postex_analysis
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
@@ -188,7 +188,7 @@ def postex_scan(
     ] = None,
 ) -> None:
     """Remote WinRM scan: COM scheduled tasks + DLL hijack detection from loot intel."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.postex.analyze import run_postex_analysis
 
     session = _session_with_workspace(workspace, domain=domain)
@@ -251,7 +251,7 @@ def escalate_show(
 ) -> None:
     """Muestra estado de escalada (siguiente hop)."""
     from admapper.escalate.analyze import run_escalate_analysis
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
@@ -289,7 +289,7 @@ def escalate_mark(
     ] = False,
 ) -> None:
     """Mark a user as owned and set them as the active pivot."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.escalate.analyze import mark_user_owned
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
@@ -317,7 +317,7 @@ def escalate_pivot(
     ] = None,
 ) -> None:
     """Change the active pivot without adding the user to owned."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.escalate.analyze import run_escalate_analysis, set_pivot_user
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
@@ -350,7 +350,7 @@ def postex_show(
     ] = False,
 ) -> None:
     """Show one post-ex opportunity with manual commands."""
-    from admapper.core.output import print_error, print_info
+    from admapper.support.output import print_error, print_info
     from admapper.postex.analyze import get_postex_op
     from admapper.postex.render import print_postex_detail
 
@@ -414,7 +414,7 @@ def postex_deploy(
     """Deploy scheduled-task DLL hijack payload from postex_scan.json intel."""
     from pathlib import Path
 
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.postex.deploy import deploy_dll_hijack
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
@@ -487,7 +487,7 @@ def postex_run(
     """Auto: VPN IP + msfvenom + listener + deploy + wait for reverse shell."""
     from pathlib import Path
 
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.postex.pe_arch import normalize_arch
     from admapper.postex.payload import PayloadMode
     from admapper.postex.runner import run_dll_hijack
@@ -554,7 +554,7 @@ def scan(
     ] = False,
 ) -> None:
     """Black-box recon: discover domain and AD surface from DC IP only (no credentials)."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.cli.scan import scan_engagement
 
     session = Session.bootstrap()
@@ -597,7 +597,7 @@ def sync_dc(
 ) -> None:
     """Sync local clock (and /etc/hosts) to the DC — run once with sudo, outside the dashboard UI."""
     from admapper.cli.scan import sync_dc_engagement
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
 
     session = Session.bootstrap()
     try:
@@ -774,8 +774,8 @@ def analyst(
 ) -> None:
     """Engagement map: pivot, creds, next hop (compact by default)."""
     from admapper.cli.brief import run_brief
-    from admapper.core.output import print_error
-    from admapper.core.verbosity import set_verbose
+    from admapper.support.output import print_error
+    from admapper.support.verbosity import set_verbose
 
     session = Session.bootstrap()
     set_verbose(verbose)
@@ -819,8 +819,8 @@ def graph(
     ] = False,
 ) -> None:
     """Attack graph — interactive web (default) or ASCII terminal."""
-    from admapper.core.output import print_error, print_info, print_success
-    from admapper.core.session import Session
+    from admapper.support.output import print_error, print_info, print_success
+    from admapper.support.session import Session
     from admapper.analysis.user_match import refresh_workspace_intel
 
     session = Session.bootstrap()
@@ -942,9 +942,9 @@ def web(
 ) -> None:
     """Web dashboard — live attack graph, terminal, and findings."""
     from admapper.cli.commands import dispatch
-    from admapper.core.discovery import default_workspace_name
-    from admapper.core.output import print_error, print_info
-    from admapper.core.session import Session
+    from admapper.support.discovery import default_workspace_name
+    from admapper.support.output import print_error, print_info
+    from admapper.support.session import Session
     from admapper.graph.dashboard_server import run_dashboard_server
 
     # Require explicit target — never silently reuse the last active workspace
@@ -980,7 +980,7 @@ def web(
         ws = session.workspace
 
     # Try to resolve domain and sync hosts mapping
-    from admapper.core.discovery import resolve_domain, ensure_domain
+    from admapper.support.discovery import resolve_domain, ensure_domain
     from admapper.cli.scan import sync_hosts_from_session
     from admapper.recon.unauth import run_unauth_scan
 
@@ -1047,9 +1047,9 @@ def dashboard(
 ) -> None:
     """AD Ops — blackbox AD engagement dashboard (IP -> scan -> topology -> escalate)."""
     from admapper.cli.commands import dispatch
-    from admapper.core.discovery import default_workspace_name
-    from admapper.core.output import print_error, print_info
-    from admapper.core.session import Session
+    from admapper.support.discovery import default_workspace_name
+    from admapper.support.output import print_error, print_info
+    from admapper.support.session import Session
     from admapper.graph.dashboard_server import run_dashboard_server
     from admapper.graph.ops_ui import write_ops_html
 
@@ -1085,7 +1085,7 @@ def dashboard(
         ws = session.workspace
 
     # Try to resolve domain and sync hosts mapping
-    from admapper.core.discovery import resolve_domain, ensure_domain
+    from admapper.support.discovery import resolve_domain, ensure_domain
     from admapper.cli.scan import sync_hosts_from_session
     from admapper.recon.unauth import run_unauth_scan
 
@@ -1191,7 +1191,7 @@ def winrm(
     """WinRM shell — Kerberos via pypsrp, or Pass-the-Hash via nxc (--hash, no --dc-ip)."""
     from pathlib import Path
 
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.creds.common import resolve_dc_fqdn
     from admapper.winrm.shell_cli import run_winrm_shell
 
@@ -1242,7 +1242,7 @@ def version() -> None:
 @app.command()
 def doctor() -> None:
     """Validate repo layout, dependencies, and optional tools."""
-    from admapper.core.install_check import print_doctor_report
+    from admapper.support.install_check import print_doctor_report
 
     raise typer.Exit(code=print_doctor_report())
 
@@ -1255,7 +1255,7 @@ def status(
     ] = None,
 ) -> None:
     """Quick dashboard (no re-scan)."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.report.session_status import print_session_status
 
     session = Session.bootstrap()
@@ -1290,7 +1290,7 @@ def exploit(
     ] = False,
 ) -> None:
     """Auto-exploit chain: share loot → creds → ACL abuse → lateral."""
-    from admapper.core.output import print_error
+    from admapper.support.output import print_error
     from admapper.creds.kerberos_skew import apply_clock_skew_option
     from admapper.exploit.engine import run_exploit_engagement
 
@@ -1335,7 +1335,7 @@ def opsec_main(
     """Show current OPSEC profile and settings."""
     if ctx.invoked_subcommand is not None:
         return
-    from admapper.core.opsec import print_opsec_status
+    from admapper.support.opsec import print_opsec_status
 
     session = Session.bootstrap()
     if workspace:
@@ -1361,8 +1361,8 @@ def opsec_set(
     normal   Balanced defaults (current ADMapper behaviour)
     lab      Maximum aggression: no delays, no confirmations (lab/testing use)
     """
-    from admapper.core.output import print_error, print_success as _ps
-    from admapper.core.opsec import OpsecProfile, save_workspace_profile, print_opsec_status
+    from admapper.support.output import print_error, print_success as _ps
+    from admapper.support.opsec import OpsecProfile, save_workspace_profile, print_opsec_status
 
     try:
         p = OpsecProfile(profile.lower())

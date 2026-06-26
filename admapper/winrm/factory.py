@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.platform import get_clock_skew
+from admapper.support.platform import get_clock_skew
 from admapper.creds.common import pick_dc_ip
 from admapper.postex.creds import WinRMCred
 from admapper.winrm.client import WinRMClient
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def winrm_client_for_cred(

@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from admapper.core.paths import default_workspaces_root
+from admapper.support.paths import default_workspaces_root
 from admapper.models.workspace import OperationMode, WorkspaceState
 
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
@@ -58,7 +58,7 @@ class WorkspaceManager:
     def load(self, name: str) -> WorkspaceState:
         state_path = self.path_for(name) / "state.json"
         if not state_path.is_file():
-            from admapper.core.paths import find_repo_root, is_package_source_dir, legacy_repo_workspaces
+            from admapper.support.paths import find_repo_root, is_package_source_dir, legacy_repo_workspaces
 
             hints: list[str] = []
             if is_package_source_dir(Path.cwd()):

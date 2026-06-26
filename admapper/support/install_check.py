@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from admapper.core.paths import (
+from admapper.support.paths import (
     WORKSPACES_ENV_VAR,
     default_user_workspaces_root,
     find_repo_root,
@@ -13,7 +13,7 @@ from admapper.core.paths import (
     legacy_repo_workspaces,
     resolve_workspaces_root,
 )
-from admapper.core.platform import inspect_tools, platform_label
+from admapper.support.platform import inspect_tools, platform_label
 
 _PYTHON_CORE = (
     ("typer", "typer", "pip install -e '.[full]'"),
@@ -51,7 +51,7 @@ def _module_available(name: str) -> bool:
 def collect_tool_matrix() -> list[dict[str, str]]:
     """AdStrike Tool Checker (#58) — external CLI matrix for doctor."""
     from admapper.adcs.certipy import resolve_certipy
-    from admapper.core.platform import resolve_executable, resolve_faketime, resolve_impacket_script, resolve_nxc
+    from admapper.support.platform import resolve_executable, resolve_faketime, resolve_impacket_script, resolve_nxc
 
     def _row(
         tool: str,
@@ -228,7 +228,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
 
 def print_doctor_report(*, cwd: Path | None = None) -> int:
     """Print install/layout diagnostics; return non-zero if errors present."""
-    from admapper.core.output import print_error, print_info, print_success, print_table, print_warning
+    from admapper.support.output import print_error, print_info, print_success, print_table, print_warning
 
     here = (cwd or Path.cwd()).resolve()
     print_info(f"Platform: {platform_label()}")

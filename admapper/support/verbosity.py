@@ -14,7 +14,7 @@ def is_verbose() -> bool:
 
 def is_compact() -> bool:
     """Dashboard mode — short structured output, no raw CLI dumps."""
-    from admapper.core.dashboard_mode import is_dashboard_mode
+    from admapper.support.dashboard_mode import is_dashboard_mode
 
     return is_dashboard_mode()
 
@@ -22,7 +22,7 @@ def is_compact() -> bool:
 def print_phase(message: str) -> None:
     """Print phase banners only in verbose mode."""
     if _verbose:
-        from admapper.core.output import print_info
+        from admapper.support.output import print_info
 
         print_info(message)
 
@@ -35,7 +35,7 @@ def quiet_info(message: str) -> None:
 def quiet_success(message: str) -> None:
     """Success detail — only when verbose."""
     if _verbose:
-        from admapper.core.output import print_success
+        from admapper.support.output import print_success
 
         print_success(message)
 
@@ -43,6 +43,6 @@ def quiet_success(message: str) -> None:
 def quiet_warning(message: str) -> None:
     """Warning detail — only when verbose."""
     if _verbose:
-        from admapper.core.output import print_warning
+        from admapper.support.output import print_warning
 
         print_warning(message)

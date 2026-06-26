@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-from admapper.core.output import ConfirmLevel, confirm, print_info, print_success, print_warning
+from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+from admapper.support.output import ConfirmLevel, confirm, print_info, print_success, print_warning
 from admapper.models.workspace import OperationMode
 from admapper.postex.creds import WinRMCred, resolve_winrm_cred
 from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
@@ -17,7 +17,7 @@ from admapper.winrm.factory import winrm_client_for_cred
 from admapper.winrm.upload import remote_file_ok, upload_file
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass

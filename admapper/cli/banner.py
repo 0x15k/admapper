@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from admapper import __version__
-from admapper.core.output import print_banner, print_info
+from admapper.support.output import print_banner, print_info
 
 # Three steps — less is more (ADscan / AdStrike Smart Analyst).
 WORKFLOW_LINES = (

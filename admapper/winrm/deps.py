@@ -14,7 +14,7 @@ class WinRMDeps:
 
 
 def check_winrm_deps() -> WinRMDeps:
-    from admapper.core.platform import resolve_mit_krb5_bin
+    from admapper.support.platform import resolve_mit_krb5_bin
 
     mit_kinit = resolve_mit_krb5_bin("kinit")
 
@@ -46,7 +46,7 @@ def winrm_deps_hint(deps: WinRMDeps | None = None) -> str:
     pip = f"{sys.executable} -m pip install"
     lines = [f"{pip} pypsrp gssapi krb5"]
     if not deps.mit_kinit:
-        from admapper.core.platform import mit_krb5_install_hint
+        from admapper.support.platform import mit_krb5_install_hint
 
         lines.append(f"{mit_krb5_install_hint()}  # MIT kinit/kvno for Kerberos WinRM")
     else:

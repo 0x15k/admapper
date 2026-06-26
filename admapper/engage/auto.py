@@ -4,18 +4,18 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.graph import GraphStore
-from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-from admapper.core.output import print_error, print_info, print_success
-from admapper.core.owned import is_valid_owned_username
-from admapper.core.provenance import Tool, print_step
+from admapper.stores.graph import GraphStore
+from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+from admapper.support.output import print_error, print_info, print_success
+from admapper.support.owned import is_valid_owned_username
+from admapper.support.provenance import Tool, print_step
 from admapper.creds.common import collect_gained_hashes
 from admapper.escalate.analyze import get_escalation_state, run_escalate_analysis, run_escalate_exec
 from admapper.models.escalation import EscalationEdge
 from admapper.models.workspace import OperationMode
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _WIRED_EDGES = {
     ("postex", "dll_hijack_scheduled_task"),

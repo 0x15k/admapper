@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.adcs.runner import run_enroll_hijack
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip, resolve_dc_fqdn
 from admapper.wsus.analyze import get_wsus_op
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -116,7 +116,7 @@ def run_wsus_cert_chain(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
     from admapper.models.workspace import OperationMode
 
     if enroll and session.workspace.mode == OperationMode.AUTO:

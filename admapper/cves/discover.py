@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.hosts import HostsStore
+from admapper.stores.hosts import HostsStore
 from admapper.models.cve_finding import CveTarget
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def _host_port_map(session: Session) -> dict[str, list[int]]:

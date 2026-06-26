@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_success
+from admapper.support.output import print_success
 from admapper.creds.common import collect_gained_hashes, pick_dc_ip, resolve_winrm_host_for_account
 from admapper.winrm.client import WinRMClient, WinRMError
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def _normalize_account(name: str) -> str:

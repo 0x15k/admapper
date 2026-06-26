@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import CredentialStatus
@@ -14,7 +14,7 @@ from admapper.cves.discover import discover_cve_targets
 from admapper.cves.enum_domain import enumerate_domain_cve_context
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def _load_json(path) -> dict[str, Any] | None:

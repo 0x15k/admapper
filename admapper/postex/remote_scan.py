@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_info, print_success, print_warning
-from admapper.core.provenance import Tool, print_ok, print_step, print_warn
+from admapper.support.output import print_info, print_success, print_warning
+from admapper.support.provenance import Tool, print_ok, print_step, print_warn
 from admapper.postex.evil_winrm_output import extract_winrm_command_body, strip_evil_winrm_output
 from admapper.postex.hijack_intel import (
     extract_hijack_intel,
@@ -22,7 +22,7 @@ from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 _MONITOR_LOG_PATHS: tuple[str, ...] = (

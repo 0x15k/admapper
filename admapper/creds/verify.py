@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.auth_checks import verify_credential_checks
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import Credential, CredentialStatus
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -34,7 +34,7 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
 
     domain = cred.domain or session.workspace.domain
     if not domain:
-        from admapper.core.discovery import ensure_domain
+        from admapper.support.discovery import ensure_domain
 
         domain = ensure_domain(session, announce=False)
 
@@ -47,8 +47,8 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
 
     ws_path = session.workspaces.path_for(session.workspace.name)
     ensure_dc_clock(dc_ip, ws_path=ws_path)
-    from admapper.core.phases import phase_banner
-    from admapper.core.verbosity import print_phase
+    from admapper.support.phases import phase_banner
+    from admapper.support.verbosity import print_phase
 
     print_phase(phase_banner("p05", detail=f"verifying {cred.display_user()} @ {dc_ip}"))
     from admapper.creds.auth_checks import load_protected_users
@@ -72,7 +72,7 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
     if updated is None:
         raise RuntimeError(f"failed to update credential status: {cred_id}")
 
-    from admapper.core.verbosity import is_compact
+    from admapper.support.verbosity import is_compact
 
     rows = [
         ["ldap", _status_label(auth_result.ldap)],
@@ -83,7 +83,7 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
         print_info("Protected Users — only Kerberos is accepted for this account")
     print_table("Auth checks", ["method", "result"], rows)
 
-    from admapper.core.platform import get_clock_skew, resolve_faketime
+    from admapper.support.platform import get_clock_skew, resolve_faketime
     from admapper.creds.kerberos_skew import faketime_install_hint
 
     if status == CredentialStatus.VALID:
@@ -121,7 +121,7 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
                 continue
             print_warning(err)
         if auth_result.kerberos is False and not is_compact():
-            from admapper.core.platform import get_clock_skew
+            from admapper.support.platform import get_clock_skew
             from admapper.creds.time_sync import suggest_time_sync
 
             current_skew = get_clock_skew()

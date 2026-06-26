@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
-from admapper.core.verbosity import is_verbose
+from admapper.support.output import print_info, print_success, print_table, print_warning
+from admapper.support.verbosity import is_verbose
 from admapper.models.escalation import EscalationState
 
 

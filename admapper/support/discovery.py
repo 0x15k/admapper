@@ -5,12 +5,12 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.core.hosts import HostsStore
-from admapper.core.output import print_info, print_success
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success
 from admapper.recon.dns import dn_to_domain, infer_domain_from_hostname, reverse_ptr
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def default_workspace_name(host: str) -> str:

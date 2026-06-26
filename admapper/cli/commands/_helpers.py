@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_error, print_warning
+from admapper.support.output import print_error, print_warning
 from admapper.models.credential import CredentialType
 from admapper.models.workspace import OperationMode
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _HELP_ESSENTIAL = """
 Essential (90% of the engagement):

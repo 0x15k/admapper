@@ -8,7 +8,7 @@ from pathlib import Path
 from ldap3 import ALL, SIMPLE, Connection, Server
 from ldap3.core.exceptions import LDAPException
 
-from admapper.core.platform import (
+from admapper.support.platform import (
     resolve_kerbrute,
     resolve_nxc,
     run_command,

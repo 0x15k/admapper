@@ -104,7 +104,7 @@ def check_kerberos_tgt(
     except ImportError:
         return False
 
-    from admapper.core.platform import get_clock_skew
+    from admapper.support.platform import get_clock_skew
     from admapper.creds.kerberos_skew import check_kerberos_with_skew, seconds_to_faketime_offset
     from admapper.creds.time_sync import get_last_ntp_step_seconds, is_clock_unstable
 

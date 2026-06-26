@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.core.reachability import check_target_reachable
+from admapper.support.reachability import check_target_reachable
 from admapper.creds.common import pick_dc_ip
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _PROBE_PORTS = (445, 5985, 389)
 
@@ -44,7 +44,7 @@ def resolve_target_hosts(session: Session) -> list[str]:
         for ip in parse_targets(session.workspace.hosts):
             add(ip)
 
-    from admapper.core.hosts import HostsStore
+    from admapper.stores.hosts import HostsStore
 
     for host in HostsStore(session.workspaces, session.workspace.name).list():
         add(host.address)

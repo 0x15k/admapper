@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from admapper.core.platform import user_config_dir
+from admapper.support.platform import user_config_dir
 
 WORKSPACES_ENV_VAR = "ADMAPPER_WORKSPACES"
 

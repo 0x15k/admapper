@@ -5,8 +5,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from admapper.core.output import print_info, print_success
-from admapper.core.platform import resolve_executable
+from admapper.support.output import print_info, print_success
+from admapper.support.platform import resolve_executable
 from admapper.postex.pe_arch import TargetArch
 
 _MINGW_DLL_C = r"""

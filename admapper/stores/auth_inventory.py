@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from admapper.core.workspace import WorkspaceManager
+from admapper.support.workspace import WorkspaceManager
 from admapper.models.ad_object import (
     ComputerRecord,
     DelegationRecord,

@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from admapper.core.output import print_info
-from admapper.core.platform import is_macos, resolve_executable, resolve_nxc, run_command, tool_install_hint
+from admapper.support.output import print_info
+from admapper.support.platform import is_macos, resolve_executable, resolve_nxc, run_command, tool_install_hint
 from admapper.postex.evil_winrm_output import strip_evil_winrm_output
 from admapper.postex.hijack_intel import parse_schtasks_list_output
 from admapper.postex.nxc_output import strip_nxc_winrm_output

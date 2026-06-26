@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from admapper.core.output import print_error, print_info, print_success
+from admapper.support.output import print_error, print_info, print_success
 from admapper.creds.common import resolve_dc_fqdn
 from admapper.creds.time_sync import ensure_dc_clock
 from admapper.postex.creds import machine_hash_from_workspace
@@ -164,7 +164,7 @@ def run_winrm_shell(
 def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
     """Best-effort: mark user as owned in the workspace after successful WinRM."""
     try:
-        from admapper.core.session import Session
+        from admapper.support.session import Session
         from admapper.escalate.analyze import mark_user_owned
 
         session = Session.bootstrap()

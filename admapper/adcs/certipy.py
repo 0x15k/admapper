@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from admapper.core.platform import resolve_certipy
+from admapper.support.platform import resolve_certipy
 
 
 def certipy_install_hint() -> str:

@@ -6,10 +6,10 @@ from prompt_toolkit.history import FileHistory
 
 from admapper.cli.banner import print_workflow_banner
 from admapper.cli.commands import dispatch
-from admapper.core.config import ensure_config_dir
-from admapper.core.output import print_info
-from admapper.core.paths import global_config_dir
-from admapper.core.session import Session
+from admapper.support.config import ensure_config_dir
+from admapper.support.output import print_info
+from admapper.support.paths import global_config_dir
+from admapper.support.session import Session
 
 
 def run_shell(session: Session | None = None) -> None:

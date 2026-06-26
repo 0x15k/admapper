@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands._helpers import require_workspace
-from admapper.core.output import print_error
+from admapper.support.output import print_error
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def handle(session: Session, cmd: str, args: list[str]) -> bool | None:

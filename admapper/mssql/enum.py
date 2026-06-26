@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from admapper.core.platform import tool_install_hint
+from admapper.support.platform import tool_install_hint
 from admapper.models.credential import Credential, CredentialType
 from admapper.models.mssql_op import MssqlInstance
 

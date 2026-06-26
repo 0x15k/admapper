@@ -12,16 +12,16 @@ from admapper.acl.enum import (
 from admapper.acl.parse import owner_abuse_right, parse_security_descriptor
 from admapper.acl.rights import abuse_right
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.core.auth_inventory import AuthInventoryStore
-from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.stores.auth_inventory import AuthInventoryStore
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.ad_object import AclAbuseFinding
 from admapper.models.credential import Credential, CredentialStatus
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -227,7 +227,7 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
     cred = _pick_credential(session, cred_id)
     ws_name = session.workspace.name
 
-    from admapper.core.verbosity import print_phase
+    from admapper.support.verbosity import print_phase
 
     print_phase(f"Phase 10 — ACL enumeration @ {dc_ip} as {cred.display_user()}")
 
@@ -257,7 +257,7 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
                 continue
 
             targets = build_acl_targets(ldap_session, inventory)
-            from admapper.core.verbosity import quiet_info
+            from admapper.support.verbosity import quiet_info
 
             quiet_info(f"scanning {len(targets)} objects for ACL abuse via {owned}")
 
@@ -312,7 +312,7 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
         result.graph_path = str(graph_store.path)
         print_success("graph updated with ACL edges → graph.json")
 
-    from admapper.core.verbosity import is_verbose
+    from admapper.support.verbosity import is_verbose
 
     if all_findings and is_verbose():
         rows = [
@@ -333,7 +333,7 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
     elif not all_findings:
         print_warning("no ACL abuse paths found for owned principals")
 
-    from admapper.core.verbosity import quiet_success
+    from admapper.support.verbosity import quiet_success
 
     quiet_success("ACL findings saved → acl_findings.json")
     print_manual_guide("acl_abuse", session=session)

@@ -9,10 +9,10 @@ from admapper.cli.commands._helpers import (
     parse_set_mode,
     require_workspace,
 )
-from admapper.core.output import print_error, print_info, print_success, print_table, print_warning
+from admapper.support.output import print_error, print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
@@ -103,13 +103,13 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
         return True
 
     if cmd == "doctor":
-        from admapper.core.install_check import print_doctor_report
+        from admapper.support.install_check import print_doctor_report
 
         print_doctor_report()
         return True
 
     if cmd == "platform":
-        from admapper.core.tools_report import print_platform_report
+        from admapper.support.tools_report import print_platform_report
 
         print_platform_report()
         return True

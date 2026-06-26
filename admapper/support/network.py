@@ -5,8 +5,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from admapper.core.output import print_info
-from admapper.core.platform import is_macos, is_linux
+from admapper.support.output import print_info
+from admapper.support.platform import is_macos, is_linux
 
 # Common pentest VPN / lab callback ranges (attacker-side tunnels).
 _CALLBACK_NETS = (

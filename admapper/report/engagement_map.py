@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.auth_checks import load_protected_users
 from admapper.creds.common import (
     collect_gained_hashes,
@@ -112,7 +112,7 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
             return "ACL exploit skipped — check exploit_log.json"
         detail_l = detail.lower()
         if "krb5" in detail_l or "kinit" in detail_l or "mit krb5" in detail_l:
-            from admapper.core.platform import mit_krb5_install_hint
+            from admapper.support.platform import mit_krb5_install_hint
  
             return f"Missing MIT krb5 — {mit_krb5_install_hint()}"
         if "http service ticket" in detail_l:
@@ -128,7 +128,7 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
         if "clock skew" in detail_l or "krb_ap_err_skew" in detail_l:
             skew = load_workspace_clock_skew(ws_path)
             if skew:
-                from admapper.core.platform import resolve_faketime
+                from admapper.support.platform import resolve_faketime
  
                 if resolve_faketime():
                     return (
@@ -346,7 +346,7 @@ def build_engagement_map(
 
     lines.extend(_hash_section_lines(ws_path, domain=domain))
 
-    from admapper.core.verbosity import is_verbose
+    from admapper.support.verbosity import is_verbose
 
     if is_verbose():
         pw_data = _load_json(ws_path / "password_candidates.json") or {}
@@ -534,7 +534,7 @@ def print_engagement_map(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
 ) -> None:
-    from admapper.core.verbosity import is_compact
+    from admapper.support.verbosity import is_compact
 
     if is_compact():
         summary = build_engagement_summary(

@@ -12,7 +12,7 @@ Usage in CLI:
   admapper opsec show      # show current profile + settings
 
 Usage in code:
-  from admapper.core.opsec import get_opsec, OpsecProfile
+  from admapper.support.opsec import get_opsec, OpsecProfile
   opsec = get_opsec(session)
   opsec.sleep_between_requests()     # auto-delays in STEALTH
   if opsec.require_confirm("spray"): # gate noisy ops
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 class OpsecProfile(StrEnum):
@@ -204,7 +204,7 @@ def _load_workspace_profile(ws_path: Path) -> OpsecProfile | None:
 
 def print_opsec_status(session: "Session | None" = None) -> None:
     """Print the current OPSEC profile and key settings."""
-    from admapper.core.output import print_table, print_info
+    from admapper.support.output import print_table, print_info
 
     settings = get_opsec(session)
     print_info(f"OPSEC profile: {settings.profile.upper()}")

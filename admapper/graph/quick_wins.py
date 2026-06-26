@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from admapper.core.workspace import WorkspaceManager
+from admapper.support.workspace import WorkspaceManager
 
 
 @dataclass

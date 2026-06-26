@@ -5,12 +5,12 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.core.credentials import CredentialStore
-from admapper.core.hosts import HostsStore
+from admapper.stores.credentials import CredentialStore
+from admapper.stores.hosts import HostsStore
 from admapper.models.credential import CredentialStatus, CredentialType
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 def resolve_dc_fqdn(ws_path: str | None, domain: str | None, *, fallback_ip: str | None = None) -> str:

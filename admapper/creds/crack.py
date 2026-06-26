@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from admapper.core.platform import (
+from admapper.support.platform import (
     default_wordlist_paths,
     resolve_hashcat,
     resolve_john,

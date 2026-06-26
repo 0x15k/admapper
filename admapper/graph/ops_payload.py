@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from admapper.analysis.engagement_intel import build_engagement_intel
-from admapper.core.operator_setup import build_operator_setup
+from admapper.support.operator_setup import build_operator_setup
 from admapper.methodology.unified import (
     ENGAGEMENT_FRAMEWORK,
     build_study_map,

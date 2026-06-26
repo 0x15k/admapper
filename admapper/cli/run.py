@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands import dispatch
-from admapper.core.discovery import default_workspace_name, ensure_domain
-from admapper.core.output import print_info
-from admapper.core.session import Session
+from admapper.support.discovery import default_workspace_name, ensure_domain
+from admapper.support.output import print_info
+from admapper.support.session import Session
 
 
 def _load_json(path: Path) -> dict | None:
@@ -48,11 +48,11 @@ def run_engagement(
     auto: bool = False,
 ) -> None:
     """Non-interactive engagement — con creds ejecuta analyst por defecto."""
-    from admapper.core.dashboard_mode import effective_sync_clock, effective_sync_hosts
+    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
     from admapper.creds.kerberos_skew import apply_clock_skew_option
     from admapper.creds.time_sync import ensure_dc_clock
 
-    from admapper.core.verbosity import set_verbose
+    from admapper.support.verbosity import set_verbose
 
     apply_clock_skew_option(clock_skew)
     set_verbose(verbose)
@@ -128,7 +128,7 @@ def run_engagement(
         )
         if inferred:
             session.set_domain(inferred)
-            from admapper.core.output import print_success
+            from admapper.support.output import print_success
 
             print_success(f"domain inferred from LDAP bind: {inferred}")
 

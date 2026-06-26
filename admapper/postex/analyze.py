@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.hosts import HostsStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import CredentialStatus
@@ -21,7 +21,7 @@ from admapper.postex.task_hijack import (
 from admapper.postex.templates import apply_postex_templates, build_template_context
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _LOCAL_SHELL_TECHNIQUES = (
     "sam_dump",

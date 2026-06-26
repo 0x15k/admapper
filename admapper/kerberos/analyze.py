@@ -5,14 +5,14 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.core.graph import GraphStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guide
 from admapper.kerberos.catalog import technique_meta
 from admapper.models.kerberos_op import KerberosOpportunity
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _BACKUP_OPERATORS = "backup operators"
 

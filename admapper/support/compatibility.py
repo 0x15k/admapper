@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from admapper.core.platform import (
+from admapper.support.platform import (
     _impacket_status,
     platform_label,
     resolve_hashcat,

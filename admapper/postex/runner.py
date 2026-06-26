@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_info, print_success, print_warning
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip, resolve_dc_fqdn
 from admapper.postex.pe_arch import TargetArch
 from admapper.postex.payload import PayloadMode
@@ -18,7 +18,7 @@ from admapper.winrm.client import WinRMClient
 from admapper.winrm.factory import winrm_client_for_cred
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -102,7 +102,7 @@ def _target_ips(session: Session) -> set[str]:
     if dc:
         ips.add(dc)
     if session.workspace:
-        from admapper.core.hosts import HostsStore
+        from admapper.stores.hosts import HostsStore
 
         for host in HostsStore(session.workspaces, session.workspace.name).list():
             if host.address:
@@ -257,7 +257,7 @@ def run_dll_hijack(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
+    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
     from admapper.models.workspace import OperationMode
 
     if not dry_run and session.workspace.mode == OperationMode.AUTO:

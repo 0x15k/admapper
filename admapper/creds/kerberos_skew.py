@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from admapper.core.platform import (
+from admapper.support.platform import (
     resolve_faketime,
     run_command,
     set_clock_skew,
@@ -82,16 +82,16 @@ def apply_workspace_clock_skew(ws_path: str | Path | None) -> str | None:
 
 def ensure_workspace_skew(ws_path: str | Path | None) -> str | None:
     """Apply cached workspace skew when --clock-skew was not passed on CLI."""
-    from admapper.core.platform import get_clock_skew, resolve_faketime
+    from admapper.support.platform import get_clock_skew, resolve_faketime
 
     existing = get_clock_skew()
     if existing:
         return existing
     skew = apply_workspace_clock_skew(ws_path)
     if skew and resolve_faketime():
-        from admapper.core.output import print_info
+        from admapper.support.output import print_info
 
-        from admapper.core.provenance import Tool, print_step
+        from admapper.support.provenance import Tool, print_step
 
         print_step(
             f"Kerberos clock skew: {skew} (workspace kerberos_clock.json)",
@@ -173,7 +173,7 @@ def check_kerberos_with_skew(
     if not skip_system_time:
         if _kerberos_subprocess(domain, username, secret, dc_ip=dc_ip):
             if effective_preferred:
-                from admapper.core.output import print_info
+                from admapper.support.output import print_info
 
                 set_clock_skew(None)
                 save_workspace_clock_skew(ws_path, None)
@@ -219,7 +219,7 @@ def apply_clock_skew_option(clock_skew: str | None) -> None:
     """Set global libfaketime offset when --clock-skew is passed on CLI."""
     if not clock_skew:
         return
-    from admapper.core.output import print_info, print_warning
+    from admapper.support.output import print_info, print_warning
 
     if resolve_faketime():
         set_clock_skew(clock_skew)

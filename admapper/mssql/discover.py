@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import re
 
-from admapper.core.hosts import HostsStore
-from admapper.core.users import UsersStore
+from admapper.stores.hosts import HostsStore
+from admapper.stores.users import UsersStore
 from admapper.models.mssql_op import MssqlInstance
 
 if True:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _MSSQL_SPN_RE = re.compile(r"^MSSQLSvc/([^:/]+)", re.IGNORECASE)
 

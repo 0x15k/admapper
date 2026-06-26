@@ -4,9 +4,9 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.core.findings import FindingsStore
-from admapper.core.hosts import HostsStore
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.stores.findings import FindingsStore
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guides_for_keys
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.host import HostRecord
@@ -17,7 +17,7 @@ from admapper.recon.smb_probe import probe_smb_null
 from admapper.recon.targets import parse_targets
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 _PROBE_PORTS = (88, 389, 445, 636, 5985, 1433)
 _SCAN_TIMEOUT = 3.0
@@ -226,8 +226,8 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
     if not session.workspace.hosts and not session.workspace.domain:
         raise ValueError("set domain <fqdn> and/or set hosts <cidr|ip> before start_unauth")
 
-    from admapper.core.phases import phase_banner
-    from admapper.core.verbosity import print_phase, quiet_info, quiet_success, quiet_warning
+    from admapper.support.phases import phase_banner
+    from admapper.support.verbosity import print_phase, quiet_info, quiet_success, quiet_warning
 
     print_phase(phase_banner("p02", detail="unauthenticated recon"))
     dns_dcs: list[str] = []
@@ -363,7 +363,7 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
         ]
         for h in result.hosts
     ]
-    from admapper.core.verbosity import is_verbose
+    from admapper.support.verbosity import is_verbose
 
     if rows and is_verbose():
         print_table(
@@ -386,7 +386,7 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
             guide_keys.append("kerberos_open")
     guide_keys.append("ldap_user_enum")
     if guide_keys:
-        from admapper.core.verbosity import is_verbose
+        from admapper.support.verbosity import is_verbose
 
         if is_verbose():
             print_info("Manual exploitation guides (BloodHound-style):")

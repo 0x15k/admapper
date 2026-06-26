@@ -5,15 +5,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands import dispatch
-from admapper.core.output import print_info
-from admapper.core.verbosity import is_verbose, print_phase
+from admapper.support.output import print_info
+from admapper.support.verbosity import is_verbose, print_phase
 from admapper.creds.kerberos_skew import apply_clock_skew_option, ensure_workspace_skew
 from admapper.report.engagement_map import print_engagement_map
 from admapper.report.export import run_export
 from admapper.report.scenario import print_scenario_report
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 # Light: loot + ACLs + next hop. Deep adds paths/adcs/postex.
 _PIPELINE_LIGHT = ("exploit", "acls", "escalate")
@@ -84,7 +84,7 @@ def run_brief(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.core.dashboard_mode import effective_sync_clock
+    from admapper.support.dashboard_mode import effective_sync_clock
 
     apply_clock_skew_option(clock_skew)
     sync_clock = effective_sync_clock(sync_clock)

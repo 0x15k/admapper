@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.core.output import print_info, print_success, print_table, print_warning
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.report.collect import collect_workspace_report
 from admapper.report.evidence import build_evidence_export, write_evidence_export
 from admapper.report.navigator import build_navigator_layer, write_navigator_layer
@@ -13,7 +13,7 @@ from admapper.report.html import build_engagement_html, write_engagement_html
 from admapper.report.txt import build_evidence_txt, write_evidence_txt
 
 if TYPE_CHECKING:
-    from admapper.core.session import Session
+    from admapper.support.session import Session
 
 
 @dataclass
@@ -45,7 +45,7 @@ def run_export(
     ws_path = session.workspaces.path_for(ws_name)
 
     if not quiet:
-        from admapper.core.phases import phase_banner
+        from admapper.support.phases import phase_banner
 
         print_info(phase_banner("p12", detail="reporting export"))
     collected = collect_workspace_report(ws_path)

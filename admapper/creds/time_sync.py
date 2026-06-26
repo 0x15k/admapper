@@ -9,7 +9,7 @@ from pathlib import Path
 from ldap3 import Server, Connection, ALL
 
 
-from admapper.core.platform import is_linux, is_macos, subprocess_run_kwargs
+from admapper.support.platform import is_linux, is_macos, subprocess_run_kwargs
 
 # ntpdate steps larger than this suggest VM guest time sync is fighting manual sync.
 _LARGE_STEP_THRESHOLD_SEC = 3600
@@ -85,7 +85,7 @@ def calculate_ldap_clock_skew(dc_ip: str, timeout: int = 5) -> float | None:
 
 
 def _sntp_binary() -> str | None:
-    from admapper.core.platform import resolve_executable
+    from admapper.support.platform import resolve_executable
 
     return resolve_executable(["sntp"])
 
@@ -205,8 +205,8 @@ def ensure_dc_clock(
     else:
         enabled = _dc_clock_state.get("sync_enabled", True)
 
-    from admapper.core.output import print_info, print_success, print_warning
-    from admapper.core.platform import get_clock_skew, set_clock_skew
+    from admapper.support.output import print_info, print_success, print_warning
+    from admapper.support.platform import get_clock_skew, set_clock_skew
     from admapper.creds.kerberos_skew import apply_workspace_clock_skew
 
     if not dc_ip:
@@ -216,7 +216,7 @@ def ensure_dc_clock(
 
     explicit_skew = get_clock_skew()
     if cached_skew:
-        from admapper.core.provenance import Tool, print_step
+        from admapper.support.provenance import Tool, print_step
 
         print_step(
             f"using cached Kerberos clock skew {cached_skew} (workspace)",
@@ -253,7 +253,7 @@ def ensure_dc_clock(
         if not get_clock_skew() and abs(ldap_skew_seconds) > 10:
             set_clock_skew(derived)
             save_workspace_clock_skew(ws_path, derived, dc_ip=dc_ip, stepped_seconds=ldap_skew_seconds)
-            from admapper.core.provenance import Tool, print_step
+            from admapper.support.provenance import Tool, print_step
             print_step(
                 f"DC clock detected via LDAP (skew: {derived}) — configuring libfaketime automatically",
                 source=Tool.FAKETIME,

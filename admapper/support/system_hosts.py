@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from admapper.core.platform import is_windows, subprocess_run_kwargs
+from admapper.support.platform import is_windows, subprocess_run_kwargs
 
 _HOSTS_MARKER = "# admapper"
 

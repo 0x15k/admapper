@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
-from admapper.core.dashboard_mode import enable_dashboard_mode, dashboard_subprocess_env
+from admapper.support.dashboard_mode import enable_dashboard_mode, dashboard_subprocess_env
 from admapper.models.workspace import OperationMode
 
 
@@ -483,7 +483,7 @@ class DashboardContext:
 
             # Update owned users in graph.json and state.json (best-effort)
             try:
-                from admapper.core.session import Session
+                from admapper.support.session import Session
                 from admapper.escalate.analyze import mark_user_owned
                 session = Session.bootstrap()
                 session.select_workspace(self.workspace, create=True)
@@ -621,7 +621,7 @@ class DashboardContext:
 
     def _persist_target_ip(self, ip: str) -> None:
         from admapper.cli.commands import dispatch
-        from admapper.core.session import Session
+        from admapper.support.session import Session
 
         session = Session.bootstrap()
         session.select_workspace(self.workspace, create=True)
@@ -698,7 +698,7 @@ class DashboardContext:
         import traceback as _traceback
         from contextlib import redirect_stderr, redirect_stdout
 
-        from admapper.core.session import Session
+        from admapper.support.session import Session
 
         self.emit(label, kind="cmd")
         self.terminal_filter.reset()
@@ -1137,7 +1137,7 @@ def run_dashboard_server(
         raise OSError(f"puertos {port}–{port + 9} ocupados — cierra otra instancia de admapper dashboard")
 
     url = f"http://127.0.0.1:{bound_port}/"
-    from admapper.core.output import print_info, print_success
+    from admapper.support.output import print_info, print_success
 
     print_success(f"ADMapper dashboard → {url}")
     print_info("Ctrl+C para detener el servidor")
