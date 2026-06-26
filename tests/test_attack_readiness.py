@@ -8,6 +8,10 @@ from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 
 
+_TEST_LOOT_PASSWORD = "StaticPlaceholder2025"
+_TEST_SOURCE_LOG = "Logs/trace_20260219.log"
+
+
 def _base_ws(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
