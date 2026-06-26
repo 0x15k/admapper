@@ -47,7 +47,6 @@ full = [
     "krb5>=0.5",
 ]
 dev = [
-    "pytest>=8.0,<9.0",
     "ruff>=0.9,<1.0",
     "bandit>=1.8,<2.0",
 ]
@@ -73,7 +72,3 @@ select = ["E", "F", "I", "UP"]
 "admapper/guides/catalog.py" = ["E501"]
 "admapper/recon/dns.py" = ["I001"]
 "admapper/enumeration/ldap_users.py" = ["I001"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
