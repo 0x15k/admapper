@@ -12,8 +12,8 @@ from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
 from admapper.dashboard.ops_progress import filtered_loot_clues
 
-from admapper.analysis.attack_readiness import build_attack_readiness
-from admapper.analysis.password_rules import analyze_password_clues
+from admapper.intelligence.attack_readiness import build_attack_readiness
+from admapper.intelligence.password_rules import analyze_password_clues
 
 
 def _load_lockout_policy(ws_path: Path) -> dict[str, Any] | None:

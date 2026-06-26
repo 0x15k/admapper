@@ -171,7 +171,7 @@ def run_auth_enumeration(
     users_store = UsersStore(session.workspaces, ws_name)
     if result.ldap.users:
         users_store.merge(result.ldap.users)
-    from admapper.analysis.user_match import refresh_workspace_intel
+    from admapper.intelligence.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(ws_path, users_store=users_store)
 
@@ -250,7 +250,7 @@ def run_auth_enumeration(
 
     # Phase 8.8 — security posture checks (non-blocking: errors don't fail auth enum)
     try:
-        from admapper.auth.posture import check_security_posture
+        from admapper.posture import check_security_posture
         check_security_posture(session, dc_ip, cred, domain)
     except Exception as _posture_exc:
         from admapper.support.output import print_warning as _pw

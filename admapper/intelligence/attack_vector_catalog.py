@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from admapper.analysis.attack_readiness import (
+from admapper.intelligence.attack_readiness import (
     AttackVector,
     PrerequisiteCheck,
     _human_users,
@@ -306,7 +306,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     )
 
     # Loot verify — per clue
-    from admapper.analysis.attack_readiness import _attempts_remaining
+    from admapper.intelligence.attack_readiness import _attempts_remaining
 
     by_name = {u.username.lower(): u for u in ctx.humans}
     for clue in ctx.clues:

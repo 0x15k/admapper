@@ -38,7 +38,7 @@ from admapper.dashboard.ops_progress import OpsProgress
 from admapper.dashboard.dashboard_html import build_dashboard_html
 from admapper.dashboard.ops_ui import build_ops_payload
 from admapper.dashboard.terminal_filter import TerminalFilter
-from admapper.analysis.user_match import refresh_workspace_intel
+from admapper.intelligence.user_match import refresh_workspace_intel
 
 
 def _load_json_safe(path: Path) -> dict[str, Any]:

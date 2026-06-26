@@ -12,7 +12,7 @@ from admapper.stores.findings import FindingsStore
 from admapper.stores.hosts import HostsStore
 from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.stores.users import UsersStore
-from admapper.enumeration.ldap_users import enumerate_users_ldap
+from admapper.enum.ldap_users import enumerate_users_ldap
 from admapper.enum.rid_cycle import cycle_rids
 from admapper.enum.samr import enumerate_users_samr
 from admapper.guides.render import print_manual_guides_for_keys
@@ -173,7 +173,7 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
             )
 
     result.users = merged
-    from admapper.analysis.user_match import refresh_workspace_intel
+    from admapper.intelligence.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(session.workspaces.path_for(ws_name))
     asrep = [u for u in human_users if u.asrep_roastable]

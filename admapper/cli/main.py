@@ -821,7 +821,7 @@ def graph(
     """Attack graph — interactive web (default) or ASCII terminal."""
     from admapper.support.output import print_error, print_info, print_success
     from admapper.support.session import Session
-    from admapper.analysis.user_match import refresh_workspace_intel
+    from admapper.intelligence.user_match import refresh_workspace_intel
 
     session = Session.bootstrap()
     if workspace:

@@ -204,7 +204,7 @@ def build_attack_readiness(
     owned_users: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Full AD pentest attack-vector prerequisite matrix (generic, not lab-specific)."""
-    from admapper.analysis.attack_vector_catalog import WorkspaceContext, build_all_attack_vectors
+    from admapper.intelligence.attack_vector_catalog import WorkspaceContext, build_all_attack_vectors
 
     ctx = WorkspaceContext.build(ws_path, users=users, policy=policy, owned_users=owned_users)
     return [v.to_dict() for v in build_all_attack_vectors(ctx)]

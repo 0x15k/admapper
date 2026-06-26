@@ -134,7 +134,7 @@ def run_brief(
 
         finalize_auto(session)
 
-    from admapper.analysis.user_match import refresh_workspace_intel
+    from admapper.intelligence.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(ws_path)
 
