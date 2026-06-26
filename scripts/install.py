@@ -242,9 +242,9 @@ def uninstall(root: Path) -> None:
     ok("Uninstall complete")
 
 
-def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None:
+def install_companion_tools(system: str, is_kali: bool, python_exe: str, force: bool = False) -> None:
     print()
-    info("Installing companion tools...")
+    info("Installing/verifying companion tools...")
 
     # 1. Install pipx tools
     pipx = shutil.which("pipx")
@@ -258,13 +258,17 @@ def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None
     }
 
     for bin_name, package in pipx_tools.items():
-        if shutil.which(bin_name):
+        if shutil.which(bin_name) and not force:
             ok(f"Companion (Python): {package} is already installed ({shutil.which(bin_name)})")
         else:
-            info(f"Installing {package} via pipx...")
+            action_str = "Reinstalling" if force and shutil.which(bin_name) else "Installing"
+            info(f"{action_str} {package} via pipx...")
             try:
-                run(pipx, "install", package)
-                ok(f"Installed {package}")
+                args = [pipx, "install", package]
+                if force:
+                    args.append("--force")
+                run(*args)
+                ok(f"Installed/Reinstalled {package}")
             except Exception as exc:
                 warn(f"Failed to install {package}: {exc}")
 
@@ -281,13 +285,15 @@ def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None
             "faketime": "libfaketime",
         }
         for bin_name, formula in brew_tools.items():
-            if shutil.which(bin_name):
+            if shutil.which(bin_name) and not force:
                 ok(f"Companion (System): {formula} is already installed ({shutil.which(bin_name)})")
             else:
-                info(f"Installing {formula} via Homebrew...")
+                action_str = "Reinstalling" if force and shutil.which(bin_name) else "Installing"
+                info(f"{action_str} {formula} via Homebrew...")
                 try:
-                    run(brew, "install", formula)
-                    ok(f"Installed {formula}")
+                    cmd = [brew, "reinstall" if force else "install", formula]
+                    run(*cmd)
+                    ok(f"Installed/Reinstalled {formula}")
                 except Exception as exc:
                     warn(f"Failed to install {formula}: {exc}")
 
@@ -302,13 +308,18 @@ def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None
             "john": "john",
         }
         for bin_name, package in apt_tools.items():
-            if shutil.which(bin_name):
+            if shutil.which(bin_name) and not force:
                 ok(f"Companion (System): {package} is already installed ({shutil.which(bin_name)})")
             else:
-                info(f"Installing {package} via apt-get...")
+                action_str = "Reinstalling" if force and shutil.which(bin_name) else "Installing"
+                info(f"{action_str} {package} via apt-get...")
                 try:
-                    run("sudo", "apt-get", "install", "-y", package)
-                    ok(f"Installed {package}")
+                    cmd = ["sudo", "apt-get", "install", "-y"]
+                    if force:
+                        cmd.append("--reinstall")
+                    cmd.append(package)
+                    run(*cmd)
+                    ok(f"Installed/Reinstalled {package}")
                 except Exception as exc:
                     warn(f"Failed to install {package}: {exc}")
 
@@ -358,7 +369,7 @@ def main() -> None:
         pipx = ensure_pipx(python, system, is_kali)
         install_pipx(root, pipx, extra, args.force)
 
-    install_companion_tools(system, is_kali, python)
+    install_companion_tools(system, is_kali, python, force=args.force)
 
     post_install(system)
 
