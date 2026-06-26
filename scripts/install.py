@@ -315,18 +315,6 @@ def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None
 
 def post_install(system: str) -> None:
     print()
-    print("Recommended companion tools (or run this installer with '--companion' to auto-install):")
-    print("  pipx install certipy-ad       # AD CS exploitation (ESC1-14)")
-    print("  pipx install pywhisker        # Shadow Credentials")
-    print("  pipx install netexec          # nxc (SMB/WinRM/LDAP)")
-    if system == "darwin":
-        print("  brew install hashcat john-jumbo libfaketime")
-    elif system == "linux":
-        print("  sudo apt install -y hashcat john   # Debian/Kali")
-    else:
-        print("  Install Hashcat / John-the-Ripper manually on Windows")
-
-    print()
     print("Quick start:")
     print("  admapper run -H <DC_IP> -u <user> -p '<pass>'")
     print("  admapper doctor    # verify installation health")
@@ -339,7 +327,6 @@ def main() -> None:
     parser.add_argument("--dev", action="store_true", help="Local .venv + dev extras")
     parser.add_argument("--force", action="store_true", help="Force reinstall")
     parser.add_argument("--uninstall", action="store_true", help="Remove admapper")
-    parser.add_argument("--companion", "-c", action="store_true", help="Install companion tools (certipy, netexec, hashcat, john, libfaketime)")
     args = parser.parse_args()
 
     extra = "full" if not args.dev else "dev"
@@ -371,8 +358,7 @@ def main() -> None:
         pipx = ensure_pipx(python, system, is_kali)
         install_pipx(root, pipx, extra, args.force)
 
-    if args.companion:
-        install_companion_tools(system, is_kali, python)
+    install_companion_tools(system, is_kali, python)
 
     post_install(system)
 
