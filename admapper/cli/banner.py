@@ -10,7 +10,7 @@ ADMAPPER_ASCII = r"""
   / _ \ | | | | |\/| |/ _` | '_ \| '_ \ / _ \ '__|
  / ___ \| |_| | |  | | (_| | |_) | |_) |  __/ |   
 /_/   \_\____/|_|  |_|\__,_| .__/| .__/ \___|_|   
-                           |_|   |_|              
+                           |_|   |_|   by 0x15k   
 """
 
 # Three steps — less is more (ADscan / AdStrike Smart Analyst).
