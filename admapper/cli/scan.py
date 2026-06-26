@@ -6,17 +6,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.cli.commands import dispatch
-from admapper.support.discovery import default_workspace_name, ensure_domain
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.models.workspace import OperationMode
 from admapper.recon.unauth import run_unauth_scan
+from admapper.support.discovery import default_workspace_name, ensure_domain
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
 
 
-_HOSTS_POLL_INTERVAL = 3   # seconds between checks
-_HOSTS_POLL_MAX = 20       # max attempts (~60s total)
+_HOSTS_POLL_INTERVAL = 3  # seconds between checks
+_HOSTS_POLL_MAX = 20  # max attempts (~60s total)
 
 
 def format_hosts_hint(ip: str, fqdn: str) -> str | None:
@@ -81,7 +81,9 @@ def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
     print_info("")
     print_info(f"  sudo sh -c 'echo \"{ip}  {fqdn}\" >> /etc/hosts'")
     print_info("")
-    print_info(f"Waiting for /etc/hosts entry... (Ctrl+C to skip, checking every {_HOSTS_POLL_INTERVAL}s)")
+    print_info(
+        f"Waiting for /etc/hosts entry... (Ctrl+C to skip, checking every {_HOSTS_POLL_INTERVAL}s)"
+    )
 
     try:
         for attempt in range(1, _HOSTS_POLL_MAX + 1):
@@ -94,7 +96,9 @@ def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
         print_warning("skipped — Kerberos may fail without /etc/hosts entry")
         return
 
-    print_warning(f"timeout after {_HOSTS_POLL_MAX * _HOSTS_POLL_INTERVAL}s — continuing without /etc/hosts")
+    print_warning(
+        f"timeout after {_HOSTS_POLL_MAX * _HOSTS_POLL_INTERVAL}s — continuing without /etc/hosts"
+    )
 
 
 def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
@@ -165,9 +169,7 @@ def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
     target = ws.hosts or "<ip>"
     wflag = f" -w {ws.name}" if ws.name else ""
     print_info("Siguiente:")
-    print_info(
-        f"  admapper run -H {target} -u <user> -p '<pass>'{wflag} --clock-skew '+7h'"
-    )
+    print_info(f"  admapper run -H {target} -u <user> -p '<pass>'{wflag} --clock-skew '+7h'")
     if domain and domain != "-":
         print_info(f"Optional override:  > set domain {domain}")
     print_warning("No credentials were used — workspace is recon-only until you add creds.")
@@ -190,8 +192,8 @@ def sync_dc_engagement(
     dispatch(session, f"set hosts {ip}")
     session.persist_workspace()
 
-    from admapper.support.output import print_info, print_success
     from admapper.kerberos.time_sync import ensure_dc_clock
+    from admapper.support.output import print_info, print_success
 
     ws_path = session.workspaces.path_for(ws_name)
     print_info(f"sync-dc @ {ip} → workspace {ws_name}")
@@ -241,16 +243,16 @@ def scan_engagement(
     try:
         ensure_domain(session, announce=False)
     except ValueError:
-        print_warning("domain not inferred — PTR/LDAP may be restricted; set domain manually if known")
+        print_warning(
+            "domain not inferred — PTR/LDAP may be restricted; set domain manually if known"
+        )
 
-    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
     from admapper.kerberos.time_sync import ensure_dc_clock
+    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
 
     sync_clock = effective_sync_clock(sync_clock)
     sync_hosts = effective_sync_hosts(sync_hosts)
-    ws_path = (
-        session.workspaces.path_for(session.workspace.name) if session.workspace else None
-    )
+    ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
     ensure_dc_clock(ip, enabled=sync_clock, ws_path=ws_path)
 
     print_scan_summary(session, sync_hosts=sync_hosts)

@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from admapper.stores.users import UsersStore
 from admapper.models.user import UserRecord
+from admapper.stores.users import UsersStore
 
 
 @dataclass
@@ -171,8 +171,8 @@ def refresh_workspace_intel(ws_path: Path | str, *, users_store: UsersStore | No
     manifest = _load_json(ws_path / "loot_manifest.json")
     if users_store is not None and manifest:
         sync_loot_users(users_store, manifest)
-    from admapper.support.verbosity import is_verbose
     from admapper.creds.password_candidates import build_password_candidates_file
+    from admapper.support.verbosity import is_verbose
 
     build_user_intel(ws_path)
     if is_verbose():

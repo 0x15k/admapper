@@ -4,11 +4,10 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.chain_op import ChainOpportunity, ChainStep
-from admapper.wsus.prerequisites import owned_groups_for_user
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -104,7 +103,9 @@ def build_attack_chains(
                 op_id=enroll_id,
                 title=f"AD CS template abuse ({template})" if template else "AD CS template abuse",
                 ready=enroll_ready,
-                detail=f"Enroll {template} as {pivot}" if template else "Run adcs after owning pivot user",
+                detail=f"Enroll {template} as {pivot}"
+                if template
+                else "Run adcs after owning pivot user",
             ),
             ChainStep(
                 order=3,
@@ -123,9 +124,11 @@ def build_attack_chains(
             commands.append(f"admapper postex run --op {hijack_id} -w <workspace>")
         elif hijack_ready and not enroll_ready:
             commands.append(f"admapper adcs -w <workspace>  # re-run as {pivot}")
-            commands.append("certipy find -u <user>@<domain> -hashes :<NTLM> -dc-ip <DC> -vulnerable")
+            commands.append(
+                "certipy find -u <user>@<domain> -hashes :<NTLM> -dc-ip <DC> -vulnerable"
+            )
         elif enroll_ready and not wsus_ready:
-            commands.append(f"admapper wsus -w <workspace>")
+            commands.append("admapper wsus -w <workspace>")
             if template:
                 commands.append(
                     f"certipy req -u {pivot}@<domain> -hashes :<NTLM> -ca <CA> "

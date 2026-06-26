@@ -15,6 +15,8 @@ def _gssapi_installed() -> bool:
         return True
     except ImportError:
         return False
+
+
 from admapper.kerberos.skew import load_workspace_clock_skew
 from admapper.kerberos.time_sync import suggest_time_sync, was_dc_clock_synced
 
@@ -35,9 +37,7 @@ def build_operator_setup(
         hosts_entry = f"{dc_ip}  {dc_host}"
 
     clock_ok = bool(skew) or (dc_ip and was_dc_clock_synced(dc_ip))
-    install_faketime = (
-        "brew install libfaketime" if is_macos() else "sudo apt install faketime"
-    )
+    install_faketime = "brew install libfaketime" if is_macos() else "sudo apt install faketime"
 
     notes: list[str] = []
     if not clock_ok and not faketime_ok:
@@ -65,8 +65,6 @@ def build_operator_setup(
         "hosts_entry": hosts_entry or None,
         "sync_clock_cmd": suggest_time_sync(dc_ip) if dc_ip else None,
         "install_faketime_cmd": install_faketime,
-        "sync_dc_cmd": (
-            f"admapper sync-dc -H {dc_ip}" if dc_ip else None
-        ),
+        "sync_dc_cmd": (f"admapper sync-dc -H {dc_ip}" if dc_ip else None),
         "notes": notes,
     }

@@ -4,17 +4,17 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.adcs.detect import detect_esc_vulnerabilities
+from admapper.acl.enum import resolve_principal_context
 from admapper.adcs.acl_detect import detect_owned_adcs_abuse
 from admapper.adcs.certipy import certipy_install_hint, resolve_certipy
+from admapper.adcs.detect import detect_esc_vulnerabilities
 from admapper.adcs.enum import enumerate_adcs
-from admapper.acl.enum import resolve_principal_context
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.adcs import AdcsFinding
 from admapper.models.credential import Credential, CredentialStatus
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -186,9 +186,7 @@ def run_adcs_analysis(session: Session, *, cred_id: str | None = None) -> AdcsAn
             {
                 "domain": domain,
                 "dc_ip": dc_ip,
-                "enrollment_services": [
-                    s.to_dict() for s in enum_result.enrollment_services
-                ],
+                "enrollment_services": [s.to_dict() for s in enum_result.enrollment_services],
                 "templates": [t.to_dict() for t in enum_result.templates],
                 "errors": enum_result.errors,
                 "certipy_hint": certipy_install_hint(),
@@ -220,10 +218,7 @@ def run_adcs_analysis(session: Session, *, cred_id: str | None = None) -> AdcsAn
     result.findings_path = str(findings_path)
 
     if findings:
-        rows = [
-            [f.id, f.esc, f.template or "", f.ca_name or "", f.severity]
-            for f in findings[:20]
-        ]
+        rows = [[f.id, f.esc, f.template or "", f.ca_name or "", f.severity] for f in findings[:20]]
         print_table("AD CS findings", ["id", "esc", "template", "ca", "severity"], rows)
     else:
         print_warning("no ESC findings — AD CS may be hardened or ACLs restrict enum")

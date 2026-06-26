@@ -7,6 +7,7 @@ Identifies targets without requesting any ticket:
 Prerequisite: Phase 2 (users.json / auth_inventory.json available).
 MITRE: T1558.004 (AS-REP), T1558.003 (Kerberoast)
 """
+
 from __future__ import annotations
 
 import json
@@ -14,10 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.stores.findings import FindingsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.user import UAC_DONT_REQ_PREAUTH, UserRecord
+from admapper.stores.findings import FindingsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -52,9 +53,7 @@ def detect_roastable_targets(session: Session) -> RoastableReport:
     users = _load_users(ws_path)
 
     if not users:
-        print_warning(
-            "no user inventory found — run 'enum users' first (Phase 2)"
-        )
+        print_warning("no user inventory found — run 'enum users' first (Phase 2)")
         return report
 
     human_users = [u for u in users if not u.is_machine_account and u.enabled]
@@ -64,14 +63,11 @@ def detect_roastable_targets(session: Session) -> RoastableReport:
 
     # Kerberoastable: SPN present (excl. krbtgt)
     report.kerberoast_targets = [
-        u for u in human_users
-        if u.kerberoastable and u.username.lower() != "krbtgt"
+        u for u in human_users if u.kerberoastable and u.username.lower() != "krbtgt"
     ]
 
     # Password not required (low-hanging fruit)
-    report.password_not_required = [
-        u for u in human_users if u.password_not_required
-    ]
+    report.password_not_required = [u for u in human_users if u.password_not_required]
 
     # SAMR fallback: check UAC directly for users where asrep_roastable may be
     # unset because SAMR doesn't expose UAC in detail — re-evaluate from uac field
@@ -217,11 +213,11 @@ def _print_report(report: RoastableReport) -> None:
 
     if report.asrep_targets:
         print_success(
-            f"AS-REP targets → run 'asreproast' to harvest hashes: "
+            "AS-REP targets → run 'asreproast' to harvest hashes: "
             + ", ".join(u.username for u in report.asrep_targets[:5])
         )
     if report.kerberoast_targets:
         print_success(
-            f"Kerberoast targets → run 'kerberoast': "
+            "Kerberoast targets → run 'kerberoast': "
             + ", ".join(u.username for u in report.kerberoast_targets[:5])
         )

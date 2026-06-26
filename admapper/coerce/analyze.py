@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from admapper.coerce.catalog import coerce_meta
-from admapper.stores.hosts import HostsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guide
 from admapper.models.coerce_op import CoerceOpportunity
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

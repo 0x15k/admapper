@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from admapper.stores.hosts import HostsStore
 from admapper.models.cve_finding import CveTarget
+from admapper.stores.hosts import HostsStore
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

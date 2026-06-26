@@ -4,9 +4,9 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 
-from admapper.support.platform import run_command, tool_install_hint
 from admapper.models.ad_object import GppCredential
 from admapper.models.credential import Credential, CredentialType
+from admapper.support.platform import run_command, tool_install_hint
 
 _GPP_LINE_RE = re.compile(
     r"(?:\[+\]|GPP)\s*(?:password\s+)?(?P<user>\S+?)(?::\s*|\s+)(?P<pass>\S+)",

@@ -6,33 +6,31 @@ import html
 from pathlib import Path
 from typing import Any
 
-from admapper.intelligence.engagement_intel import build_engagement_intel
-from admapper.support.operator_setup import build_operator_setup
-from admapper.methodology.unified import (
-    ENGAGEMENT_FRAMEWORK,
-    build_study_map,
-)
-from admapper.report.engagement_map import loot_clue_rows
-from admapper.report.methodology import enum_highlights, methodology_lines
-from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth
-from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import _acl_exploit_blocker
-from admapper.report.scenario import _best_cred_per_user
-from admapper.guides.pentest_book import build_pentest_book
-from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
+from admapper.creds.common import format_admapper_winrm_pth
 from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
 from admapper.dashboard.ops_state import build_objective_ops_state
+from admapper.dashboard.topology import build_network_topology
+from admapper.dashboard.web import build_graph_payload
 from admapper.graph.identity_lens import (
     build_identity_lens,
     build_selectable_identities,
     filter_actions_for_pivot,
+    filter_attack_paths_for_pivot,
     filter_intel_for_pivot,
     filter_targets_for_pivot,
-    filter_attack_paths_for_pivot,
 )
-from admapper.dashboard.topology import build_network_topology
+from admapper.guides.pentest_book import build_pentest_book
+from admapper.intelligence.engagement_intel import build_engagement_intel
+from admapper.methodology.unified import (
+    ENGAGEMENT_FRAMEWORK,
+    build_study_map,
+)
 from admapper.models.escalation import EscalationEdge
-from admapper.dashboard.web import build_graph_payload
+from admapper.report.engagement import _load_json
+from admapper.report.engagement_map import _acl_exploit_blocker
+from admapper.report.methodology import enum_highlights, methodology_lines
+from admapper.report.scenario import _best_cred_per_user
+from admapper.support.operator_setup import build_operator_setup
 
 
 def _esc(text: str) -> str:
@@ -68,7 +66,11 @@ def _mission_action(edge: EscalationEdge) -> str:
     tech = edge.technique.lower()
     if edge.module == "acls" or tech in _EXPLOIT_TECHNIQUES:
         return "exploit"
-    if edge.module in {"wsus", "postex", "adcs"} or tech.startswith("wsus") or tech.startswith("esc"):
+    if (
+        edge.module in {"wsus", "postex", "adcs"}
+        or tech.startswith("wsus")
+        or tech.startswith("esc")
+    ):
         return "brief"
     return "exploit"
 
@@ -106,7 +108,7 @@ def _mission_from_edge(edge: EscalationEdge, *, workspace: str, pivot: str) -> d
         "exploit": f"admapper exploit -w {workspace}",
         "brief": f"admapper brief -w {workspace} --auto",
         "acls": f"admapper acls -w {workspace}",
-        "scan": f"admapper scan -H <DC>",
+        "scan": "admapper scan -H <DC>",
         "run": f"admapper run -w {workspace} -u <user> -p '<pass>'",
     }.get(action, f"admapper {action} -w {workspace}")
     return {
@@ -226,11 +228,7 @@ def build_ops_payload(
     else:
         owned = sorted(set(owned_users or []), key=str.lower)
     state = _load_json(ws_path / "state.json") or {}
-    pivot = (
-        pivot_user
-        or state.get("pivot_user")
-        or (owned[-1] if owned else "")
-    )
+    pivot = pivot_user or state.get("pivot_user") or (owned[-1] if owned else "")
     pivot = str(pivot or "").strip()
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
@@ -299,7 +297,9 @@ def build_ops_payload(
         next_hop_cmd = None
         graph = {**graph, "gained_hashes": [], "next_hop_cmd": None}
     objective = {
-        "headline": graph.get("next_hop") or next_edge_data.get("title") or ops_state.get("stage_label", ""),
+        "headline": graph.get("next_hop")
+        or next_edge_data.get("title")
+        or ops_state.get("stage_label", ""),
         "technique": next_edge_data.get("technique", ""),
         "target": next_edge_data.get("target", ""),
         "command": next_hop_cmd or (mission or {}).get("command", ""),
@@ -316,16 +316,12 @@ def build_ops_payload(
         verified = ops_progress.verified_set()
         if verified:
             best_creds = {
-                user: cred
-                for user, cred in file_creds.items()
-                if user.lower() in verified
+                user: cred for user, cred in file_creds.items() if user.lower() in verified
             }
         elif pivot_user:
             pivot_key = str(pivot_user).lower()
             best_creds = {
-                user: cred
-                for user, cred in file_creds.items()
-                if user.lower() == pivot_key
+                user: cred for user, cred in file_creds.items() if user.lower() == pivot_key
             }
         else:
             best_creds = {}
@@ -394,11 +390,7 @@ def build_ops_payload(
         attack_paths = filter_attack_paths_for_pivot(attack_paths, pivot)
         engagement_intel = filter_intel_for_pivot(engagement_intel, pivot, identity_lens)
         actions = filter_actions_for_pivot(actions, pivot=pivot)
-        pivot_quests = [
-            q
-            for q in quests
-            if str(q.get("principal", "")).lower() == pivot.lower()
-        ]
+        pivot_quests = [q for q in quests if str(q.get("principal", "")).lower() == pivot.lower()]
         if pivot_quests:
             quests = pivot_quests
         pm = identity_lens.get("primary_mission")
@@ -462,7 +454,9 @@ def build_ops_payload(
             }
         )
 
-    cred_inventory = [c for c in cred_inventory if _account_base(c.get("user", "")) not in pth_accounts]
+    cred_inventory = [
+        c for c in cred_inventory if _account_base(c.get("user", "")) not in pth_accounts
+    ]
 
     return {
         "meta": {
@@ -476,7 +470,11 @@ def build_ops_payload(
         },
         "topology": topology,
         "graph_mode": graph_mode,
-        "player": {"pivot": pivot, "owned": owned, "owned_methods": (ops_progress.owned_methods if ops_progress else {})},
+        "player": {
+            "pivot": pivot,
+            "owned": owned,
+            "owned_methods": (ops_progress.owned_methods if ops_progress else {}),
+        },
         "selectable_identities": selectable,
         "identity_lens": identity_lens,
         "phases": _phase_status(ws_path),
@@ -488,7 +486,9 @@ def build_ops_payload(
         "actions": actions,
         "objective": objective,
         "methodology": methodology_lines(ws_path),
-        "highlights": enum_highlights(ws_path) if ops_progress is None or ops_progress.enum_users else [],
+        "highlights": enum_highlights(ws_path)
+        if ops_progress is None or ops_progress.enum_users
+        else [],
         "clues": clues,
         "creds": cred_inventory,
         "hashes": hashes,
@@ -502,5 +502,3 @@ def build_ops_payload(
         "study_map": build_study_map(),
         "pentest_book": build_pentest_book(),
     }
-
-

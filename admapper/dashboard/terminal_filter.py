@@ -109,7 +109,7 @@ class TerminalFilter:
         return line.strip()
 
     def _is_dup(self, line: str) -> bool:
-        if line in self._recent[-_DEDUPE_WINDOW :]:
+        if line in self._recent[-_DEDUPE_WINDOW:]:
             return True
         self._recent.append(line)
         if len(self._recent) > _DEDUPE_WINDOW * 2:

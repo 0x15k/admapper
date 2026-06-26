@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.support.reachability import check_target_reachable
 from admapper.creds.common import pick_dc_ip
+from admapper.support.reachability import check_target_reachable
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

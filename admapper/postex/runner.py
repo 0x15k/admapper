@@ -7,13 +7,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip, resolve_dc_fqdn
-from admapper.postex.pe_arch import TargetArch
-from admapper.postex.payload import PayloadMode
 from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.deploy import deploy_dll_hijack
 from admapper.postex.listener import ReverseShellListener, start_listener
+from admapper.postex.payload import PayloadMode
+from admapper.postex.pe_arch import TargetArch
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.winrm.client import WinRMClient
 from admapper.winrm.factory import winrm_client_for_cred
 
@@ -257,8 +257,12 @@ def run_dll_hijack(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
     from admapper.models.workspace import OperationMode
+    from admapper.support.connectivity import (
+        TargetUnreachableError,
+        format_unreachable_message,
+        require_target_reachable,
+    )
 
     if not dry_run and session.workspace.mode == OperationMode.AUTO:
         try:
@@ -280,7 +284,9 @@ def run_dll_hijack(
             if use_ncat:
                 print_info(f"external listener required: ncat -lvnp {lport} on your LHOST")
             else:
-                print_info(f"starting built-in reverse-shell listener on 0.0.0.0:{lport} (set ADMAPPER_LHOST)")
+                print_info(
+                    f"starting built-in reverse-shell listener on 0.0.0.0:{lport} (set ADMAPPER_LHOST)"
+                )
             listener = start_listener(lport, use_ncat=use_ncat)
 
         deploy = deploy_dll_hijack(

@@ -10,6 +10,7 @@ Checks implemented:
 All checks are non-destructive read-only queries.
 Output: security_posture.json + findings.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,11 +20,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.stores.findings import FindingsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
-from admapper.support.platform import resolve_nxc, run_command
 from admapper.models.credential import Credential
 from admapper.models.finding import Finding, FindingSeverity
+from admapper.stores.findings import FindingsStore
+from admapper.support.output import print_info, print_success, print_table
+from admapper.support.platform import resolve_nxc, run_command
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -31,18 +32,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class PostureResult:
-    smb_signing: bool | None = None          # True = required (good), False = not required (bad)
-    laps_deployed: bool | None = None        # True = LAPS present
-    laps_covered_count: int = 0             # computers with LAPS password set
-    ntlmv1_accepted: bool | None = None     # True = server accepts NTLMv1 (bad)
+    smb_signing: bool | None = None  # True = required (good), False = not required (bad)
+    laps_deployed: bool | None = None  # True = LAPS present
+    laps_covered_count: int = 0  # computers with LAPS password set
+    ntlmv1_accepted: bool | None = None  # True = server accepts NTLMv1 (bad)
     ldap_signing_required: bool | None = None  # True = required (good)
     da_sessions: list[dict[str, str]] = field(default_factory=list)  # active DA sessions
-    stale_computers: list[dict[str, Any]] = field(default_factory=list) # stale computer accounts
+    stale_computers: list[dict[str, Any]] = field(default_factory=list)  # stale computer accounts
     errors: list[str] = field(default_factory=list)
 
 
 def check_security_posture(
-    session: "Session",
+    session: Session,
     dc_ip: str,
     cred: Credential,
     domain: str,
@@ -121,6 +122,7 @@ def check_security_posture(
 
 # ── Individual checks ──────────────────────────────────────────────────────
 
+
 def _read_smb_signing(ws_path: Path) -> bool | None:
     """Read SMB signing from existing auth_inventory.json."""
     inv_path = ws_path / "auth_inventory.json"
@@ -157,7 +159,8 @@ def _check_smb_signing(dc_ip: str, cred: Credential, domain: str) -> bool | None
 def _check_laps(dc_ip: str, cred: Credential, domain: str) -> tuple[bool | None, int]:
     """Detect LAPS via LDAP — check for ms-Mcs-AdmPwd attribute on computer objects."""
     try:
-        from ldap3 import Server, Connection, SUBTREE, ALL
+        from ldap3 import ALL, SUBTREE, Connection, Server
+
         base_dn = ",".join(f"DC={p}" for p in domain.split("."))
         srv = Server(dc_ip, get_info=ALL)
         conn = Connection(
@@ -226,10 +229,15 @@ def _check_ntlmv1(dc_ip: str, cred: Credential, domain: str) -> bool | None:
         return None
     try:
         cmd = [
-            nxc, "smb", dc_ip,
-            "-u", cred.username,
-            "-p", cred.secret or "",
-            "-d", domain,
+            nxc,
+            "smb",
+            dc_ip,
+            "-u",
+            cred.username,
+            "-p",
+            cred.secret or "",
+            "-d",
+            domain,
             "--ntlmv1",
         ]
         proc = run_command(cmd, timeout=20)
@@ -250,11 +258,17 @@ def _check_ldap_signing(dc_ip: str, cred: Credential, domain: str) -> bool | Non
         return _check_ldap_signing_native(dc_ip, cred, domain)
     try:
         cmd = [
-            nxc, "ldap", dc_ip,
-            "-u", cred.username,
-            "-p", cred.secret or "",
-            "-d", domain,
-            "-M", "ldap-checker",
+            nxc,
+            "ldap",
+            dc_ip,
+            "-u",
+            cred.username,
+            "-p",
+            cred.secret or "",
+            "-d",
+            domain,
+            "-M",
+            "ldap-checker",
         ]
         proc = run_command(cmd, timeout=30)
         output = (proc.stdout or "") + (proc.stderr or "")
@@ -270,7 +284,8 @@ def _check_ldap_signing(dc_ip: str, cred: Credential, domain: str) -> bool | Non
 def _check_ldap_signing_native(dc_ip: str, cred: Credential, domain: str) -> bool | None:
     """Try LDAP bind without signing — if it succeeds, signing is not required."""
     try:
-        from ldap3 import Server, Connection, ALL, SIMPLE
+        from ldap3 import ALL, SIMPLE, Connection, Server
+
         srv = Server(dc_ip, get_info=ALL)
         conn = Connection(
             srv,
@@ -309,10 +324,15 @@ def _check_da_sessions(
         return sessions
     try:
         cmd = [
-            nxc, "smb", dc_ip,
-            "-u", cred.username,
-            "-p", cred.secret or "",
-            "-d", domain,
+            nxc,
+            "smb",
+            dc_ip,
+            "-u",
+            cred.username,
+            "-p",
+            cred.secret or "",
+            "-d",
+            domain,
             "--sessions",
         ]
         proc = run_command(cmd, timeout=30)
@@ -338,11 +358,7 @@ def _get_da_members(ws_path: Path) -> list[str]:
         for group in data.get("groups") or []:
             if str(group.get("name", "")).lower() in ("domain admins", "domain administrators"):
                 members = group.get("members") or []
-                return [
-                    m.split(",")[0].removeprefix("CN=")
-                    for m in members
-                    if m
-                ]
+                return [m.split(",")[0].removeprefix("CN=") for m in members if m]
     except Exception:
         pass
     return []
@@ -358,6 +374,7 @@ def _check_stale_computers(ws_path: Path) -> list[dict[str, Any]]:
         data = json.loads(inv_path.read_text(encoding="utf-8"))
         computers = data.get("computers") or []
         import time
+
         interval_45_days = 45 * 86400 * 10000000
         now_filetime = int(time.time() * 10000000) + 116444736000000000
         for comp in computers:
@@ -368,27 +385,32 @@ def _check_stale_computers(ws_path: Path) -> list[dict[str, Any]]:
                 except (ValueError, TypeError):
                     continue
                 if pwd_last_set == 0:
-                    stale.append({
-                        "name": comp.get("name"),
-                        "dn": comp.get("dn"),
-                        "dns_host": comp.get("dns_host"),
-                        "pwd_last_set": 0,
-                        "reason": "Password never changed"
-                    })
+                    stale.append(
+                        {
+                            "name": comp.get("name"),
+                            "dn": comp.get("dn"),
+                            "dns_host": comp.get("dns_host"),
+                            "pwd_last_set": 0,
+                            "reason": "Password never changed",
+                        }
+                    )
                 elif (now_filetime - pwd_last_set) > interval_45_days:
-                    stale.append({
-                        "name": comp.get("name"),
-                        "dn": comp.get("dn"),
-                        "dns_host": comp.get("dns_host"),
-                        "pwd_last_set": pwd_last_set,
-                        "reason": "Password older than 45 days"
-                    })
+                    stale.append(
+                        {
+                            "name": comp.get("name"),
+                            "dn": comp.get("dn"),
+                            "dns_host": comp.get("dns_host"),
+                            "pwd_last_set": pwd_last_set,
+                            "reason": "Password older than 45 days",
+                        }
+                    )
     except Exception:
         pass
     return stale
 
 
 # ── Output ─────────────────────────────────────────────────────────────────
+
 
 def _print_posture_summary(result: PostureResult) -> None:
     rows: list[list[str]] = []
@@ -424,7 +446,9 @@ def _print_posture_summary(result: PostureResult) -> None:
         ntlm_detail = "skipped (NetExec/nxc missing)" if nxc_missing else "check failed/timed out"
     elif result.ntlmv1_accepted:
         ntlm_detail = "relay to RC4 / downgrade"
-    rows.append(["NTLMv1 accepted", _status(result.ntlmv1_accepted, good_if_true=False), ntlm_detail])
+    rows.append(
+        ["NTLMv1 accepted", _status(result.ntlmv1_accepted, good_if_true=False), ntlm_detail]
+    )
 
     # LDAP signing check (depends on NetExec/nxc, falls back to native bind)
     ldap_detail = ""
@@ -434,10 +458,22 @@ def _print_posture_summary(result: PostureResult) -> None:
         ldap_detail = "LDAP relay / MitM viable"
     rows.append(["LDAP signing required", _status(result.ldap_signing_required), ldap_detail])
 
-    rows.append(["DA sessions detected", str(len(result.da_sessions)),
-                 ", ".join(s["user"] for s in result.da_sessions[:3]) if result.da_sessions else "none"])
-    rows.append(["Stale computers detected", str(len(result.stale_computers)),
-                 ", ".join(str(c["name"]) for c in result.stale_computers[:3]) if result.stale_computers else "none"])
+    rows.append(
+        [
+            "DA sessions detected",
+            str(len(result.da_sessions)),
+            ", ".join(s["user"] for s in result.da_sessions[:3]) if result.da_sessions else "none",
+        ]
+    )
+    rows.append(
+        [
+            "Stale computers detected",
+            str(len(result.stale_computers)),
+            ", ".join(str(c["name"]) for c in result.stale_computers[:3])
+            if result.stale_computers
+            else "none",
+        ]
+    )
 
     print_table("Security posture", ["check", "status", "detail"], rows)
 

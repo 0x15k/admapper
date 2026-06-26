@@ -72,7 +72,10 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         "ldap_anonymous",
         title="LDAP anonymous bind",
         summary="Query Active Directory via LDAP without credentials when anonymous bind is allowed.",
-        prerequisites=("TCP/389 reachable on a domain controller", "Anonymous bind enabled (misconfiguration)"),
+        prerequisites=(
+            "TCP/389 reachable on a domain controller",
+            "Anonymous bind enabled (misconfiguration)",
+        ),
         manual_steps=(
             "Confirm anonymous bind against the DC RootDSE.",
             "Read defaultNamingContext from RootDSE — this is your LDAP search base.",
@@ -88,7 +91,11 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         tools=("ldapsearch", "ldap3", "NetExec (nxc ldap)", "ADMapper enum users"),
         mitre_id="T1087.002",
-        next_steps=("enum users", "Check AS-REP roastable accounts (no preauth)", "Password spray user list"),
+        next_steps=(
+            "enum users",
+            "Check AS-REP roastable accounts (no preauth)",
+            "Password spray user list",
+        ),
         references=("https://attack.mitre.org/techniques/T1087/002/",),
     ),
     "smb_null": _g(
@@ -152,17 +159,23 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         tools=("NetExec", "rpcclient", "Impacket samrdump", "ADMapper enum users"),
         mitre_id="T1087.002",
-        next_steps=("rid_cycling if user count is low", "asreproast / kerberoast on discovered users"),
+        next_steps=(
+            "rid_cycling if user count is low",
+            "asreproast / kerberoast on discovered users",
+        ),
     ),
     "ldap_user_enum": _g(
         "ldap_user_enum",
         title="LDAP user enumeration (authenticated or anonymous)",
         summary="Pull the canonical user list from AD LDAP including UAC and SPN attributes.",
-        prerequisites=("LDAP bind (anonymous or credentialed)", "defaultNamingContext from RootDSE"),
+        prerequisites=(
+            "LDAP bind (anonymous or credentialed)",
+            "defaultNamingContext from RootDSE",
+        ),
         manual_steps=(
             "Bind to LDAP on tcp/389 (or 636 with LDAPS).",
             "Search base: defaultNamingContext from RootDSE.",
-            'Filter: (&(objectClass=user)(objectCategory=person))',
+            "Filter: (&(objectClass=user)(objectCategory=person))",
             "Attributes: sAMAccountName, userAccountControl, servicePrincipalName, description, memberOf.",
             "Flag DONT_REQ_PREAUTH (0x400000) → AS-REP roastable.",
             "Non-empty servicePrincipalName on user account → Kerberoast candidate.",
@@ -247,9 +260,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
     "passwordspray": _g(
         "passwordspray",
         title="Password spraying",
-        summary=(
-            "Try one password against many domain users while respecting lockout policy."
-        ),
+        summary=("Try one password against many domain users while respecting lockout policy."),
         prerequisites=(
             "Username list from enum users",
             "Domain lockout policy (lockoutThreshold, badPwdCount per user)",

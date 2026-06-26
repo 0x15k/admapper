@@ -14,9 +14,7 @@ def pick_best_pivot(owned: list[str], *, ws_path: Path | None = None) -> str | N
         default=-1,
     )
     post_machine_humans = [
-        user
-        for i, user in enumerate(owned)
-        if i > last_machine_idx and not user.endswith("$")
+        user for i, user in enumerate(owned) if i > last_machine_idx and not user.endswith("$")
     ]
     if post_machine_humans:
         return post_machine_humans[-1]

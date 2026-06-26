@@ -418,9 +418,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   <div class="header">
     <span class="logo"><i class="fa-solid fa-network-wired"></i> ADMapper</span>
     <div class="meta">
-      <span>Domain: <strong id="h-domain">{domain_s or '...'}</strong></span>
+      <span>Domain: <strong id="h-domain">{domain_s or "..."}</strong></span>
       <span>DC: <strong id="h-dc">...</strong></span>
-      <span>Active Pivot: <strong id="h-pivot" style="color:var(--orange)">{pivot_s or 'none'}</strong></span>
+      <span>Active Pivot: <strong id="h-pivot" style="color:var(--orange)">{pivot_s or "none"}</strong></span>
     </div>
     <div class="status" id="h-status">
       <span class="dot" style="background:var(--green)"></span> Ready

@@ -5,9 +5,9 @@ import re
 import subprocess
 from pathlib import Path
 
+from admapper.postex.evil_winrm_output import extract_winrm_command_body
 from admapper.support.output import print_error, print_info, print_success, print_warning
 from admapper.support.platform import resolve_executable, subprocess_run_kwargs
-from admapper.postex.evil_winrm_output import extract_winrm_command_body
 from admapper.winrm.client import WinRMClient, WinRMError
 
 _B64_LINE = 480
@@ -72,7 +72,9 @@ def _parse_dir_size(output: str, filename: str) -> int | None:
     return None
 
 
-def _run_evil_winrm_stdin(client: WinRMClient, script: str, *, timeout: int = _UPLOAD_TIMEOUT) -> str:
+def _run_evil_winrm_stdin(
+    client: WinRMClient, script: str, *, timeout: int = _UPLOAD_TIMEOUT
+) -> str:
     ew = resolve_executable(["evil-winrm"])
     if not ew or not client.nthash:
         raise WinRMError("evil-winrm not found (required for PTH upload)")
@@ -91,7 +93,9 @@ def _run_evil_winrm_stdin(client: WinRMClient, script: str, *, timeout: int = _U
     except subprocess.TimeoutExpired as exc:
         partial = ""
         if exc.stdout:
-            partial = exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")
+            partial = (
+                exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")
+            )
         client.last_raw_output = partial or f"evil-winrm timeout after {timeout}s"
         raise WinRMError("evil-winrm session timeout") from exc
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
@@ -172,13 +176,13 @@ def manual_upload_instructions(
     filename = remote.rsplit("\\", 1)[-1]
     remote_fwd = remote_path.replace("\\", "/")
     lines = [
-        f"# evil-winrm interactive — use / in remote path or upload+copy",
+        "# evil-winrm interactive — use / in remote path or upload+copy",
         f"evil-winrm -i {target} -u '{user}' -H {nthash}",
         f"mkdir {parent} -Force",
-        f"# option A (recommended): forward slashes",
+        "# option A (recommended): forward slashes",
         f"upload {local_abs} {remote_fwd}",
         f"dir {remote_fwd}",
-        f"# option B: upload to cwd and copy",
+        "# option B: upload to cwd and copy",
         f"upload {local_abs} {filename}",
         f"copy .\\{filename} {remote}",
         f"dir {remote}",
@@ -261,8 +265,7 @@ def _upload_via_certutil_b64(
         timeout=_WINRM_TIMEOUT,
     )
     client.execute(
-        f"Remove-Item -Force -ErrorAction SilentlyContinue "
-        f"(Join-Path $env:TEMP '{safe_name}')",
+        f"Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $env:TEMP '{safe_name}')",
         shell="powershell",
         timeout=_WINRM_TIMEOUT,
     )
@@ -367,9 +370,7 @@ def upload_file(
 
     if client.ticket_method == "nthash" and client.nthash:
         # Skip nxc mkdir here — gMSA PTH often returns empty stdout; evil-winrm script creates parent.
-        print_info(
-            f"upload: evil-winrm builtin @ {target} ({expected_size} bytes → {remote_path})"
-        )
+        print_info(f"upload: evil-winrm builtin @ {target} ({expected_size} bytes → {remote_path})")
         if _upload_via_evil_winrm_builtin(
             client, local_path, remote_path, expected_size=expected_size
         ):

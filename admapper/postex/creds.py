@@ -148,7 +148,9 @@ def resolve_winrm_cred(
                 return WinRMCred(
                     username=account,
                     domain=domain,
-                    host=_winrm_target_host(session, ws_path=ws_path, account=account, explicit_host=host),
+                    host=_winrm_target_host(
+                        session, ws_path=ws_path, account=account, explicit_host=host
+                    ),
                     nthash=nthash,
                     source="exploit_log",
                 )
@@ -193,6 +195,4 @@ def resolve_winrm_cred(
             source="exploit_log:auto",
         )
 
-    raise ValueError(
-        "no WinRM credential — add machine NTLM hash (creds add) or run exploit chain"
-    )
+    raise ValueError("no WinRM credential — add machine NTLM hash (creds add) or run exploit chain")

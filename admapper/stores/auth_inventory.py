@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from admapper.support.workspace import WorkspaceManager
 from admapper.models.ad_object import (
     ComputerRecord,
     DelegationRecord,
@@ -15,6 +14,7 @@ from admapper.models.ad_object import (
     TrustRecord,
 )
 from admapper.models.user import UserRecord
+from admapper.support.workspace import WorkspaceManager
 
 
 class AuthInventoryStore:

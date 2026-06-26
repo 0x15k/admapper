@@ -5,8 +5,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_info, print_success, print_warning
-from admapper.support.provenance import Tool, print_ok, print_step, print_warn
+from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.evil_winrm_output import extract_winrm_command_body, strip_evil_winrm_output
 from admapper.postex.hijack_intel import (
     extract_hijack_intel,
@@ -14,10 +13,15 @@ from admapper.postex.hijack_intel import (
     parse_schtasks_list_output,
     parse_task_xml_file_output,
 )
-from admapper.postex.creds import resolve_winrm_cred
-from admapper.postex.pe_arch import infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.loot_intel import scan_loot_directory
-from admapper.postex.task_hijack import TaskHijackAnalysis, analyze_task_hijack, analysis_to_dict
+from admapper.postex.pe_arch import (
+    infer_arch_from_monitor_log,
+    normalize_arch,
+    ps_read_pe_arch_script,
+)
+from admapper.postex.task_hijack import TaskHijackAnalysis, analysis_to_dict, analyze_task_hijack
+from admapper.support.output import print_info, print_success, print_warning
+from admapper.support.provenance import Tool, print_ok, print_step, print_warn
 from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 
@@ -35,6 +39,8 @@ _MONITOR_LOG_PATHS: tuple[str, ...] = (
 def _monitor_log_candidates(drop_path: str) -> list[str]:
     base = drop_path.rstrip("\\/").split("\\")[-1]
     return [p.format(name=base) for p in _MONITOR_LOG_PATHS]
+
+
 # Fast targeted queries before full schtasks /query (slow via evil-winrm)
 _TARGETED_TASK_QUERIES: tuple[tuple[str, str], ...] = ()
 
@@ -151,10 +157,7 @@ def _monitor_usable(monitor_log: str) -> bool:
     text = _clean_monitor_log(monitor_log)
     if not text:
         return False
-    return bool(
-        _has_hijack_payload_hint(text)
-        or re.search(r"ProgramData\\.*\.zip", text, re.I)
-    )
+    return bool(_has_hijack_payload_hint(text) or re.search(r"ProgramData\\.*\.zip", text, re.I))
 
 
 def _intel_sufficient(
@@ -229,7 +232,9 @@ def _enumerate_scheduled_tasks(
         if raw_hint:
             print_warning(f"task enum: no parsed output — raw nxc: {raw_hint[:200]}…")
         else:
-            print_warning("task enum: no output — COM/schtasks/xml empty (check WinRM or permissions)")
+            print_warning(
+                "task enum: no output — COM/schtasks/xml empty (check WinRM or permissions)"
+            )
     return merged, "+".join(methods)
 
 
@@ -293,10 +298,7 @@ def _probe_monitor_logs(client: WinRMClient, intel=None) -> str:
 
 def _ps_monitor_log(path: str) -> str:
     safe = path.replace("'", "''")
-    return (
-        f"if(Test-Path -LiteralPath '{safe}')"
-        f"{{Get-Content -LiteralPath '{safe}' -Tail 25}}"
-    )
+    return f"if(Test-Path -LiteralPath '{safe}'){{Get-Content -LiteralPath '{safe}' -Tail 25}}"
 
 
 def _ps_acl(path: str) -> str:
@@ -361,7 +363,9 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
             prev = json.loads(scan_path.read_text(encoding="utf-8"))
             hi = prev.get("hijack_intel") or {}
             if intel is None and hi.get("drop_path"):
-                intel = extract_hijack_intel(loot, monitor_log=str(prev.get("monitor_log_excerpt") or ""))
+                intel = extract_hijack_intel(
+                    loot, monitor_log=str(prev.get("monitor_log_excerpt") or "")
+                )
         except (json.JSONDecodeError, OSError):
             prev = None
 
@@ -407,7 +411,9 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
 
     com_out = ""
     task_enum_method = ""
-    if not _intel_sufficient(intel, monitor_log, loot=loot, drop_path=intel.drop_path if intel else ""):
+    if not _intel_sufficient(
+        intel, monitor_log, loot=loot, drop_path=intel.drop_path if intel else ""
+    ):
         task_filter = intel.com_task_filter if intel else None
         if task_filter:
             print_info(f"task enum: filter {task_filter!r}")
@@ -521,7 +527,9 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
             f"writable={f.writable} → {f.drop_path}\\{f.payload_zip}"
         )
         if len(result.analysis.findings) > 1:
-            print_info(f"+ {len(result.analysis.findings) - 1} additional task(s) in postex_scan.json")
+            print_info(
+                f"+ {len(result.analysis.findings) - 1} additional task(s) in postex_scan.json"
+            )
     else:
         print_warning("no DLL hijack finding — check postex_scan.json")
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 
+from admapper.models.mssql_op import MssqlInstance
 from admapper.stores.hosts import HostsStore
 from admapper.stores.users import UsersStore
-from admapper.models.mssql_op import MssqlInstance
 
 if True:
     from admapper.support.session import Session
@@ -21,14 +21,14 @@ def discover_mssql_instances(session: Session) -> list[MssqlInstance]:
     seen: set[tuple[str, int]] = set()
     instances: list[MssqlInstance] = []
 
-    def add(host: str, *, port: int = 1433, instance: str | None = None, spn: str | None = None) -> None:
+    def add(
+        host: str, *, port: int = 1433, instance: str | None = None, spn: str | None = None
+    ) -> None:
         key = (host.lower(), port)
         if key in seen:
             return
         seen.add(key)
-        instances.append(
-            MssqlInstance(host=host, port=port, instance=instance, spn=spn)
-        )
+        instances.append(MssqlInstance(host=host, port=port, instance=instance, spn=spn))
 
     for host in HostsStore(session.workspaces, ws_name).list():
         if 1433 in (host.open_ports or []):

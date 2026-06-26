@@ -25,7 +25,9 @@ def _norm_severity(value: str | None) -> str:
 
 
 def _item_from_finding(raw: dict[str, Any], *, source: str, category: str) -> ReportItem:
-    title = str(raw.get("title") or raw.get("summary") or raw.get("right") or raw.get("esc") or "finding")
+    title = str(
+        raw.get("title") or raw.get("summary") or raw.get("right") or raw.get("esc") or "finding"
+    )
     detail = str(
         raw.get("detail")
         or raw.get("summary")
@@ -45,7 +47,11 @@ def _item_from_finding(raw: dict[str, Any], *, source: str, category: str) -> Re
         mitre_id=raw.get("mitre_id"),
         host=str(host) if host else None,
         technique=str(technique) if technique else None,
-        extra={k: v for k, v in raw.items() if k not in {"id", "title", "severity", "summary", "detail"}},
+        extra={
+            k: v
+            for k, v in raw.items()
+            if k not in {"id", "title", "severity", "summary", "detail"}
+        },
     )
 
 

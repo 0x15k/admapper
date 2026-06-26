@@ -69,7 +69,9 @@ def _build_entry_line(ip: str, hostname: str) -> str:
     return f"{ip}  {hostname}\n"
 
 
-def _apply_entry(lines: list[str], ip: str, hostname: str) -> tuple[list[str], HostsSyncStatus, str | None]:
+def _apply_entry(
+    lines: list[str], ip: str, hostname: str
+) -> tuple[list[str], HostsSyncStatus, str | None]:
     """Return updated lines, status, and previous IP if updated."""
     idx = _find_hostname_line(lines, hostname)
     if idx is not None:
@@ -191,10 +193,7 @@ def format_hosts_sync_message(result: HostsSyncResult) -> str:
         return f"/etc/hosts updated — added {result.ip}  {result.hostname}"
     if result.status == HostsSyncStatus.UPDATED:
         prev = result.previous_ip or "?"
-        return (
-            f"/etc/hosts updated — {result.hostname}: {prev} → {result.ip} "
-            "(machine respawned)"
-        )
+        return f"/etc/hosts updated — {result.hostname}: {prev} → {result.ip} (machine respawned)"
     if result.status == HostsSyncStatus.SKIPPED:
         return f"/etc/hosts skipped — {result.detail}"
     return f"/etc/hosts failed — {result.detail}"

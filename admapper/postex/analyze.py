@@ -5,8 +5,6 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.stores.hosts import HostsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import CredentialStatus
@@ -19,6 +17,8 @@ from admapper.postex.task_hijack import (
     findings_to_opportunities,
 )
 from admapper.postex.templates import apply_postex_templates, build_template_context
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

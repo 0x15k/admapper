@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-from admapper.support.output import print_success, print_warning
 from admapper.escalate.edges import collect_edges_from_pivot, sort_edges
 from admapper.report.engagement import _load_json
+from admapper.support.output import print_success, print_warning
 
 
 def _node_label(node: dict[str, Any], *, owned_mark: bool = False) -> str:
@@ -41,7 +40,11 @@ def _outbound_edges(
             continue
         target_id = str(edge.get("target", ""))
         target = nodes_by_id.get(target_id, {})
-        label = _node_label(target, owned_mark=False) if target else target_id.split(":")[-1].split("@")[0]
+        label = (
+            _node_label(target, owned_mark=False)
+            if target
+            else target_id.split(":")[-1].split("@")[0]
+        )
         etype = _edge_label(edge)
         tgt_user = str(target.get("username", label)).lower()
         status = "owned" if tgt_user in owned or target.get("owned") else "edge"
@@ -100,7 +103,11 @@ def build_graph_view(
             ws_path=ws_path,
             domain=domain,
         )
-        ready = [e for e in sort_edges(edges) if e.ready and not e.target_owned and e.technique != "member_of"]
+        ready = [
+            e
+            for e in sort_edges(edges)
+            if e.ready and not e.target_owned and e.technique != "member_of"
+        ]
         if ready:
             lines.append("  FROM PIVOT (1-hop — BloodHound style)")
             for edge in ready[:8]:
@@ -135,9 +142,7 @@ def build_graph_view(
         lines.append("  MULTI-HOP PATHS (paths.json)")
         for path in path_list[:5]:
             steps = path.get("steps") or []
-            chain = " → ".join(
-                s.get("narrative", s.get("edge_type", "?"))[:40] for s in steps[:6]
-            )
+            chain = " → ".join(s.get("narrative", s.get("edge_type", "?"))[:40] for s in steps[:6])
             lines.append(
                 f"    {path.get('id')}: {path.get('source_label')} → {path.get('target_label')} "
                 f"({path.get('length')} hops)"

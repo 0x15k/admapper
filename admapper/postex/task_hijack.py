@@ -139,18 +139,14 @@ def analyze_task_hijack(
         candidate_tasks = [ScheduledTaskRecord(name=intel.task_name_hint)]
 
     zip_tasks = [
-        t
-        for t in candidate_tasks
-        if _PAYLOAD_REF_RE.search(f"{t.executable} {t.arguments}")
+        t for t in candidate_tasks if _PAYLOAD_REF_RE.search(f"{t.executable} {t.arguments}")
     ]
     if zip_tasks:
         candidate_tasks = zip_tasks
 
     writable = bool(_WRITABLE_RE.search(acl_output))
     arch: TargetArch = (
-        normalize_arch(target_arch)
-        or infer_arch_from_monitor_log(monitor_log)
-        or "x86"
+        normalize_arch(target_arch) or infer_arch_from_monitor_log(monitor_log) or "x86"
     )
     zip_name = intel.payload_zip
     dll_name = intel.payload_dll
@@ -190,9 +186,7 @@ def analyze_task_hijack(
         if writable:
             evidence.append(f"remote: {drop_path} writable by current principal")
         if not writable and strong_loot_hints:
-            evidence.append(
-                "loot: zip+dll+drop path detected — verify ACL with postex scan"
-            )
+            evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
 
         severity = "high"
         if writable and run_as != "unknown":
@@ -236,9 +230,7 @@ def analyze_task_hijack(
         if monitor_log:
             evidence.append("remote: monitor log references zip/dll load path")
         if strong_loot_hints:
-            evidence.append(
-                "loot: zip+dll+drop path detected — verify ACL with postex scan"
-            )
+            evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
         severity = "critical" if writable and run_as != "unknown" else "high"
         if writable or strong_loot_hints:
             analysis.findings.append(
@@ -323,10 +315,7 @@ def findings_to_opportunities(
         else:
             detail_parts.append("Confirm ACLs on drop path after shell access")
 
-        commands = [
-            apply_postex_templates(c, ctx)
-            for c in meta.manual_commands
-        ]
+        commands = [apply_postex_templates(c, ctx) for c in meta.manual_commands]
 
         ops.append(
             PostexOpportunity(

@@ -104,9 +104,9 @@ def check_kerberos_tgt(
     except ImportError:
         return False
 
-    from admapper.support.platform import get_clock_skew
     from admapper.kerberos.skew import check_kerberos_with_skew, seconds_to_faketime_offset
     from admapper.kerberos.time_sync import get_last_ntp_step_seconds, is_clock_unstable
+    from admapper.support.platform import get_clock_skew
 
     skew = preferred_clock_skew or get_clock_skew()
     step_seconds = get_last_ntp_step_seconds()
@@ -114,9 +114,7 @@ def check_kerberos_tgt(
     from admapper.kerberos.time_sync import was_dc_clock_synced
 
     skip_system_time = (
-        kerberos_only
-        and not was_dc_clock_synced(dc_ip)
-        and (bool(skew) or is_clock_unstable())
+        kerberos_only and not was_dc_clock_synced(dc_ip) and (bool(skew) or is_clock_unstable())
     )
     ok, _applied = check_kerberos_with_skew(
         domain,
@@ -141,8 +139,8 @@ def load_protected_users(ws_path: str | None = None) -> set[str]:
     """Read Protected Users group members from auth_inventory.json."""
     if not ws_path:
         return set()
-    from pathlib import Path
     import json
+    from pathlib import Path
 
     inv_path = Path(ws_path) / "auth_inventory.json"
     if not inv_path.is_file():

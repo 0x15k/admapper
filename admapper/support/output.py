@@ -60,8 +60,9 @@ def print_scan_line(
 ) -> None:
     """Format columnar scan line: [TIMESTAMP] PROTOCOL IP PREFIX MESSAGE."""
     from datetime import datetime
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     if level == "success":
         prefix = "[bold green][+][/bold green]"
     elif level == "warning":
@@ -73,7 +74,7 @@ def print_scan_line(
 
     proto_str = f"{protocol[:8]:<8}"
     ip_str = f"{ip[:15]:<15}"
-    
+
     console.print(f"[dim]{timestamp}[/dim] {proto_str} {ip_str} {prefix} {message}")
 
 
@@ -84,7 +85,7 @@ def print_loot_box(title: str, data: dict[str, str]) -> None:
     for k, v in data.items():
         padded_key = f"{k:<{max_key_len}}"
         body.append(f"[bold cyan]{padded_key}[/bold cyan] : [bold white]{v}[/bold white]")
-    
+
     panel_content = "\n".join(body)
     panel = Panel(
         panel_content,
@@ -120,10 +121,7 @@ def _print_table_compact(title: str, columns: list[str], rows: list[list[str]]) 
     title_l = title.lower()
     if title == "Auth checks" and len(columns) >= 2:
         parts = {str(r[0]): str(r[1]) for r in rows if len(r) >= 2}
-        print_info(
-            "Auth: "
-            + " · ".join(f"{k}={v}" for k, v in parts.items())
-        )
+        print_info("Auth: " + " · ".join(f"{k}={v}" for k, v in parts.items()))
         return
     if "post-exploitation" in title_l or "post-exploitation" in title_l.replace("_", "-"):
         print_info(f"POST-EX: {len(rows)} opportunity(ies) — details in right panel")

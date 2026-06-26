@@ -9,7 +9,13 @@ from admapper.cli.commands._helpers import (
     parse_set_mode,
     require_workspace,
 )
-from admapper.support.output import print_error, print_info, print_success, print_table, print_warning
+from admapper.support.output import (
+    print_error,
+    print_info,
+    print_success,
+    print_table,
+    print_warning,
+)
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -42,9 +48,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
             print_warning("no workspaces yet — run: set workspace <name>")
             return True
         active = session.workspace.name if session.workspace else None
-        rows = [["name", "active"]] + [
-            [name, "yes" if name == active else ""] for name in names
-        ]
+        rows = [["name", "active"]] + [[name, "yes" if name == active else ""] for name in names]
         print_table("Workspaces", rows[0], rows[1:])
         return True
 

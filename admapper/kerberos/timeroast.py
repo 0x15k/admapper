@@ -5,6 +5,8 @@ import shutil
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from admapper.creds.common import pick_dc_ip
+from admapper.guides.render import print_manual_guide
 from admapper.support.output import (
     ConfirmLevel,
     confirm,
@@ -13,8 +15,6 @@ from admapper.support.output import (
     print_table,
     print_warning,
 )
-from admapper.creds.common import pick_dc_ip
-from admapper.guides.render import print_manual_guide
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

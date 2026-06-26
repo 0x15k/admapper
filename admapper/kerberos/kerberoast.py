@@ -7,18 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.stores.findings import FindingsStore
-from admapper.stores.kerberos_hashes import TgsHashStore
-from admapper.support.output import (
-    ConfirmLevel,
-    confirm,
-    print_info,
-    print_success,
-    print_table,
-    print_warning,
-)
-from admapper.support.platform import resolve_impacket_script, run_command, tool_install_hint
-from admapper.stores.users import UsersStore
 from admapper.creds.common import (
     apply_cracked_credentials,
     pick_dc_ip,
@@ -30,6 +18,18 @@ from admapper.creds.crack import crack_with_hashcat, crack_with_john, find_wordl
 from admapper.guides.render import print_manual_guide
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.hash_record import TgsHash
+from admapper.stores.findings import FindingsStore
+from admapper.stores.kerberos_hashes import TgsHashStore
+from admapper.stores.users import UsersStore
+from admapper.support.output import (
+    ConfirmLevel,
+    confirm,
+    print_info,
+    print_success,
+    print_table,
+    print_warning,
+)
+from admapper.support.platform import resolve_impacket_script, run_command, tool_install_hint
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -161,9 +161,7 @@ def run_kerberoast(
     targets = _kerberoast_targets(session, usernames)
     cred = workspace_password_cred(session, domain)
     if not targets and not cred:
-        raise ValueError(
-            "no Kerberoastable users — run enum users, or add creds for full SPN dump"
-        )
+        raise ValueError("no Kerberoastable users — run enum users, or add creds for full SPN dump")
 
     auth_hint = "workspace credential" if cred else "no-pass (LDAP anonymous)"
     if not confirm(

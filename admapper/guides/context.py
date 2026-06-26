@@ -4,9 +4,9 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from admapper.stores.hosts import HostsStore
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import CredentialStatus
+from admapper.stores.hosts import HostsStore
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -48,9 +48,9 @@ def build_guide_context(session: Session) -> GuideContext:
     if inv_path.is_file():
         inv = json.loads(inv_path.read_text(encoding="utf-8"))
         for computer in inv.get("computers") or []:
-            if computer.get("unconstrained_delegation") or str(computer.get("name", "")).upper().startswith(
-                "DC"
-            ):
+            if computer.get("unconstrained_delegation") or str(
+                computer.get("name", "")
+            ).upper().startswith("DC"):
                 ctx.dc_host = computer.get("dns_host") or computer.get("name")
                 break
         if not ctx.dc_host:
@@ -111,8 +111,18 @@ def contextualize_text(text: str, ctx: GuideContext) -> str:
         ("<USER>", user),
         ("<PASS>", password),
         ("<listener>", dc_host),
-        ("corp-DC01-CA", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
-        ("<CA>", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
+        (
+            "corp-DC01-CA",
+            f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA"
+            if domain != "<domain>"
+            else "<ca_name>",
+        ),
+        (
+            "<CA>",
+            f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA"
+            if domain != "<domain>"
+            else "<ca_name>",
+        ),
     ]
 
     seen: set[str] = set()

@@ -214,9 +214,7 @@ def fetch_lockout_context(
             result.error = "could not determine LDAP search base"
             return result
         result.base_dn = search_base
-        result.policy = fetch_domain_lockout_policy(
-            host, search_base, port=port, timeout=timeout
-        )
+        result.policy = fetch_domain_lockout_policy(host, search_base, port=port, timeout=timeout)
         result.user_states = fetch_user_lockout_states(
             host, search_base, port=port, timeout=timeout
         )

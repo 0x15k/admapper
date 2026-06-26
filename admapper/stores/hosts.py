@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.support.workspace import WorkspaceManager
 from admapper.models.host import HostRecord
+from admapper.support.workspace import WorkspaceManager
 
 
 class HostsStore:

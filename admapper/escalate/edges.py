@@ -107,21 +107,21 @@ def collect_edges_from_pivot(
             continue
         target = str(finding.get("target_name") or finding.get("target_dn") or "")
         right = str(finding.get("right") or "")
-        
+
         if finding.get("target_type") == "gpo":
             gpo_dn = str(finding.get("target_dn") or "")
             m = re.search(r"({[a-fA-F0-9-]+})", gpo_dn, re.I)
             gpo_guid = m.group(1) if m else target
-            
+
             affected_ou_dns = []
             for ou in inventory.get("ous", []):
                 ou_gplink = str(ou.get("gplink") or "")
                 if gpo_guid.lower() in ou_gplink.lower():
                     affected_ou_dns.append(str(ou.get("dn") or "").lower())
-            
+
             domain_gplink = str(inventory.get("domain_gplink") or "")
             link_to_domain = gpo_guid.lower() in domain_gplink.lower()
-            
+
             affected_computers = []
             for comp in inventory.get("computers", []):
                 comp_dn = str(comp.get("dn") or "").lower()
@@ -134,7 +134,7 @@ def collect_edges_from_pivot(
                             break
                 if is_affected:
                     affected_computers.append(comp_name)
-            
+
             for comp in affected_computers:
                 comp_owned = _is_owned(comp, owned)
                 edges.append(
@@ -234,9 +234,11 @@ def collect_edges_from_pivot(
         # Server-Auth-only templates (e.g. <template>) feed WSUS — not a standalone NEXT hop
         if esc == "template_enrollment" and finding.get("wsus_chain_step"):
             continue
-        if esc == "template_enrollment" and "group membership suggests" in str(
-            finding.get("detail") or finding.get("summary") or ""
-        ).lower():
+        if (
+            esc == "template_enrollment"
+            and "group membership suggests"
+            in str(finding.get("detail") or finding.get("summary") or "").lower()
+        ):
             continue
         edges.append(
             EscalationEdge(
@@ -338,11 +340,11 @@ def collect_edges_from_pivot(
                     title=f"Trust → {partner} ({direction})",
                     severity=severity,
                     summary=f"{'SID filtering OFF — ' if not sid_filter else ''}"
-                            f"trust ticket forging + cross-domain escalation",
+                    f"trust ticket forging + cross-domain escalation",
                     target=partner,
                     ready=True,
                     manual_commands=[
-                        f"# Forge inter-realm TGT with trust key",
+                        "# Forge inter-realm TGT with trust key",
                         f"ticketer.py -nthash <trust_hash> -domain-sid <SID> "
                         f"-domain {domain} -spn krbtgt/{partner} administrator",
                     ],
@@ -407,7 +409,7 @@ def collect_edges_from_pivot(
                     ready=True,
                     manual_commands=[
                         f"pywhisker -d {domain} -u <user> --target {target} -a add",
-                        f"certipy auth -pfx <target>.pfx -dc-ip <DC>",
+                        "certipy auth -pfx <target>.pfx -dc-ip <DC>",
                     ],
                     mitre_id="T1556.006",
                 )

@@ -109,13 +109,22 @@ def check_wsus_prerequisites(
     )
 
     if require_enrollment:
-        checks = [c for c in checks if c.key in ("owned_user", "adcs_present", "template_enrollment")]
+        checks = [
+            c for c in checks if c.key in ("owned_user", "adcs_present", "template_enrollment")
+        ]
     if require_wsus_path:
         checks = [
             c
             for c in checks
             if c.key
-            in ("owned_user", "adcs_present", "wsus_share", "privileged_group", "wsus_acl", "template_enrollment")
+            in (
+                "owned_user",
+                "adcs_present",
+                "wsus_share",
+                "privileged_group",
+                "wsus_acl",
+                "template_enrollment",
+            )
         ]
 
     return checks

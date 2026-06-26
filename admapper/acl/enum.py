@@ -114,9 +114,7 @@ def build_acl_targets(
         if dn.lower() in seen_dns or len(targets) >= max_targets:
             return
         seen_dns.add(dn.lower())
-        targets.append(
-            AclTarget(dn=dn, name=name, object_type=object_type, object_classes=classes)
-        )
+        targets.append(AclTarget(dn=dn, name=name, object_type=object_type, object_classes=classes))
 
     session.conn.search(
         search_base=session.base_dn,

@@ -7,6 +7,7 @@ terminal via SSE, phase-gated actions, live graph refresh after each op.
 
 from __future__ import annotations
 
+import errno
 import json
 import queue
 import shlex
@@ -15,14 +16,14 @@ import subprocess
 import sys
 import threading
 import time
-import errno
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable
-from urllib.parse import parse_qs, urlparse
+from typing import Any
+from urllib.parse import urlparse
 
-from admapper.support.dashboard_mode import enable_dashboard_mode, dashboard_subprocess_env
 from admapper.models.workspace import OperationMode
+from admapper.support.dashboard_mode import dashboard_subprocess_env, enable_dashboard_mode
 
 
 def _server_log(msg: str) -> None:
@@ -34,8 +35,8 @@ def _server_log(msg: str) -> None:
         pass
 
 
-from admapper.dashboard.ops_progress import OpsProgress
 from admapper.dashboard.dashboard_html import build_dashboard_html
+from admapper.dashboard.ops_progress import OpsProgress
 from admapper.dashboard.ops_ui import build_ops_payload
 from admapper.dashboard.terminal_filter import TerminalFilter
 from admapper.intelligence.user_match import refresh_workspace_intel
@@ -113,7 +114,9 @@ class DashboardContext:
                     username = c.get("username")
                     if str(c.get("status")) == "valid" and username:
                         username_s = str(username)
-                        if username_s.lower() not in {u.lower() for u in self.progress.verified_users}:
+                        if username_s.lower() not in {
+                            u.lower() for u in self.progress.verified_users
+                        }:
                             self.progress.verified_users.append(username_s)
                         if username_s.lower() not in {u.lower() for u in self.progress.owned_users}:
                             self.progress.owned_users.append(username_s)
@@ -156,17 +159,13 @@ class DashboardContext:
                     for c in cdata.get("credentials") or []:
                         if str(c.get("status")) == "valid" and c.get("username"):
                             self.pivot_user = str(c["username"])
-                            if self.pivot_user.lower() not in {
-                                u.lower() for u in self.owned_users
-                            }:
+                            if self.pivot_user.lower() not in {u.lower() for u in self.owned_users}:
                                 self.owned_users.append(self.pivot_user)
                             break
                 except (json.JSONDecodeError, OSError):
                     pass
 
-        if self.pivot_user and self.pivot_user.lower() not in {
-            u.lower() for u in self.owned_users
-        }:
+        if self.pivot_user and self.pivot_user.lower() not in {u.lower() for u in self.owned_users}:
             verified = self.progress.verified_set()
             if self.pivot_user.lower() not in verified:
                 self.pivot_user = self.owned_users[-1] if self.owned_users else None
@@ -268,7 +267,7 @@ class DashboardContext:
             loot_dir / "cracked.txt",
             loot_dir / "hashes.txt.cracked",
         ]
-        
+
         # Check if any cracked files exist
         has_files = False
         for f in cracked_files:
@@ -368,7 +367,7 @@ class DashboardContext:
                 pass
 
         # Parse cracked passwords
-        cracked_creds: dict[str, str] = {} # username -> password
+        cracked_creds: dict[str, str] = {}  # username -> password
         import re
 
         def extract_user_from_krb_hash(line: str) -> str | None:
@@ -394,12 +393,12 @@ class DashboardContext:
                     password = parts[1].strip()
                     if not key or not password:
                         continue
-                    
+
                     # 1. Direct username check
                     if key.lower() in known_users:
                         cracked_creds[known_users[key.lower()]] = password
                         continue
-                    
+
                     # 2. Domain clean check
                     key_clean = key
                     if "@" in key_clean:
@@ -409,12 +408,12 @@ class DashboardContext:
                     if key_clean.lower() in known_users:
                         cracked_creds[known_users[key_clean.lower()]] = password
                         continue
-                        
+
                     # 3. Direct hash check
                     if key.lower() in hash_to_user:
                         cracked_creds[hash_to_user[key.lower()]] = password
                         continue
-                        
+
                     # 4. Kerberos hash parsed user check
                     parsed_user = extract_user_from_krb_hash(key)
                     if parsed_user and parsed_user.lower() in known_users:
@@ -451,20 +450,25 @@ class DashboardContext:
                     break
             if not found:
                 import uuid
-                creds_list.append({
-                    "id": uuid.uuid4().hex[:12],
-                    "username": uname,
-                    "secret": pwd,
-                    "type": "password",
-                    "domain": self.domain,
-                    "status": "valid",
-                    "source": "cracked",
-                })
+
+                creds_list.append(
+                    {
+                        "id": uuid.uuid4().hex[:12],
+                        "username": uname,
+                        "secret": pwd,
+                        "type": "password",
+                        "domain": self.domain,
+                        "status": "valid",
+                        "source": "cracked",
+                    }
+                )
                 updated = True
 
         if updated:
             try:
-                creds_path.write_text(json.dumps(creds_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                creds_path.write_text(
+                    json.dumps(creds_data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
             except Exception:
                 pass
 
@@ -483,8 +487,9 @@ class DashboardContext:
 
             # Update owned users in graph.json and state.json (best-effort)
             try:
-                from admapper.support.session import Session
                 from admapper.escalate.analyze import mark_user_owned
+                from admapper.support.session import Session
+
                 session = Session.bootstrap()
                 session.select_workspace(self.workspace, create=True)
                 for uname in cracked_creds:
@@ -632,7 +637,9 @@ class DashboardContext:
     def run_scan(self, *, ip: str | None = None) -> bool:
         target = (ip or self._dc_ip()).strip()
         if not target:
-            self.emit("sin IP — escribe la IP del objetivo en el terminal de arranque", kind="error")
+            self.emit(
+                "sin IP — escribe la IP del objetivo en el terminal de arranque", kind="error"
+            )
             return False
         self._persist_target_ip(target)
         ok = self._run_workspace_script(
@@ -791,8 +798,7 @@ class DashboardContext:
         else:
             self.emit("pre-auth user enumeration", kind="phase")
             ok = self._run_workspace_script(
-                "from admapper.cli.commands import dispatch\n"
-                "dispatch(session, 'enum users')",
+                "from admapper.cli.commands import dispatch\ndispatch(session, 'enum users')",
                 label="enum users",
             )
         if ok:
@@ -801,16 +807,14 @@ class DashboardContext:
 
     def run_asreproast(self) -> None:
         self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            "dispatch(session, 'asreproast')",
+            "from admapper.cli.commands import dispatch\ndispatch(session, 'asreproast')",
             label="asreproast",
         )
         self._sync_new_creds_owned(source="asreproast", method="asreproast")
 
     def run_kerberoast(self) -> None:
         self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            "dispatch(session, 'kerberoast')",
+            "from admapper.cli.commands import dispatch\ndispatch(session, 'kerberoast')",
             label="kerberoast",
         )
         self._sync_new_creds_owned(source="kerberoast", method="kerberoast")
@@ -833,8 +837,7 @@ class DashboardContext:
 
     def run_exploit(self) -> None:
         ok = self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            "dispatch(session, 'exploit')",
+            "from admapper.cli.commands import dispatch\ndispatch(session, 'exploit')",
             label="exploit (loot → ACL/gMSA)",
         )
         if ok:
@@ -844,8 +847,7 @@ class DashboardContext:
 
     def run_acls(self) -> None:
         ok = self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            "dispatch(session, 'acls')",
+            "from admapper.cli.commands import dispatch\ndispatch(session, 'acls')",
             label="acl analysis",
         )
         if ok:
@@ -866,8 +868,7 @@ class DashboardContext:
 
     def run_winrm_pth(self, account: str) -> None:
         ok = self._run_workspace_script(
-            "from admapper.cli.commands import dispatch\n"
-            f"dispatch(session, 'winrm {account}')",
+            f"from admapper.cli.commands import dispatch\ndispatch(session, 'winrm {account}')",
             label=f"winrm PTH {account}",
         )
         if ok:
@@ -1009,7 +1010,9 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
             if path == "/api/run":
                 self._start_background(
                     lambda: ctx.run_auth(
-                        str(body.get("username") or body.get("user") or body.get("u") or "").strip(),
+                        str(
+                            body.get("username") or body.get("user") or body.get("u") or ""
+                        ).strip(),
                         str(body.get("password") or body.get("p") or ""),
                         str(body.get("host") or body.get("ip") or "").strip() or None,
                     )
@@ -1044,7 +1047,9 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
                 return
 
             if path == "/api/winrm":
-                account = str(body.get("account") or body.get("user") or body.get("username") or "").strip()
+                account = str(
+                    body.get("account") or body.get("user") or body.get("username") or ""
+                ).strip()
                 if not account:
                     _json_response(self, 400, {"error": "account/user required"})
                     return
@@ -1134,7 +1139,9 @@ def run_dashboard_server(
             if exc.errno not in {errno.EADDRINUSE, 48}:
                 raise
     if httpd is None:
-        raise OSError(f"puertos {port}–{port + 9} ocupados — cierra otra instancia de admapper dashboard")
+        raise OSError(
+            f"puertos {port}–{port + 9} ocupados — cierra otra instancia de admapper dashboard"
+        )
 
     url = f"http://127.0.0.1:{bound_port}/"
     from admapper.support.output import print_info, print_success

@@ -44,8 +44,7 @@ KERBEROS_TECHNIQUES: dict[str, KerberosTechnique] = {
         mitre_id="T1558",
         summary="Request S4U2Self/S4U2Proxy service tickets to allowed targets.",
         manual_commands=(
-            "getST.py -spn <target_spn> -impersonate administrator "
-            "-dc-ip <DC> <DOMAIN>/user:pass",
+            "getST.py -spn <target_spn> -impersonate administrator -dc-ip <DC> <DOMAIN>/user:pass",
         ),
     ),
     "constrained_pt": KerberosTechnique(

@@ -4,15 +4,19 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.stores.graph import GraphStore
-from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-from admapper.support.output import print_error, print_info, print_success
-from admapper.support.owned import is_valid_owned_username
-from admapper.support.provenance import Tool, print_step
 from admapper.creds.common import collect_gained_hashes
 from admapper.escalate.analyze import get_escalation_state, run_escalate_analysis, run_escalate_exec
 from admapper.models.escalation import EscalationEdge
 from admapper.models.workspace import OperationMode
+from admapper.stores.graph import GraphStore
+from admapper.support.connectivity import (
+    TargetUnreachableError,
+    format_unreachable_message,
+    require_target_reachable,
+)
+from admapper.support.output import print_error, print_info, print_success
+from admapper.support.owned import is_valid_owned_username
+from admapper.support.provenance import Tool, print_step
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -184,7 +188,11 @@ def _pick_wired_next(state: dict[str, Any] | None) -> dict[str, Any] | None:
         return None
     ranked = sort_edges([_edge_from_dict(raw) for raw in raws])
     raw_by_key = {
-        (str(r.get("module") or ""), str(r.get("technique") or ""), str(r.get("target") or "").lower()): r
+        (
+            str(r.get("module") or ""),
+            str(r.get("technique") or ""),
+            str(r.get("target") or "").lower(),
+        ): r
         for r in raws
     }
     for edge in ranked:
@@ -269,6 +277,7 @@ def prepare_auto(session: Session) -> None:
                         source=Tool.ADMAPPER,
                     )
                     from admapper.creds.spray import run_spray
+
                     try:
                         run_spray(
                             session,
@@ -283,7 +292,6 @@ def prepare_auto(session: Session) -> None:
                         print_info(f"Blank spray: {e}")
             except Exception:
                 pass
-
 
 
 def finalize_auto(session: Session) -> None:

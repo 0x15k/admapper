@@ -89,7 +89,6 @@ def ensure_workspace_skew(ws_path: str | Path | None) -> str | None:
         return existing
     skew = apply_workspace_clock_skew(ws_path)
     if skew and resolve_faketime():
-        from admapper.support.output import print_info
 
         from admapper.support.provenance import Tool, print_step
 
@@ -191,6 +190,7 @@ def check_kerberos_with_skew(
     ldap_derived_skew = None
     if dc_ip:
         from admapper.kerberos.time_sync import calculate_ldap_clock_skew
+
         try:
             ldap_skew_seconds = calculate_ldap_clock_skew(dc_ip)
             if ldap_skew_seconds is not None:

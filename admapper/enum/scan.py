@@ -5,13 +5,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.enum.ldap_enum import enumerate_ldap_authenticated
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.stores.credentials import CredentialStore
-from admapper.stores.findings import FindingsStore
-from admapper.stores.hosts import HostsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
-from admapper.stores.users import UsersStore
+from admapper.enum.ldap_enum import enumerate_ldap_authenticated
 from admapper.enum.ldap_users import enumerate_users_ldap
 from admapper.enum.rid_cycle import cycle_rids
 from admapper.enum.samr import enumerate_users_samr
@@ -19,6 +14,11 @@ from admapper.guides.render import print_manual_guides_for_keys
 from admapper.models.credential import CredentialStatus
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.user import UserRecord
+from admapper.stores.credentials import CredentialStore
+from admapper.stores.findings import FindingsStore
+from admapper.stores.hosts import HostsStore
+from admapper.stores.users import UsersStore
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -289,6 +289,7 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
     # Phase 3 — surface roastable targets explicitly after enumeration
     try:
         from admapper.enum.roastable import detect_roastable_targets
+
         detect_roastable_targets(session)
     except Exception as _roast_exc:
         print_warning(f"roastable detection skipped: {_roast_exc}")

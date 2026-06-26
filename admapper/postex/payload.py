@@ -6,13 +6,12 @@ import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-
 from typing import Any, Literal
 
+from admapper.postex.pe_arch import TargetArch
 from admapper.support.network import log_detected_callback_ip
 from admapper.support.output import print_info, print_success, print_warning
 from admapper.support.platform import resolve_executable
-from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch
 
 PayloadMode = Literal["shell", "enroll"]
 
@@ -59,16 +58,16 @@ def ensure_msfvenom() -> str:
         bootstrap_metasploit()
         return found
     if sys.platform != "darwin":
-        raise RuntimeError(
-            "msfvenom not found — install Metasploit or pass --payload /path/to.dll"
-        )
+        raise RuntimeError("msfvenom not found — install Metasploit or pass --payload /path/to.dll")
     brew = resolve_executable(["brew"])
     if not brew:
         raise RuntimeError(
             "msfvenom not found and Homebrew missing — install: brew install metasploit"
         )
     print_info("msfvenom not found — installing Metasploit via Homebrew (one-time) …")
-    proc = subprocess.run([brew, "install", "metasploit"], capture_output=True, text=True, check=False)
+    proc = subprocess.run(
+        [brew, "install", "metasploit"], capture_output=True, text=True, check=False
+    )
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()
         raise RuntimeError(f"brew install metasploit failed: {detail}")

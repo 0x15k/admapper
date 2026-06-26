@@ -32,9 +32,7 @@ class OpportunityPath:
 
 def _owned_user_ids(graph: dict[str, Any], domain: str) -> list[str]:
     return [
-        str(n["id"])
-        for n in graph.get("nodes", [])
-        if n.get("type") == "user" and n.get("owned")
+        str(n["id"]) for n in graph.get("nodes", []) if n.get("type") == "user" and n.get("owned")
     ]
 
 
@@ -43,8 +41,7 @@ def _node_id_for_principal(graph: dict[str, Any], name: str, domain: str) -> str
     for n in graph.get("nodes", []):
         ntype = n.get("type")
         if ntype == "user" and (
-            str(n.get("username", "")).lower() == key
-            or str(n.get("name", "")).lower() == key
+            str(n.get("username", "")).lower() == key or str(n.get("name", "")).lower() == key
         ):
             return str(n["id"])
         if ntype in {"computer", "group"} and str(n.get("name", "")).lower() == key:

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from typing import TYPE_CHECKING
 
 from admapper.report.scenario import (
@@ -11,6 +9,7 @@ from admapper.report.scenario import (
     list_artefact_status,
     resolve_next_command,
 )
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

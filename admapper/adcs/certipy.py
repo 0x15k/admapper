@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from admapper.support.platform import resolve_certipy
-
 
 def certipy_install_hint() -> str:
     return "pip install certipy-ad  # or: pipx install certipy-ad"
 
 
-def build_certipy_find_command(*, domain: str, dc_ip: str, principal: str, auth: str = "-hashes :<NTLM>") -> str:
+def build_certipy_find_command(
+    *, domain: str, dc_ip: str, principal: str, auth: str = "-hashes :<NTLM>"
+) -> str:
     user = principal if "@" in principal else f"{principal}@{domain}"
     return f"certipy find -u {user} {auth} -dc-ip {dc_ip} -vulnerable -stdout"
 

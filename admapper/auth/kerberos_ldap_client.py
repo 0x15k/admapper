@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any
 
-from admapper.support.platform import get_clock_skew, resolve_faketime, wrap_command_with_clock_skew
+from admapper.support.platform import get_clock_skew, wrap_command_with_clock_skew
 
 
 @dataclass

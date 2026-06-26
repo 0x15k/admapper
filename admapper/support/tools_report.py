@@ -23,7 +23,8 @@ def print_platform_report() -> None:
     ensure_user_dirs()
 
     cwd_issues = [
-        i for i in collect_install_issues()
+        i
+        for i in collect_install_issues()
         if i.severity in {"error", "warning"}
         and i.code in {"wrong_cwd", "repo_not_found", "workspaces_missing", "cwd_not_repo"}
     ]
@@ -48,8 +49,7 @@ def print_platform_report() -> None:
     print_info(f"Wordlists: {user_config_dir() / 'wordlists'}")
 
     feature_rows = [
-        [item.command, item.tier.value, item.level.value, item.runtime]
-        for item in feature_matrix()
+        [item.command, item.tier.value, item.level.value, item.runtime] for item in feature_matrix()
     ]
     print_table(
         "Feature compatibility",

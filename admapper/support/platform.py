@@ -279,7 +279,7 @@ def tool_install_hint(tool: str) -> str:
             "hashcat": "install hashcat binaries and add to PATH",
             "john": "install John the Ripper and add john.exe to PATH",
             "nxc": "pip install netexec  (Scripts folder must be on PATH)",
-            "impacket": "pip install -e \".[recon]\"  (activate .venv first)",
+            "impacket": 'pip install -e ".[recon]"  (activate .venv first)',
         }
         return hints.get(tool, "add the tool to PATH — see docs/PLATFORMS.md")
     if is_macos():

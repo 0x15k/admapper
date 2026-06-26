@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from admapper.models.escalation import EscalationState
 from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.support.verbosity import is_verbose
-from admapper.models.escalation import EscalationState
 
 
 def print_escalation_state(state: EscalationState) -> None:

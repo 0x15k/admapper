@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from admapper.adcs.constants import CT_FLAG_MACHINE_TYPE
@@ -167,7 +166,9 @@ def parse_enroll_log(
 ) -> EnrollLogStatus:
     body = (text or "").strip()
     if not body:
-        return EnrollLogStatus(present=False, text="", success=False, errors=["enroll.log empty or missing"])
+        return EnrollLogStatus(
+            present=False, text="", success=False, errors=["enroll.log empty or missing"]
+        )
     if since_marker and since_marker in body:
         body = body.split(since_marker, 1)[-1]
     lowered = body.lower()
@@ -188,7 +189,9 @@ def parse_enroll_log(
             elif expect_user and expect_user.lower() not in who:
                 errors.append(f"enroll ran as {who.strip()} but task user is {expect_user}")
     if not success and not errors and "conflict" in lowered:
-        errors.append("template context conflict — enroll must run as the task user, not gMSA over WinRM")
+        errors.append(
+            "template context conflict — enroll must run as the task user, not gMSA over WinRM"
+        )
     return EnrollLogStatus(present=True, text=body, success=success, errors=errors)
 
 
@@ -213,7 +216,7 @@ def build_local_enroll_powershell(
     inf = build_cert_request_inf(prof)
     pfx_name = dns_name
     log_path = f"{drop_path.rstrip('\\')}\\enroll.log"
-    out_dir = drop_path.rstrip('\\')
+    out_dir = drop_path.rstrip("\\")
     return f"""
 $log = '{log_path}'
 Start-Transcript -LiteralPath $log -Append -Force

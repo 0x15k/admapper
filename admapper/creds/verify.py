@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.auth_checks import verify_credential_checks
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import Credential, CredentialStatus
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -42,8 +42,12 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
     if not dc_ip:
         raise ValueError("no DC with LDAP/SMB — run start_unauth first")
 
-    from admapper.kerberos.time_sync import ensure_dc_clock, is_clock_unstable, vm_time_sync_warning
-    from admapper.kerberos.time_sync import get_last_ntp_step_seconds
+    from admapper.kerberos.time_sync import (
+        ensure_dc_clock,
+        get_last_ntp_step_seconds,
+        is_clock_unstable,
+        vm_time_sync_warning,
+    )
 
     ws_path = session.workspaces.path_for(session.workspace.name)
     ensure_dc_clock(dc_ip, ws_path=ws_path)
@@ -83,8 +87,8 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
         print_info("Protected Users — only Kerberos is accepted for this account")
     print_table("Auth checks", ["method", "result"], rows)
 
-    from admapper.support.platform import get_clock_skew, resolve_faketime
     from admapper.kerberos.skew import faketime_install_hint
+    from admapper.support.platform import get_clock_skew, resolve_faketime
 
     if status == CredentialStatus.VALID:
         if is_compact():
@@ -93,9 +97,7 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
             print_success(f"credential valid: {updated.display_user()} ({updated.id})")
         skew = get_clock_skew()
         if skew and auth_result.kerberos is True and not is_compact():
-            print_info(
-                f"Kerberos OK with clock skew {skew} — nxc/impacket calls use libfaketime"
-            )
+            print_info(f"Kerberos OK with clock skew {skew} — nxc/impacket calls use libfaketime")
         elif auth_result.kerberos is False:
             from admapper.kerberos.time_sync import suggest_time_sync
 
@@ -121,8 +123,8 @@ def run_credential_verify(session: Session, cred_id: str) -> CredentialVerifyRes
                 continue
             print_warning(err)
         if auth_result.kerberos is False and not is_compact():
-            from admapper.support.platform import get_clock_skew
             from admapper.kerberos.time_sync import suggest_time_sync
+            from admapper.support.platform import get_clock_skew
 
             current_skew = get_clock_skew()
             if current_skew:

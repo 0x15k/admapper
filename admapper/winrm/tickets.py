@@ -114,7 +114,9 @@ def _mit_kinit_env(
 
     skew = clock_skew or get_clock_skew()
     kinit_cmd = wrap_command_with_clock_skew([kinit, principal], clock_skew=skew)
-    proc = subprocess.run(kinit_cmd, input=password.encode(), env=env, capture_output=True, check=False)
+    proc = subprocess.run(
+        kinit_cmd, input=password.encode(), env=env, capture_output=True, check=False
+    )
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or b"").decode(errors="replace").strip()
         raise TicketError(f"kinit failed: {err or proc.returncode}")
@@ -219,7 +221,9 @@ def impacket_tickets(
     get_tgt = resolve_impacket_script("getTGT")
     get_st = resolve_impacket_script("getST")
 
-    def _run(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    def _run(
+        cmd: list[str], *, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         if clock_skew and not env:
             from admapper.support.platform import wrap_command_with_clock_skew
 

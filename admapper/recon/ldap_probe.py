@@ -51,7 +51,12 @@ def _fetch_rootdse_search(conn: Connection, result: LdapProbeResult) -> None:
             search_base="",
             search_filter="(objectClass=*)",
             search_scope=BASE,
-            attributes=["defaultNamingContext", "dnsHostName", "namingContexts", "domainFunctionality"],
+            attributes=[
+                "defaultNamingContext",
+                "dnsHostName",
+                "namingContexts",
+                "domainFunctionality",
+            ],
         ):
             return
         if not conn.entries:
@@ -224,7 +229,11 @@ def discover_domain_from_bind(
                 )
                 if not conn.bind():
                     continue
-                ctx = server.info.other.get("defaultNamingContext", [None])[0] if server.info else None
+                ctx = (
+                    server.info.other.get("defaultNamingContext", [None])[0]
+                    if server.info
+                    else None
+                )
                 if ctx:
                     return dn_to_domain(str(ctx))
             except (LDAPException, OSError):

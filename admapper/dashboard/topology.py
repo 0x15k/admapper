@@ -171,7 +171,9 @@ def build_network_topology(
             {"port": int(port), "label": _PORT_LABELS.get(int(port), f"TCP/{port}")}
             for port in ports
         ]
-        svc_short = " · ".join(s["label"] for s in services[:6]) if services else "sin puertos abiertos"
+        svc_short = (
+            " · ".join(s["label"] for s in services[:6]) if services else "sin puertos abiertos"
+        )
         label = f"{role}\n{addr}"
         hx = 80 + idx * 220
         hid = f"host:{addr}"

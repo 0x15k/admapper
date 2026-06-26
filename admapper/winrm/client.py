@@ -6,11 +6,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from admapper.support.output import print_info
-from admapper.support.platform import is_macos, resolve_executable, resolve_nxc, run_command, tool_install_hint
 from admapper.postex.evil_winrm_output import strip_evil_winrm_output
 from admapper.postex.hijack_intel import parse_schtasks_list_output
 from admapper.postex.nxc_output import strip_nxc_winrm_output
+from admapper.support.output import print_info
+from admapper.support.platform import (
+    is_macos,
+    resolve_executable,
+    resolve_nxc,
+    run_command,
+    tool_install_hint,
+)
 from admapper.winrm.deps import WinRMDeps, check_winrm_deps, winrm_deps_hint
 from admapper.winrm.tickets import (
     TicketError,
@@ -94,7 +100,9 @@ class WinRMClient:
     def _require_deps(self) -> WinRMDeps:
         if self.ticket_method == "nthash":
             if not resolve_nxc():
-                raise WinRMError(f"nxc required for Pass-the-Hash WinRM.\n{tool_install_hint('nxc')}")
+                raise WinRMError(
+                    f"nxc required for Pass-the-Hash WinRM.\n{tool_install_hint('nxc')}"
+                )
             return check_winrm_deps()
         deps = check_winrm_deps()
         if not deps.pypsrp or not deps.gssapi or not deps.krb5:
@@ -131,7 +139,9 @@ class WinRMClient:
             if not self.password:
                 raise TicketError("password required for mit kinit")
             if self.verbose:
-                print_info(f"Kerberos SPN hosts: {', '.join(winrm_host_candidates(self.domain, self.dc_fqdn))}")
+                print_info(
+                    f"Kerberos SPN hosts: {', '.join(winrm_host_candidates(self.domain, self.dc_fqdn))}"
+                )
             obtained = mit_kinit(
                 username=self.username,
                 password=self.password,
@@ -171,7 +181,18 @@ class WinRMClient:
 
         user = self.username if self.username.endswith("$") else f"{self.username}$"
         target = self._nthash_target or self._nthash_target_host()
-        cmd = [nxc, "winrm", target, "-u", user, "-H", self.nthash, "-d", self.domain, "--no-progress"]
+        cmd = [
+            nxc,
+            "winrm",
+            target,
+            "-u",
+            user,
+            "-H",
+            self.nthash,
+            "-d",
+            self.domain,
+            "--no-progress",
+        ]
         if shell == "powershell":
             cmd.extend(["-X", command])
         else:
@@ -215,7 +236,11 @@ class WinRMClient:
         except subprocess.TimeoutExpired as exc:
             partial = ""
             if exc.stdout:
-                partial = exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")
+                partial = (
+                    exc.stdout
+                    if isinstance(exc.stdout, str)
+                    else exc.stdout.decode(errors="replace")
+                )
             self.last_raw_output = partial or f"evil-winrm timeout after {timeout}s"
             raise WinRMError(f"evil-winrm timeout: {command[:80]}…") from exc
         output = (proc.stdout or "") + "\n" + (proc.stderr or "")
@@ -278,7 +303,9 @@ class WinRMClient:
                     self._client = client
                     self._connected_host = target_host
                     if self.verbose:
-                        print_info(f"WinRM auth OK: {target_host} auth={auth} service={service or 'default'}")
+                        print_info(
+                            f"WinRM auth OK: {target_host} auth={auth} service={service or 'default'}"
+                        )
                     return
                 except Exception as exc:
                     last_err = exc

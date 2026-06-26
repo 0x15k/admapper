@@ -25,13 +25,13 @@ def print_chain_detail(chain: dict[str, Any]) -> None:
             "Steps",
             ["#", "module", "technique", "ready", "detail"],
             [
-            [
-                str(s.get("order")),
-                str(s.get("module")),
-                str(s.get("technique")),
-                "yes" if s.get("ready") else "no",
-                str((s.get("detail") or "")[:60]),
-            ]
+                [
+                    str(s.get("order")),
+                    str(s.get("module")),
+                    str(s.get("technique")),
+                    "yes" if s.get("ready") else "no",
+                    str((s.get("detail") or "")[:60]),
+                ]
                 for s in steps
             ],
         )

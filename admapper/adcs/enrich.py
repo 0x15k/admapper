@@ -7,7 +7,9 @@ from typing import Any
 from admapper.adcs.eku import template_profile_from_inventory
 
 
-def enrich_finding_dict(finding: dict[str, Any], inventory: dict[str, Any] | None) -> dict[str, Any]:
+def enrich_finding_dict(
+    finding: dict[str, Any], inventory: dict[str, Any] | None
+) -> dict[str, Any]:
     """Attach EKU / WSUS-chain flags from adcs_inventory.json to a finding dict."""
     template = str(finding.get("template") or "")
     if not template:

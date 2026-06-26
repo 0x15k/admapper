@@ -18,13 +18,14 @@ Usage in code:
   if opsec.require_confirm("spray"): # gate noisy ops
       ...
 """
+
 from __future__ import annotations
 
 import json
-import time
 import random
-from enum import StrEnum
+import time
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -107,10 +108,10 @@ _PROFILES: dict[OpsecProfile, OpsecSettings] = {
         profile=OpsecProfile.STEALTH,
         request_delay_min=3.0,
         request_delay_max=10.0,
-        allow_spray=False,   # Spray disabled in stealth (online attack)
-        allow_roast=True,    # Roasting is read-only (pre-auth requests)
+        allow_spray=False,  # Spray disabled in stealth (online attack)
+        allow_roast=True,  # Roasting is read-only (pre-auth requests)
         allow_coerce=False,  # No coercion in stealth (very noisy)
-        allow_dcsync=True,   # DCSync only if already DA
+        allow_dcsync=True,  # DCSync only if already DA
         confirm_spray=True,
         confirm_coerce=True,
         confirm_dcsync=True,
@@ -157,7 +158,7 @@ def set_global_profile(profile: OpsecProfile) -> None:
     _ACTIVE_PROFILE = profile
 
 
-def get_opsec(session: "Session | None" = None) -> OpsecSettings:
+def get_opsec(session: Session | None = None) -> OpsecSettings:
     """Return the active OpsecSettings for the session.
 
     Priority: process override → workspace state → NORMAL default.
@@ -166,9 +167,7 @@ def get_opsec(session: "Session | None" = None) -> OpsecSettings:
         return _PROFILES[_ACTIVE_PROFILE]
 
     if session is not None and session.workspace is not None:
-        profile = _load_workspace_profile(
-            session.workspaces.path_for(session.workspace.name)
-        )
+        profile = _load_workspace_profile(session.workspaces.path_for(session.workspace.name))
         if profile is not None:
             return _PROFILES[profile]
 
@@ -183,9 +182,7 @@ def save_workspace_profile(ws_path: Path, profile: OpsecProfile) -> None:
         if state_path.is_file():
             data = json.loads(state_path.read_text(encoding="utf-8"))
         data["opsec_profile"] = profile.value
-        state_path.write_text(
-            json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        state_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     except Exception:
         pass
 
@@ -202,9 +199,9 @@ def _load_workspace_profile(ws_path: Path) -> OpsecProfile | None:
         return None
 
 
-def print_opsec_status(session: "Session | None" = None) -> None:
+def print_opsec_status(session: Session | None = None) -> None:
     """Print the current OPSEC profile and key settings."""
-    from admapper.support.output import print_table, print_info
+    from admapper.support.output import print_info, print_table
 
     settings = get_opsec(session)
     print_info(f"OPSEC profile: {settings.profile.upper()}")

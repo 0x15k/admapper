@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from admapper.models.workspace import OperationMode
 from admapper.support.paths import global_config_path
 from admapper.support.platform import ensure_user_dirs
-from admapper.models.workspace import OperationMode
 
 
 @dataclass

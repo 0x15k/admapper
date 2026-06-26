@@ -163,9 +163,7 @@ def build_engagement_summary(
                 next_actions.append(
                     f"WinRM shell: nxc winrm {dc} -u '{user}' -H {nthash} -d {domain or 'DOMAIN'}"
                 )
-                next_actions.append(
-                    f"evil-winrm -i {dc} -u '{user}' -H {nthash}"
-                )
+                next_actions.append(f"evil-winrm -i {dc} -u '{user}' -H {nthash}")
 
     cred_data = _load_json(ws_path / "credentials.json")
     if cred_data and domain:
@@ -227,9 +225,7 @@ def build_engagement_summary(
         lines.append("")
         lines.append(f"Deferred candidates ({noise_count} items)")
         lines.append("-" * 60)
-        lines.append(
-            "  Generic CVE/delegation/coercion candidates are in evidence_report.txt"
-        )
+        lines.append("  Generic CVE/delegation/coercion candidates are in evidence_report.txt")
         lines.append("  (ZeroLogon, noPac, PrintNightmare, Guest, Golden Cert, etc.)")
         lines.append("  Treat as unverified until confirmed manually.")
 

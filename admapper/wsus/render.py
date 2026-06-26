@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_exploit_table
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 
 def print_wsus_detail(finding: dict[str, Any]) -> None:
@@ -29,8 +29,10 @@ def print_wsus_detail(finding: dict[str, Any]) -> None:
         print_table(
             "Prerequisites",
             ["key", "met", "detail"],
-            [[p.get("label", p.get("key")), "yes" if p.get("met") else "no", p.get("detail", "")]
-             for p in prereqs],
+            [
+                [p.get("label", p.get("key")), "yes" if p.get("met") else "no", p.get("detail", "")]
+                for p in prereqs
+            ],
         )
 
     commands = finding.get("manual_commands") or []

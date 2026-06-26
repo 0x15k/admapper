@@ -172,14 +172,14 @@ def enumerate_ldap_authenticated(session: LdapSession) -> LdapAuthEnumResult:
                 continue
             uac_raw = entry.userAccountControl.value if entry.userAccountControl else None
             uac = int(uac_raw) if uac_raw is not None else 0
-            
+
             pwd_last_set = None
             if hasattr(entry, "pwdLastSet") and entry.pwdLastSet:
                 try:
                     pwd_last_set = int(entry.pwdLastSet.value)
                 except (ValueError, TypeError):
                     pass
-            
+
             last_logon = None
             if hasattr(entry, "lastLogonTimestamp") and entry.lastLogonTimestamp:
                 try:
@@ -307,9 +307,7 @@ def _collect_delegation_user(
     constrained = _attr_list(entry, "msDS-AllowedToDelegateTo")
     if constrained:
         dtype = (
-            "constrained_pt"
-            if uac & UAC_TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION
-            else "constrained"
+            "constrained_pt" if uac & UAC_TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION else "constrained"
         )
         result.delegations.append(
             DelegationRecord(

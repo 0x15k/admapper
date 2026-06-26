@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 from dataclasses import dataclass
 
 from admapper.support.output import print_info
-from admapper.support.platform import is_macos, is_linux
+from admapper.support.platform import is_linux, is_macos
 
 # Common pentest VPN / lab callback ranges (attacker-side tunnels).
 _CALLBACK_NETS = (
@@ -50,7 +49,9 @@ def _parse_darwin_ifconfig(text: str) -> list[CallbackCandidate]:
         iface = first.split(":")[0].strip()
         if not iface:
             continue
-        for match in re.finditer(r"\binet (\d+\.\d+\.\d+\.\d+)(?: --> (\d+\.\d+\.\d+\.\d+))?", block):
+        for match in re.finditer(
+            r"\binet (\d+\.\d+\.\d+\.\d+)(?: --> (\d+\.\d+\.\d+\.\d+))?", block
+        ):
             ip = match.group(1)
             if not _is_callback_address(ip):
                 continue
@@ -80,12 +81,16 @@ def list_callback_candidates() -> list[CallbackCandidate]:
     """Return VPN/tunnel IPv4 addresses suitable as reverse-shell LHOST."""
     try:
         if is_macos():
-            proc = subprocess.run(["ifconfig"], capture_output=True, text=True, check=False, timeout=5)
+            proc = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, check=False, timeout=5
+            )
             if proc.returncode != 0:
                 return []
             return _parse_darwin_ifconfig(proc.stdout)
         if is_linux():
-            proc = subprocess.run(["ip", "-4", "addr"], capture_output=True, text=True, check=False, timeout=5)
+            proc = subprocess.run(
+                ["ip", "-4", "addr"], capture_output=True, text=True, check=False, timeout=5
+            )
             if proc.returncode != 0:
                 return []
             return _parse_linux_ip_addr(proc.stdout)

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pathlib import Path
-
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.wsus_op import WsusOpportunity
+from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.wsus.catalog import wsus_meta
 from admapper.wsus.prerequisites import (
     WsusPrerequisite,
@@ -159,9 +158,8 @@ def build_wsus_opportunities(
                 acl_findings=(acl_data or {}).get("findings") or [],
                 require_enrollment=True,
             )
-            detail = (
-                f"Enroll {template} as {username} (IT), then WSUS spoofing toward DA"
-                + (" — Server Auth only, no cert login" if wsus_only else "")
+            detail = f"Enroll {template} as {username} (IT), then WSUS spoofing toward DA" + (
+                " — Server Auth only, no cert login" if wsus_only else ""
             )
             op = _opportunity(
                 "wsus_cert_chain",

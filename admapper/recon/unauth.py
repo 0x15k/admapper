@@ -4,17 +4,22 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from admapper.stores.findings import FindingsStore
-from admapper.stores.hosts import HostsStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guides_for_keys
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.host import HostRecord
-from admapper.recon.dns import discover_domain_dns, dn_to_domain, infer_domain_from_hostname, reverse_ptr
+from admapper.recon.dns import (
+    discover_domain_dns,
+    dn_to_domain,
+    infer_domain_from_hostname,
+    reverse_ptr,
+)
 from admapper.recon.ldap_probe import discover_domain_from_ldap, probe_ldap
 from admapper.recon.ports import scan_host, scan_hosts, service_name
 from admapper.recon.smb_probe import probe_smb_null
 from admapper.recon.targets import parse_targets
+from admapper.stores.findings import FindingsStore
+from admapper.stores.hosts import HostsStore
+from admapper.support.output import print_info, print_success, print_table
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -260,7 +265,9 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
     smb_results: dict[str, object] = {}
 
     for address, open_ports in port_map.items():
-        ldap_domain, ldap_host, ldap_best = discover_domain_from_ldap(address, timeout=_LDAP_TIMEOUT)
+        ldap_domain, ldap_host, ldap_best = discover_domain_from_ldap(
+            address, timeout=_LDAP_TIMEOUT
+        )
         if ldap_domain:
             quiet_success(f"LDAP domain: {ldap_domain}" + (f" ({ldap_host})" if ldap_host else ""))
         if ldap_best:
@@ -280,7 +287,8 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
                 ldap = probe_ldap(address, port=port, use_ssl=use_ssl, timeout=_LDAP_TIMEOUT)
                 prior = ldap_results.get(address)
                 if prior is None or (
-                    ldap.default_naming_context and not getattr(prior, "default_naming_context", None)
+                    ldap.default_naming_context
+                    and not getattr(prior, "default_naming_context", None)
                 ):
                     ldap_results[address] = ldap
                 if ldap.is_domain_controller or ldap.default_naming_context:
@@ -295,7 +303,10 @@ def run_unauth_scan(session: Session) -> UnauthScanResult:
             if smb.null_session:
                 quiet_warning(f"SMB null session: {address}")
                 if smb.dns_domain:
-                    quiet_success(f"SMB domain: {smb.dns_domain}" + (f" ({smb.dns_hostname})" if smb.dns_hostname else ""))
+                    quiet_success(
+                        f"SMB domain: {smb.dns_domain}"
+                        + (f" ({smb.dns_hostname})" if smb.dns_hostname else "")
+                    )
 
     hostnames = [h for h in (reverse_ptr(ip) for ip in port_map) if h]
     for ldap in ldap_results.values():

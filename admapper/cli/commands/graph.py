@@ -14,8 +14,8 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
         if not require_workspace(session):
             return True
         ws_path = session.workspaces.path_for(session.workspace.name)  # type: ignore[union-attr]
-        from admapper.kerberos.skew import ensure_workspace_skew
         from admapper.intelligence.user_match import refresh_workspace_intel
+        from admapper.kerberos.skew import ensure_workspace_skew
 
         ensure_workspace_skew(ws_path)
         refresh_workspace_intel(ws_path)
@@ -32,8 +32,8 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
             print_success(f"attack graph → {out}")
             print_info(f"abrir: {out.resolve().as_uri()}")
             return True
-        from admapper.graph.analyze import run_graph_analysis
         from admapper.dashboard.web import write_attack_graph_html
+        from admapper.graph.analyze import run_graph_analysis
 
         try:
             run_graph_analysis(session)

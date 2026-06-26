@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.auth_checks import load_protected_users
 from admapper.creds.common import (
     collect_gained_hashes,
     format_admapper_winrm_pth,
     format_evil_winrm_pth,
 )
-from admapper.kerberos.skew import load_workspace_clock_skew
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
+from admapper.kerberos.skew import load_workspace_clock_skew
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
 from admapper.report.methodology import enum_highlights, methodology_lines
 from admapper.report.scenario import _access_matrix_rows, _best_cred_per_user
+from admapper.support.output import print_info, print_success, print_warning
 
 
 def _is_gmsa_target(name: str) -> bool:
@@ -100,9 +100,7 @@ def _discovered_cred_rows(ws_path: Path) -> list[list[str]]:
 def _acl_exploit_blocker(ws_path: Path) -> str | None:
     log = _load_json(ws_path / "exploit_log.json") or {}
     steps = log.get("steps") or []
-    if any(
-        s.get("phase") == "acl_exploit" and s.get("status") == "success" for s in steps
-    ):
+    if any(s.get("phase") == "acl_exploit" and s.get("status") == "success" for s in steps):
         return None
     for step in reversed(steps):
         if step.get("phase") != "acl_exploit" or step.get("status") != "skipped":
@@ -113,13 +111,10 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
         detail_l = detail.lower()
         if "krb5" in detail_l or "kinit" in detail_l or "mit krb5" in detail_l:
             from admapper.support.platform import mit_krb5_install_hint
- 
+
             return f"Missing MIT krb5 — {mit_krb5_install_hint()}"
         if "http service ticket" in detail_l:
-            return (
-                "gMSA needs only TGT (no WinRM HTTP ticket) — "
-                "update admapper and rerun brief"
-            )
+            return "gMSA needs only TGT (no WinRM HTTP ticket) — update admapper and rerun brief"
         if "preauth_failed" in detail_l or "pre-authentication" in detail_l:
             return (
                 "Kerberos password rejected — try year variant from loot "
@@ -129,21 +124,18 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
             skew = load_workspace_clock_skew(ws_path)
             if skew:
                 from admapper.support.platform import resolve_faketime
- 
+
                 if resolve_faketime():
                     return (
                         f"Kerberos skew (offset {skew}) — libfaketime active; "
                         "rerun ▶ genericwrite (or `admapper exploit -w …`)"
                     )
                 return (
-                    f"Kerberos clock skew (offset {skew}) — "
-                    "install libfaketime and rerun exploit"
+                    f"Kerberos clock skew (offset {skew}) — install libfaketime and rerun exploit"
                 )
             creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
             valid_users = {
-                str(c.get("username", "")).lower()
-                for c in creds
-                if str(c.get("status")) == "valid"
+                str(c.get("username", "")).lower() for c in creds if str(c.get("status")) == "valid"
             }
             # Stale skew from an earlier attempt — cred already verifies at system time.
             if valid_users:
@@ -312,21 +304,11 @@ def build_engagement_map(
         lines.extend(["", "  DISCOVERED CREDENTIALS"])
         col_w = [17, 20, 10, 28]
         header = ["user", "password (loot)", "verified", "source"]
+        lines.append("  ┌" + "┬".join("─" * w for w in col_w) + "┐")
         lines.append(
-            "  ┌"
-            + "┬".join("─" * w for w in col_w)
-            + "┐"
+            "  │ " + " │ ".join(h.center(w) for h, w in zip(header, col_w, strict=True)) + " │"
         )
-        lines.append(
-            "  │ "
-            + " │ ".join(h.center(w) for h, w in zip(header, col_w, strict=True))
-            + " │"
-        )
-        lines.append(
-            "  ├"
-            + "┼".join("─" * w for w in col_w)
-            + "┤"
-        )
+        lines.append("  ├" + "┼".join("─" * w for w in col_w) + "┤")
         for row in cred_rows:
             cells = [
                 (row[0][: col_w[0] - 1]).ljust(col_w[0]),
@@ -335,11 +317,7 @@ def build_engagement_map(
                 (row[3][: col_w[3] - 1]).ljust(col_w[3]),
             ]
             lines.append("  │ " + " │ ".join(cells) + " │")
-        lines.append(
-            "  └"
-            + "┴".join("─" * w for w in col_w)
-            + "┘"
-        )
+        lines.append("  └" + "┴".join("─" * w for w in col_w) + "┘")
         lines.append(
             "  * string from file = clue — operator decides what to spray/verify (creds add / verify)"
         )
@@ -352,9 +330,7 @@ def build_engagement_map(
         pw_data = _load_json(ws_path / "password_candidates.json") or {}
         wordlist = pw_data.get("wordlist") or []
         if wordlist:
-            lines.append(
-                f"  (verbose) internal variants → {ws_path / 'password_candidates.json'}"
-            )
+            lines.append(f"  (verbose) internal variants → {ws_path / 'password_candidates.json'}")
 
     intel = _load_json(ws_path / "user_intel.json") or {}
     intel_users = intel.get("users") or []
@@ -450,9 +426,7 @@ def build_engagement_map(
         lines.extend(["", "  PIVOT / OWNED ACCESS (ldap · smb · krb · winrm)"])
         lines.append("  user                 ldap  smb  krb  winrm   note")
         for row in access_owned:
-            lines.append(
-                f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}"
-            )
+            lines.append(f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}")
 
     lines.extend(["", "═" * 39, ""])
     return "\n".join(lines)
@@ -489,9 +463,7 @@ def build_engagement_summary(
     next_technique = ""
     if next_edge:
         next_title = (
-            f"{pivot} ──{next_edge.technique}──► {next_edge.target}"
-            if pivot
-            else next_edge.title
+            f"{pivot} ──{next_edge.technique}──► {next_edge.target}" if pivot else next_edge.title
         )
         next_technique = _edge_technique_detail(next_edge)
 

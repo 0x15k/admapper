@@ -20,7 +20,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
             set_pivot_user,
         )
 
-        sub = (args[0].lower() if args else "")
+        sub = args[0].lower() if args else ""
         try:
             if sub == "pivot":
                 if len(args) < 2:

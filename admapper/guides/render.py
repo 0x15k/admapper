@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING
 
 from rich.panel import Panel
 
-from admapper.support.output import console, print_table, print_warning
-from admapper.support.verbosity import is_verbose
 from admapper.guides.catalog import ManualGuide, get_manual_guide
 from admapper.guides.context import GuideContext, build_guide_context, contextualize_text
+from admapper.support.output import console, print_table, print_warning
+from admapper.support.verbosity import is_verbose
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

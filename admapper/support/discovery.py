@@ -5,9 +5,9 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from admapper.recon.dns import dn_to_domain, infer_domain_from_hostname, reverse_ptr
 from admapper.stores.hosts import HostsStore
 from admapper.support.output import print_info, print_success
-from admapper.recon.dns import dn_to_domain, infer_domain_from_hostname, reverse_ptr
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -71,9 +71,7 @@ def ensure_domain(session: Session, *, announce: bool = True) -> str:
 
     domain = resolve_domain(session)
     if not domain:
-        raise ValueError(
-            "domain not discovered — run start_unauth against the AD host first"
-        )
+        raise ValueError("domain not discovered — run start_unauth against the AD host first")
 
     if session.workspace.domain != domain:
         session.set_domain(domain)

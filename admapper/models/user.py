@@ -82,4 +82,3 @@ def apply_uac_flags(user: UserRecord) -> UserRecord:
     if user.spns and not user.is_machine_account and user.username.lower() != "krbtgt":
         user.kerberoastable = True
     return user
-

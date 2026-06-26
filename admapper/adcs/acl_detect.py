@@ -32,12 +32,20 @@ def _finding(
 ) -> AdcsFinding:
     meta = esc_meta(esc)
     commands = list(meta.manual_commands)
-    eku_profile = classify_template_eku(template_record.extended_key_usage if template_record else None)
+    eku_profile = classify_template_eku(
+        template_record.extended_key_usage if template_record else None
+    )
     cert_auth_viable = eku_profile.get("cert_auth_viable", True)
     wsus_chain_step = bool(eku_profile.get("wsus_chain_step"))
     eku_labels = eku_profile.get("eku_labels") or []
 
-    if domain and dc_ip and principal and template and esc in ("esc4", "template_enrollment", "esc1"):
+    if (
+        domain
+        and dc_ip
+        and principal
+        and template
+        and esc in ("esc4", "template_enrollment", "esc1")
+    ):
         commands = build_certipy_commands(
             esc=esc,
             domain=domain,

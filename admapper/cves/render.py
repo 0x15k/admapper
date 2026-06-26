@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_exploit_table
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 
 def print_cve_detail(finding: dict[str, Any]) -> None:

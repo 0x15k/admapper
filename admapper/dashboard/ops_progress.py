@@ -116,8 +116,4 @@ def filtered_loot_clues(ws_path: Path, progress: OpsProgress | None) -> list[dic
     if not progress.loot:
         return []
     allowed = {u.lower() for u in progress.loot_users}
-    return [
-        row
-        for row in loot_clue_rows(ws_path)
-        if str(row.get("user", "")).lower() in allowed
-    ]
+    return [row for row in loot_clue_rows(ws_path) if str(row.get("user", "")).lower() in allowed]

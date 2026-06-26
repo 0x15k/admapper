@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import sys
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
+from admapper.postex.pe_arch import TargetArch
 from admapper.support.output import print_info, print_success
 from admapper.support.platform import resolve_executable
-from admapper.postex.pe_arch import TargetArch
 
 _MINGW_DLL_C = r"""
 #include <winsock2.h>
@@ -207,7 +207,9 @@ def build_cert_enroll_dll_mingw(
     gcc = ensure_mingw_gcc(arch)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     safe = drop_path.replace("\\", "\\\\").rstrip("\\")
-    code = _MINGW_ENROLL_DLL_C.replace(r"{DROP_PATH}", safe).replace("{ENROLL_SCRIPT}", enroll_script)
+    code = _MINGW_ENROLL_DLL_C.replace(r"{DROP_PATH}", safe).replace(
+        "{ENROLL_SCRIPT}", enroll_script
+    )
     with tempfile.TemporaryDirectory(prefix="admapper-enroll-dll-") as tmp:
         src = Path(tmp) / "enroll.c"
         def_file = Path(tmp) / "enroll.def"

@@ -12,13 +12,13 @@ from admapper.acl.enum import (
 from admapper.acl.parse import owner_abuse_right, parse_security_descriptor
 from admapper.acl.rights import abuse_right
 from admapper.auth.ldap_session import open_ldap_session
-from admapper.stores.auth_inventory import AuthInventoryStore
-from admapper.stores.graph import GraphStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.ad_object import AclAbuseFinding
 from admapper.models.credential import Credential, CredentialStatus
+from admapper.stores.auth_inventory import AuthInventoryStore
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -86,10 +86,12 @@ def _match_findings(
         manual_commands = list(meta.manual_commands)
         if target.object_type == "gpo":
             import re
+
             m = re.search(r"({[a-fA-F0-9-]+})", target.dn, re.I)
             gpo_guid = m.group(1) if m else target.name
             summary = f"Write access to GPO {target.name} ({gpo_guid}). Can inject immediate tasks/scripts to compromise targets."
             from admapper.exploit.gpo_abuse import generate_gpo_abuse_commands
+
             try:
                 manual_commands = generate_gpo_abuse_commands(session, gpo_id=gpo_guid)
             except Exception:
@@ -122,10 +124,12 @@ def _match_findings(
             manual_commands = list(meta.manual_commands)
             if target.object_type == "gpo":
                 import re
+
                 m = re.search(r"({[a-fA-F0-9-]+})", target.dn, re.I)
                 gpo_guid = m.group(1) if m else target.name
                 summary = f"Write access to GPO {target.name} ({gpo_guid}). Can inject immediate tasks/scripts to compromise targets."
                 from admapper.exploit.gpo_abuse import generate_gpo_abuse_commands
+
                 try:
                     manual_commands = generate_gpo_abuse_commands(session, gpo_id=gpo_guid)
                 except Exception:

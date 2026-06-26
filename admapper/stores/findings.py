@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from admapper.support.workspace import WorkspaceManager
 from admapper.models.finding import Finding
+from admapper.support.workspace import WorkspaceManager
 
 
 class FindingsStore:

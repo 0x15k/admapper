@@ -4,13 +4,13 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from admapper.stores.graph import GraphStore
-from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import resolve_dc_fqdn
-from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
+from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 from admapper.escalate.render import print_escalation_state
 from admapper.guides.render import print_manual_guide
-from admapper.models.escalation import EscalationEdge, EscalationState
+from admapper.models.escalation import EscalationState
+from admapper.stores.graph import GraphStore
+from admapper.support.output import print_info, print_success, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -144,14 +144,14 @@ def run_escalate_analysis(
 
     # Check for shadow admins (stale adminCount)
     try:
-        from admapper.stores.findings import FindingsStore
-        from admapper.models.finding import Finding, FindingSeverity
         from admapper.graph.catalog import HIGH_VALUE_GROUPS
+        from admapper.models.finding import Finding, FindingSeverity
+        from admapper.stores.findings import FindingsStore
 
         inventory_path = ws_path / "auth_inventory.json"
         if inventory_path.is_file():
             inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-            
+
             dn_to_groups = {}
             for group in inventory.get("groups", []):
                 group_name = str(group.get("name") or "").lower()
@@ -170,7 +170,7 @@ def run_escalate_analysis(
                 if dn.lower() in visited:
                     return set()
                 visited.add(dn.lower())
-                
+
                 direct_groups = dn_to_groups.get(dn.lower(), [])
                 all_groups = set(direct_groups)
                 for gname in direct_groups:
@@ -187,7 +187,7 @@ def run_escalate_analysis(
                     continue
                 if username.lower() == "krbtgt":
                     continue
-                
+
                 if user.get("admin_count") == 1:
                     user_groups = get_all_groups_for_dn(user_dn)
                     has_admin_group = any(g in HIGH_VALUE_GROUPS for g in user_groups)
@@ -196,18 +196,22 @@ def run_escalate_analysis(
 
             if shadow_admins:
                 findings_store = FindingsStore(session.workspaces, session.workspace.name)
-                findings_store.merge([
-                    Finding(
-                        key="stale_admin_count",
-                        title=f"Stale adminCount 'Shadow Admins' detected ({len(shadow_admins)})",
-                        severity=FindingSeverity.HIGH,
-                        source="escalate",
-                        detail=f"Accounts with adminCount=1 but not in any admin groups: {', '.join(shadow_admins)}",
-                        mitre_id="T1078.002",
-                    )
-                ])
+                findings_store.merge(
+                    [
+                        Finding(
+                            key="stale_admin_count",
+                            title=f"Stale adminCount 'Shadow Admins' detected ({len(shadow_admins)})",
+                            severity=FindingSeverity.HIGH,
+                            source="escalate",
+                            detail=f"Accounts with adminCount=1 but not in any admin groups: {', '.join(shadow_admins)}",
+                            mitre_id="T1078.002",
+                        )
+                    ]
+                )
                 if not quiet:
-                    print_warning(f"Detected {len(shadow_admins)} shadow admin accounts with stale adminCount!")
+                    print_warning(
+                        f"Detected {len(shadow_admins)} shadow admin accounts with stale adminCount!"
+                    )
     except Exception as exc:
         if not quiet:
             print_warning(f"Failed stale adminCount check: {exc}")
@@ -276,9 +280,13 @@ def get_escalation_state(session: Session) -> dict[str, Any] | None:
 
 def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
     """Execute the next (or specified) escalation edge when wired."""
-    from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-    from admapper.support.output import print_error
     from admapper.models.workspace import OperationMode
+    from admapper.support.connectivity import (
+        TargetUnreachableError,
+        format_unreachable_message,
+        require_target_reachable,
+    )
+    from admapper.support.output import print_error
 
     if session.workspace and session.workspace.mode == OperationMode.AUTO:
         try:
@@ -343,18 +351,16 @@ def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
         return
 
     if module == "postex" and technique == "dll_hijack_scheduled_task":
+        from admapper.models.workspace import OperationMode
         from admapper.postex.analyze import resolve_hijack_op_id
         from admapper.postex.runner import run_dll_hijack
-        from admapper.models.workspace import OperationMode
 
         record_escalation_step(
             session,
             action="dll_hijack_exec",
             detail=finding_id or resolve_hijack_op_id(session) or "auto",
         )
-        auto_chain = bool(
-            session.workspace and session.workspace.mode == OperationMode.AUTO
-        )
+        auto_chain = bool(session.workspace and session.workspace.mode == OperationMode.AUTO)
         run_dll_hijack(
             session,
             op_id=finding_id or resolve_hijack_op_id(session),
@@ -363,7 +369,9 @@ def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
         )
         return
 
-    print_error(f"escalate exec not wired for {module}/{technique} — use manual_commands in escalate show")
+    print_error(
+        f"escalate exec not wired for {module}/{technique} — use manual_commands in escalate show"
+    )
     manual = edge.get("manual_commands") or []
     for line in manual[:5]:
         print_info(str(line))

@@ -15,7 +15,6 @@ class PostexTechnique:
     requires_external_listener: bool = False
 
 
-
 POSTEX_TECHNIQUES: dict[str, PostexTechnique] = {
     "adminto": PostexTechnique(
         key="adminto",

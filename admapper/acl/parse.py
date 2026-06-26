@@ -38,9 +38,7 @@ def _require_impacket():
 
         return ldaptypes, ACCESS_ALLOWED_ACE, ACCESS_ALLOWED_OBJECT_ACE, ACCESS_MASK, ACE
     except ImportError as exc:
-        raise ImportError(
-            "ACL parsing requires impacket — pip install admapper[recon]"
-        ) from exc
+        raise ImportError("ACL parsing requires impacket — pip install admapper[recon]") from exc
 
 
 def guid_le_to_str(data: bytes) -> str:

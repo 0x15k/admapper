@@ -54,8 +54,7 @@ def methodology_lines(ws_path: Path) -> list[str]:
     if loot.get("file_count"):
         parsed = loot.get("parsed_credentials") or []
         lines.append(
-            f"  ✓ P3 SMB Loot — {loot.get('file_count')} file(s), "
-            f"{len(parsed)} parsed cred(s)"
+            f"  ✓ P3 SMB Loot — {loot.get('file_count')} file(s), {len(parsed)} parsed cred(s)"
         )
     elif valid:
         lines.append("  · P3 SMB Loot — pending (exploit / share_loot)")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ldap3 import ALL, ANONYMOUS, Connection, Server, SUBTREE
+from ldap3 import ALL, ANONYMOUS, SUBTREE, Connection, Server
 from ldap3.core.exceptions import LDAPException
 
 from admapper.models.user import UserRecord, apply_uac_flags

@@ -4,10 +4,10 @@ from pathlib import Path
 
 import typer
 
-from admapper.support.output import print_error, print_info, print_success
 from admapper.creds.common import resolve_dc_fqdn
 from admapper.kerberos.time_sync import ensure_dc_clock
 from admapper.postex.creds import machine_hash_from_workspace
+from admapper.support.output import print_error, print_info, print_success
 from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.deps import winrm_deps_hint
 
@@ -103,7 +103,9 @@ def run_winrm_shell(
         connect_host = domain.lower().rstrip(".")
         if host and not host[0].isdigit():
             connect_host = host.rstrip(".")
-        dc_hostname = dc_fqdn or resolve_dc_fqdn(None, domain, fallback_ip=dc) or f"DC01.{domain.lower()}"
+        dc_hostname = (
+            dc_fqdn or resolve_dc_fqdn(None, domain, fallback_ip=dc) or f"DC01.{domain.lower()}"
+        )
 
     if not nthash and password:
         _warn_protected_user_winrm(domain=domain, username=username, dc_ip=dc)
@@ -164,8 +166,8 @@ def run_winrm_shell(
 def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
     """Best-effort: mark user as owned in the workspace after successful WinRM."""
     try:
-        from admapper.support.session import Session
         from admapper.escalate.analyze import mark_user_owned
+        from admapper.support.session import Session
 
         session = Session.bootstrap()
         # Locate workspace for this target
@@ -180,7 +182,11 @@ def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
             # Fall back to first workspace that has this domain
             for name in session.workspaces.list_workspaces():
                 session.select_workspace(name)
-                if session.workspace and session.workspace.domain and session.workspace.domain.lower() == domain.lower():
+                if (
+                    session.workspace
+                    and session.workspace.domain
+                    and session.workspace.domain.lower() == domain.lower()
+                ):
                     ws_name = name
                     break
         if ws_name:
@@ -190,4 +196,3 @@ def _auto_mark_owned(*, domain: str, username: str, dc_ip: str | None) -> None:
                 print_success(f"auto-owned: {username} → pwned en workspace {ws_name}")
     except Exception as exc:
         print_info(f"auto-owned skip: {exc}")
-

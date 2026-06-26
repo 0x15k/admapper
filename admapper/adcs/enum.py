@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from ldap3 import LEVEL
@@ -189,8 +188,7 @@ def enumerate_adcs(session: LdapSession) -> AdcsEnumResult:
                     display_name=_attr_str(entry, "displayName"),
                     enrollment_flags=flags,
                     extended_key_usage=_attr_list(entry, "pKIExtendedKeyUsage"),
-                    schema_version=_attr_int(entry, "msPKI-Template-Schema-Version", 0)
-                    or None,
+                    schema_version=_attr_int(entry, "msPKI-Template-Schema-Version", 0) or None,
                     low_priv_enrollment=_low_priv_enrollment_from_sd(entry),
                     requires_manager_approval=bool(flags & CT_FLAG_PEND_ALL_REQUESTS),
                     enrollee_supplies_subject=bool(flags & CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT),

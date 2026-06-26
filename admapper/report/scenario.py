@@ -3,13 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.creds.auth_checks import load_protected_users
 from admapper.creds.common import collect_gained_hashes, format_evil_winrm_pth
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
-from admapper.models.user import UAC_DONT_REQ_PREAUTH, apply_uac_flags
-from admapper.models.user import UserRecord
+from admapper.models.user import UAC_DONT_REQ_PREAUTH, UserRecord, apply_uac_flags
 from admapper.report.engagement import _load_json
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 _ARTEFACT_FILES = (
     ("unauth_scan", "unauth_scan.json"),
@@ -165,15 +164,12 @@ def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
 
     acl = _load_json(ws_path / "acl_findings.json") or {}
     acl_for_pivot = [
-        f
-        for f in acl.get("findings") or []
-        if str(f.get("principal", "")).lower() == pivot.lower()
+        f for f in acl.get("findings") or [] if str(f.get("principal", "")).lower() == pivot.lower()
     ]
     if acl_for_pivot:
         for f in acl_for_pivot[:5]:
             lines.append(
-                f"  • ACL: {f.get('right')} on {f.get('target_name')} "
-                f"({f.get('severity')})"
+                f"  • ACL: {f.get('right')} on {f.get('target_name')} ({f.get('severity')})"
             )
     elif pivot != "(none)":
         lines.append(
@@ -190,7 +186,9 @@ def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
     return lines
 
 
-def _attack_path_rows(ws_path: Path, *, pivot: str, owned: list[str], domain: str) -> list[list[str]]:
+def _attack_path_rows(
+    ws_path: Path, *, pivot: str, owned: list[str], domain: str
+) -> list[list[str]]:
     edges = sort_edges(
         collect_edges_from_pivot(
             pivot_user=pivot,
@@ -233,7 +231,9 @@ def roast_candidates_line(ws_path: Path) -> str | None:
             if isinstance(spns, str):
                 spns = [spns]
             user = apply_uac_flags(
-                UserRecord(username=username, uac=int(uac) if uac is not None else None, spns=list(spns))
+                UserRecord(
+                    username=username, uac=int(uac) if uac is not None else None, spns=list(spns)
+                )
             )
         if user.is_machine_account or not user.enabled:
             continue
@@ -360,9 +360,7 @@ def resolve_top_actions(
         default=-1,
     )
     post_machine_humans = [
-        user
-        for i, user in enumerate(owned)
-        if i > last_machine_idx and not user.endswith("$")
+        user for i, user in enumerate(owned) if i > last_machine_idx and not user.endswith("$")
     ]
     suggest_machine_pth = pivot_is_machine and not post_machine_humans
     if hashes and suggest_machine_pth:
@@ -555,9 +553,7 @@ def build_scenario_report(
         "  user                 ldap  smb  krb  winrm   note",
     ]
     for row in _access_matrix_rows(ws_path):
-        lines.append(
-            f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}"
-        )
+        lines.append(f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}")
 
     roast_line = roast_candidates_line(ws_path)
     if roast_line:
@@ -574,9 +570,7 @@ def build_scenario_report(
     path_rows = _attack_path_rows(ws_path, pivot=pivot, owned=owned, domain=domain)
     if path_rows:
         for row in path_rows:
-            lines.append(
-                f"  #{row[0]} [{row[5]}] {row[1]}/{row[2]} → {row[3]} ({row[4]})"
-            )
+            lines.append(f"  #{row[0]} [{row[5]}] {row[1]}/{row[2]} → {row[3]} ({row[4]})")
     else:
         lines.append("  (no paths — obtain loot credential or change pivot)")
 
@@ -628,7 +622,11 @@ def print_scenario_report(
             print_info(line)
         elif line.startswith("  [RECOMMENDED]") or line.startswith("  [#"):
             print_warning(line)
-        elif line.startswith("  admapper") or line.startswith("  start_auth") or line.startswith("  acls"):
+        elif (
+            line.startswith("  admapper")
+            or line.startswith("  start_auth")
+            or line.startswith("  acls")
+        ):
             print_warning(line)
         elif line.startswith("  Blocker:"):
             print_warning(line)

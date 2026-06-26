@@ -7,6 +7,7 @@ from pathlib import Path
 
 from admapper.dashboard.ops_payload import _esc, build_ops_payload
 
+
 def build_ops_html(
     ws_path: Path,
     *,

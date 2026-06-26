@@ -5,15 +5,17 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from admapper.models.credential import CredentialStatus, CredentialType
 from admapper.stores.credentials import CredentialStore
 from admapper.stores.hosts import HostsStore
-from admapper.models.credential import CredentialStatus, CredentialType
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
 
 
-def resolve_dc_fqdn(ws_path: str | None, domain: str | None, *, fallback_ip: str | None = None) -> str:
+def resolve_dc_fqdn(
+    ws_path: str | None, domain: str | None, *, fallback_ip: str | None = None
+) -> str:
     """FQDN for Kerberos LDAP SPN (ldap/DC01.domain) — IP alone causes KDC_ERR_S_PRINCIPAL_UNKNOWN."""
     import json
     from pathlib import Path
@@ -220,8 +222,11 @@ def resolve_winrm_host_for_account(
     if domain_l and base and not is_gmsa:
         return f"{base}.{domain_l}"
 
-    return resolve_dc_fqdn(str(ws) if ws else None, domain, fallback_ip=fallback_ip) or fallback_ip or base
-
+    return (
+        resolve_dc_fqdn(str(ws) if ws else None, domain, fallback_ip=fallback_ip)
+        or fallback_ip
+        or base
+    )
 
 
 def format_evil_winrm_pth(
@@ -266,10 +271,7 @@ def format_admapper_winrm_pth(
     )
     user = account if account.endswith("$") else f"{account}$"
     domain_l = (domain or "").lower().rstrip(".")
-    cmd = (
-        f"admapper winrm -H {host} -d {domain_l} -u '{user}' "
-        f"--hash {nthash} -x {command}"
-    )
+    cmd = f"admapper winrm -H {host} -d {domain_l} -u '{user}' --hash {nthash} -x {command}"
     return host, cmd
 
 

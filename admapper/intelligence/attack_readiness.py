@@ -4,12 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from admapper.creds.policy import apply_lockout_states, fetch_lockout_context
 from admapper.kerberos.skew import load_workspace_clock_skew
-from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
-from admapper.report.engagement_map import loot_clue_rows
 
 
 @dataclass
@@ -66,11 +65,7 @@ def _open_ports(ws_path: Path) -> set[int]:
 
 def _valid_cred_users(ws_path: Path) -> set[str]:
     creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
-    return {
-        str(c.get("username", "")).lower()
-        for c in creds
-        if str(c.get("status")) == "valid"
-    }
+    return {str(c.get("username", "")).lower() for c in creds if str(c.get("status")) == "valid"}
 
 
 def _human_users(users: list[UserRecord]) -> list[UserRecord]:
@@ -105,7 +100,9 @@ def _lockout_loaded(ws_path: Path, policy: DomainLockoutPolicy) -> PrerequisiteC
         key="lockout_policy",
         label="Lockout policy (GPO) retrieved",
         met=met,
-        detail="LDAP enum persists lockout_policy.json" if not met else f"threshold={policy.lockout_threshold}",
+        detail="LDAP enum persists lockout_policy.json"
+        if not met
+        else f"threshold={policy.lockout_threshold}",
     )
 
 
@@ -192,7 +189,9 @@ def resolve_lockout_context(
         ],
     }
     out = Path(ws_path) / "lockout_policy.json"
-    out.write_text(__import__("json").dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(
+        __import__("json").dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return policy, users, error
 
 
@@ -204,7 +203,10 @@ def build_attack_readiness(
     owned_users: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Full AD pentest attack-vector prerequisite matrix (generic, not lab-specific)."""
-    from admapper.intelligence.attack_vector_catalog import WorkspaceContext, build_all_attack_vectors
+    from admapper.intelligence.attack_vector_catalog import (
+        WorkspaceContext,
+        build_all_attack_vectors,
+    )
 
     ctx = WorkspaceContext.build(ws_path, users=users, policy=policy, owned_users=owned_users)
     return [v.to_dict() for v in build_all_attack_vectors(ctx)]
@@ -248,4 +250,6 @@ def _lockout_budget(users: list[UserRecord], policy: DomainLockoutPolicy) -> lis
                 "locked": bool(user.lockout_time and user.lockout_time != 0),
             }
         )
-    return sorted(rows, key=lambda r: (r["attempts_remaining"] is None, r["attempts_remaining"] or 0))
+    return sorted(
+        rows, key=lambda r: (r["attempts_remaining"] is None, r["attempts_remaining"] or 0)
+    )

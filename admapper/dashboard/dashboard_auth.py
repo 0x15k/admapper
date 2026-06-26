@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_success
 from admapper.creds.common import pick_dc_ip
-from admapper.kerberos.time_sync import ensure_dc_clock
 from admapper.creds.verify import run_credential_verify
 from admapper.escalate.analyze import mark_user_owned, set_pivot_user
+from admapper.kerberos.time_sync import ensure_dc_clock
 from admapper.models.credential import Credential, CredentialStatus
+from admapper.support.output import print_success
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -26,8 +26,8 @@ def run_dashboard_credential_auth(
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
-    from admapper.support.discovery import ensure_domain
     from admapper.recon.ldap_probe import discover_domain_from_bind
+    from admapper.support.discovery import ensure_domain
 
     resolved_domain = domain or session.workspace.domain
     if not resolved_domain:

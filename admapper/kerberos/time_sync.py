@@ -3,11 +3,10 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from ldap3 import Server, Connection, ALL
-
+from ldap3 import ALL, Connection, Server
 
 from admapper.support.platform import is_linux, is_macos, subprocess_run_kwargs
 
@@ -69,7 +68,9 @@ def query_dc_time_ldap(dc_ip: str, timeout: int = 5) -> datetime | None:
                 # Strip fractional seconds and tz suffixes for robust parsing
                 m = re.match(r"^(\d{14})", raw)
                 if m:
-                    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+                    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(
+                        tzinfo=UTC
+                    )
     except Exception:
         pass
     return None
@@ -80,7 +81,7 @@ def calculate_ldap_clock_skew(dc_ip: str, timeout: int = 5) -> float | None:
     dc_time = query_dc_time_ldap(dc_ip, timeout)
     if not dc_time:
         return None
-    local_time = datetime.now(timezone.utc)
+    local_time = datetime.now(UTC)
     return (dc_time - local_time).total_seconds()
 
 
@@ -205,9 +206,9 @@ def ensure_dc_clock(
     else:
         enabled = _dc_clock_state.get("sync_enabled", True)
 
+    from admapper.kerberos.skew import apply_workspace_clock_skew
     from admapper.support.output import print_info, print_success, print_warning
     from admapper.support.platform import get_clock_skew, set_clock_skew
-    from admapper.kerberos.skew import apply_workspace_clock_skew
 
     if not dc_ip:
         return False
@@ -223,9 +224,7 @@ def ensure_dc_clock(
             source=Tool.FAKETIME,
         )
     elif explicit_skew:
-        print_info(
-            f"using Kerberos clock skew {explicit_skew} (--clock-skew); skipping ntpdate"
-        )
+        print_info(f"using Kerberos clock skew {explicit_skew} (--clock-skew); skipping ntpdate")
 
     unstable = is_clock_unstable()
     already_synced = _dc_clock_state.get("synced_dc") == dc_ip
@@ -249,11 +248,15 @@ def ensure_dc_clock(
 
     if ldap_skew_seconds is not None:
         from admapper.kerberos.skew import save_workspace_clock_skew, seconds_to_faketime_offset
+
         derived = seconds_to_faketime_offset(ldap_skew_seconds)
         if not get_clock_skew() and abs(ldap_skew_seconds) > 10:
             set_clock_skew(derived)
-            save_workspace_clock_skew(ws_path, derived, dc_ip=dc_ip, stepped_seconds=ldap_skew_seconds)
+            save_workspace_clock_skew(
+                ws_path, derived, dc_ip=dc_ip, stepped_seconds=ldap_skew_seconds
+            )
             from admapper.support.provenance import Tool, print_step
+
             print_step(
                 f"DC clock detected via LDAP (skew: {derived}) — configuring libfaketime automatically",
                 source=Tool.FAKETIME,

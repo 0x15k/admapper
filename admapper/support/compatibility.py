@@ -55,11 +55,7 @@ def feature_matrix() -> list[FeatureSupport]:
     has_kerbrute = resolve_kerbrute() is not None
     has_nxc = resolve_nxc() is not None
 
-    roast_crack_level = (
-        SupportLevel.FULL
-        if has_hashcat or has_john
-        else SupportLevel.EXPORT
-    )
+    roast_crack_level = SupportLevel.FULL if has_hashcat or has_john else SupportLevel.EXPORT
     return [
         FeatureSupport(
             feature="Interactive CLI / workspaces",
@@ -129,9 +125,7 @@ def feature_matrix() -> list[FeatureSupport]:
             feature="Password spray (kerbrute / nxc)",
             command="spray --method kerbrute|nxc",
             tier=SupportTier.EXTERNAL,
-            level=SupportLevel.FULL
-            if (has_kerbrute or has_nxc)
-            else SupportLevel.PARTIAL,
+            level=SupportLevel.FULL if (has_kerbrute or has_nxc) else SupportLevel.PARTIAL,
             runtime="kerbrute or nxc/netexec binary",
             notes="Optional; LDAP spray remains fallback.",
         ),

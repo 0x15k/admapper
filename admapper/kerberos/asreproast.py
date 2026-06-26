@@ -8,7 +8,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from admapper.creds.common import apply_cracked_credentials, pick_dc_ip, username_from_kerberos_hash
+from admapper.creds.crack import crack_with_hashcat, crack_with_john, find_wordlist
+from admapper.guides.render import print_manual_guide
+from admapper.models.finding import Finding, FindingSeverity
+from admapper.models.hash_record import AsRepHash
 from admapper.stores.findings import FindingsStore
+from admapper.stores.users import UsersStore
 from admapper.support.hashes import AsRepHashStore
 from admapper.support.output import (
     ConfirmLevel,
@@ -19,12 +25,6 @@ from admapper.support.output import (
     print_warning,
 )
 from admapper.support.platform import resolve_impacket_script, run_command, tool_install_hint
-from admapper.stores.users import UsersStore
-from admapper.creds.common import apply_cracked_credentials, pick_dc_ip, username_from_kerberos_hash
-from admapper.creds.crack import crack_with_hashcat, crack_with_john, find_wordlist
-from admapper.guides.render import print_manual_guide
-from admapper.models.finding import Finding, FindingSeverity
-from admapper.models.hash_record import AsRepHash
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -143,9 +143,7 @@ def run_asreproast(
 
     targets = _asrep_targets(session, usernames)
     if not targets:
-        raise ValueError(
-            "no AS-REP roastable users — run enum users or pass explicit usernames"
-        )
+        raise ValueError("no AS-REP roastable users — run enum users or pass explicit usernames")
 
     if not confirm(
         f"AS-REP roast {len(targets)} user(s) against {dc_ip}?",
@@ -168,10 +166,7 @@ def run_asreproast(
     if error:
         result.errors.append(error)
 
-    rows = [
-        [h.username, h.domain, h.hashcat[:48] + "…", h.cracked_password or ""]
-        for h in stored
-    ]
+    rows = [[h.username, h.domain, h.hashcat[:48] + "…", h.cracked_password or ""] for h in stored]
     if rows:
         print_table("AS-REP hashes", ["user", "domain", "hash", "cracked"], rows)
     print_success("hashes saved → asreproast_hashes.json + asreproast_hashcat.txt")

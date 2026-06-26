@@ -6,12 +6,21 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from admapper.support.connectivity import TargetUnreachableError, format_unreachable_message, require_target_reachable
-from admapper.support.output import ConfirmLevel, confirm, print_info, print_success, print_warning
 from admapper.models.workspace import OperationMode
 from admapper.postex.creds import WinRMCred, resolve_winrm_cred
-from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.payload import PayloadMode, prepare_hijack_payload
+from admapper.postex.pe_arch import (
+    TargetArch,
+    infer_arch_from_monitor_log,
+    normalize_arch,
+    ps_read_pe_arch_script,
+)
+from admapper.support.connectivity import (
+    TargetUnreachableError,
+    format_unreachable_message,
+    require_target_reachable,
+)
+from admapper.support.output import ConfirmLevel, confirm, print_info, print_success, print_warning
 from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 from admapper.winrm.upload import remote_file_ok, upload_file
@@ -60,7 +69,9 @@ def resolve_hijack_op(
         for item in ops.get("opportunities") or []:
             if str(item.get("id")) == op_id:
                 if item.get("technique") != technique:
-                    print_warning(f"op {op_id} technique is {item.get('technique')}, not {technique}")
+                    print_warning(
+                        f"op {op_id} technique is {item.get('technique')}, not {technique}"
+                    )
                 merged = dict(item)
                 merged["finding"] = finding
                 return merged
@@ -201,7 +212,9 @@ def deploy_dll_hijack(
             ca_name=enroll_ca_name,
             run_as_user=run_as,
         )
-        for warning in validate_enroll_principal(cred.username, machine_template=enroll_profile.machine_context):
+        for warning in validate_enroll_principal(
+            cred.username, machine_template=enroll_profile.machine_context
+        ):
             print_warning(warning)
         print_info(
             f"enroll will execute as task user {run_as} when the task runs — "
@@ -254,7 +267,9 @@ def deploy_dll_hijack(
         if payload_mode == "enroll":
             from admapper.adcs.enroll import build_local_enroll_powershell
 
-            enroll_marker = f"=== admapper deploy {datetime.now(UTC).isoformat()} expect={run_as} ==="
+            enroll_marker = (
+                f"=== admapper deploy {datetime.now(UTC).isoformat()} expect={run_as} ==="
+            )
             ps = build_local_enroll_powershell(
                 template=enroll_template,
                 dns_name=enroll_dns,

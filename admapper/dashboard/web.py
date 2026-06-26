@@ -5,11 +5,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+from admapper.creds.common import (
+    collect_gained_hashes,
+    format_evil_winrm_pth,
+)
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
-from admapper.creds.common import collect_gained_hashes, format_admapper_winrm_pth, format_evil_winrm_pth
+from admapper.graph.identity_lens import METHOD_LABELS
 from admapper.report.engagement import _load_json
 from admapper.report.engagement_map import _acl_exploit_blocker, loot_clue_rows
-from admapper.graph.identity_lens import METHOD_LABELS
 
 
 def _esc(text: str) -> str:
@@ -154,8 +157,7 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
     orphan_group_ids = {
         str(node.get("id", ""))
         for node in nodes
-        if str(node.get("group", "")) == "group"
-        and str(node.get("id", "")) not in connected
+        if str(node.get("group", "")) == "group" and str(node.get("id", "")) not in connected
     }
 
     if len(nodes) <= 14:
@@ -193,9 +195,7 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
 
     filtered_nodes = [n for n in nodes if str(n.get("id", "")) in keep]
     filtered_edges = [
-        e
-        for e in edges
-        if str(e.get("from", "")) in keep and str(e.get("to", "")) in keep
+        e for e in edges if str(e.get("from", "")) in keep and str(e.get("to", "")) in keep
     ]
     hidden = len(nodes) - len(filtered_nodes)
     return {
@@ -204,7 +204,6 @@ def filter_tactical_graph(payload: dict[str, Any]) -> dict[str, Any]:
         "edges": filtered_edges,
         "hidden_nodes": hidden,
     }
-
 
 
 def build_graph_payload(
@@ -333,11 +332,15 @@ def build_graph_payload(
             p_id,
             principal,
             "user",
-            _node_color({"username": principal, "owned": principal.lower() in owned}, pivot=pivot, owned=owned),
-            username=principal,
-            identity_role="pivot" if principal.lower() == pivot.lower() else (
-                "owned" if principal.lower() in owned else "unknown"
+            _node_color(
+                {"username": principal, "owned": principal.lower() in owned},
+                pivot=pivot,
+                owned=owned,
             ),
+            username=principal,
+            identity_role="pivot"
+            if principal.lower() == pivot.lower()
+            else ("owned" if principal.lower() in owned else "unknown"),
         )
         add_node(t_id, target, "gmsa", "#06b6d4", title=finding.get("detail", ""))
         vis_edges.append(
@@ -522,14 +525,14 @@ def build_attack_graph_html(
     <h1>ADMapper — Attack Graph</h1>
     <div class="meta">
       workspace <strong>{_esc(workspace)}</strong> · domain <strong>{_esc(domain_s)}</strong>
-      · DC <strong>{_esc(dc_ip or '-')}</strong>
+      · DC <strong>{_esc(dc_ip or "-")}</strong>
     </div>
   </header>
   <div class="layout">
     <aside>
       <h2>You are here</h2>
-      <p><span class="pill owned">owned</span> {_esc(', '.join(owned_users or []) or '(none)')}</p>
-      <p><span class="pill pivot">pivot</span> {_esc(pivot_user or '-')}</p>
+      <p><span class="pill owned">owned</span> {_esc(", ".join(owned_users or []) or "(none)")}</p>
+      <p><span class="pill pivot">pivot</span> {_esc(pivot_user or "-")}</p>
       {next_hop_block}
       {blocker_block}
       <h2>Hash obtained</h2>

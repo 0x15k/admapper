@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from admapper.support.output import print_error, print_warning
 from admapper.models.credential import CredentialType
 from admapper.models.workspace import OperationMode
+from admapper.support.output import print_error, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session

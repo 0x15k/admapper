@@ -51,7 +51,12 @@ def _module_available(name: str) -> bool:
 def collect_tool_matrix() -> list[dict[str, str]]:
     """AdStrike Tool Checker (#58) — external CLI matrix for doctor."""
     from admapper.adcs.certipy import resolve_certipy
-    from admapper.support.platform import resolve_executable, resolve_faketime, resolve_impacket_script, resolve_nxc
+    from admapper.support.platform import (
+        resolve_executable,
+        resolve_faketime,
+        resolve_impacket_script,
+        resolve_nxc,
+    )
 
     def _row(
         tool: str,
@@ -76,7 +81,12 @@ def collect_tool_matrix() -> list[dict[str, str]]:
         _row("impacket-getTGT", get_tgt_path, required_for="Kerberos TGT, WinRM"),
         _row("faketime", resolve_faketime(), required_for="clock skew / Protected Users"),
         _row("ntpdate", ntpdate, required_for="DC clock sync"),
-        _row("evil-winrm", resolve_executable(["evil-winrm"]), required_for="WinRM shell", optional=True),
+        _row(
+            "evil-winrm",
+            resolve_executable(["evil-winrm"]),
+            required_for="WinRM shell",
+            optional=True,
+        ),
         _row(
             "bloodhound-python",
             resolve_executable(["bloodhound-python", "bloodhound"]),
@@ -171,13 +181,18 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
     import sys
 
     pip_path = shutil.which("pip") or ""
-    if sys.prefix == sys.base_prefix and pip_path and "/.venv/" not in pip_path and "venv" not in pip_path:
+    if (
+        sys.prefix == sys.base_prefix
+        and pip_path
+        and "/.venv/" not in pip_path
+        and "venv" not in pip_path
+    ):
         issues.append(
             InstallIssue(
                 "warning",
                 "pip_not_in_venv",
                 f"Active pip is not from a venv: {pip_path}",
-                f"source <repo>/.venv/bin/activate  or  <repo>/.venv/bin/pip install -e '.[full]'",
+                "source <repo>/.venv/bin/activate  or  <repo>/.venv/bin/pip install -e '.[full]'",
             )
         )
     if sys.prefix == sys.base_prefix:
@@ -228,7 +243,13 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
 
 def print_doctor_report(*, cwd: Path | None = None) -> int:
     """Print install/layout diagnostics; return non-zero if errors present."""
-    from admapper.support.output import print_error, print_info, print_success, print_table, print_warning
+    from admapper.support.output import (
+        print_error,
+        print_info,
+        print_success,
+        print_table,
+        print_warning,
+    )
 
     here = (cwd or Path.cwd()).resolve()
     print_info(f"Platform: {platform_label()}")

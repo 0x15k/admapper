@@ -52,8 +52,7 @@ def _rights_from_mask(mask) -> list[str]:
 
 def parse_template_security_descriptor(raw: bytes) -> list[TemplateAce]:
     """Parse pKICertificateTemplate nTSecurityDescriptor into trustee rights."""
-    from admapper.acl.parse import guid_le_to_str, parse_security_descriptor
-    from admapper.acl.parse import _require_impacket
+    from admapper.acl.parse import _require_impacket, guid_le_to_str, parse_security_descriptor
 
     ldaptypes, ACCESS_ALLOWED_ACE, ACCESS_ALLOWED_OBJECT_ACE, _, ACE = _require_impacket()
 
@@ -110,7 +109,9 @@ def parse_template_security_descriptor(raw: bytes) -> list[TemplateAce]:
         bucket = by_trustee.setdefault(ace.trustee_sid, set())
         bucket.update(rights)
 
-    return [TemplateAce(trustee_sid=sid, rights=sorted(rights)) for sid, rights in by_trustee.items()]
+    return [
+        TemplateAce(trustee_sid=sid, rights=sorted(rights)) for sid, rights in by_trustee.items()
+    ]
 
 
 def parse_ca_security_descriptor(raw: bytes) -> list[TemplateAce]:
@@ -126,7 +127,9 @@ def parse_ca_security_descriptor(raw: bytes) -> list[TemplateAce]:
         trustee = ace.trustee_sid
         bucket = by_trustee.setdefault(trustee, set())
         bucket.update(rights)
-    return [TemplateAce(trustee_sid=sid, rights=sorted(rights)) for sid, rights in by_trustee.items()]
+    return [
+        TemplateAce(trustee_sid=sid, rights=sorted(rights)) for sid, rights in by_trustee.items()
+    ]
 
 
 def parse_template_sd_from_entry(entry) -> list[TemplateAce]:

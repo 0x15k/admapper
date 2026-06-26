@@ -4,20 +4,19 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import CredentialStatus
 from admapper.models.mssql_op import MssqlOpportunity
 from admapper.mssql.catalog import mssql_meta
 from admapper.mssql.discover import discover_mssql_instances
 from admapper.mssql.enum import MssqlEnumResult, enumerate_mssql_instance
+from admapper.support.output import print_info, print_success, print_table, print_warning
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
 
 
 def _pick_credential(session: Session, cred_id: str | None):
-    from admapper.models.credential import Credential
 
     store = session.credentials
     if store is None:
