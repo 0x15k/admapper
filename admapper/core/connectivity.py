@@ -71,7 +71,7 @@ def require_target_reachable(
     """Probe target; return reachable IP or raise TargetUnreachableError."""
     candidates = [host] if host else resolve_target_hosts(session)
     if not candidates:
-        raise TargetUnreachableError("", "sin IP de objetivo — usa: admapper scan --ip-dc <DC_IP>")
+        raise TargetUnreachableError("", "no target IP — use: admapper scan --ip-dc <DC_IP>")
 
     last_detail = ""
     for ip in candidates:
@@ -84,20 +84,20 @@ def require_target_reachable(
 
 
 def format_unreachable_message(exc: TargetUnreachableError) -> str:
-    host = exc.host or "objetivo"
-    detail = exc.detail or "sin ruta"
+    host = exc.host or "target"
+    detail = exc.detail or "no route"
     lower = detail.lower()
     if "113" in detail or "no route to host" in lower:
-        hint = "La máquina está apagada o no hay VPN/ruta al lab."
+        hint = "The target machine is powered off or there is no VPN/route to the target."
     elif "timed out" in lower or "110" in detail:
-        hint = "Timeout — comprueba VPN y que la IP del lab sigue activa."
+        hint = "Timeout — verify your VPN connection and that the target IP is still active."
     elif "connection refused" in lower or "111" in detail:
-        hint = "Hay ruta pero los servicios AD no responden aún — espera a que arranque la VM."
+        hint = "Route exists but Active Directory services are not responding yet — wait for the VM to fully boot."
     elif not exc.host:
-        hint = "Registra el DC: admapper scan --ip-dc <IP> o admapper run -H <IP> ..."
+        hint = "Register the DC: admapper scan --ip-dc <IP> or admapper run -H <IP> ..."
     else:
-        hint = "Enciende la VM HTB, conecta VPN y reintenta."
+        hint = "Power on the target VM, connect to the VPN, and retry."
     return (
-        f"Target {host} no alcanzable ({detail}). {hint} "
-        f"Cuando esté online: admapper brief -w <workspace> --auto"
+        f"Target {host} unreachable ({detail}). {hint} "
+        f"When online: admapper brief -w <workspace> --auto"
     )

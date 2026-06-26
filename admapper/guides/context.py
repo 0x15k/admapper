@@ -111,7 +111,7 @@ def contextualize_text(text: str, ctx: GuideContext) -> str:
         ("<USER>", user),
         ("<PASS>", password),
         ("<listener>", dc_host),
-        ("logging-DC01-CA", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
+        ("corp-DC01-CA", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
         ("<CA>", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
     ]
 

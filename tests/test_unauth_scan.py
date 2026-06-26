@@ -91,7 +91,7 @@ def test_run_unauth_scan_falls_back_when_port_scan_empty(tmp_path: Path) -> None
         port=389,
         reachable=True,
         anonymous_bind=False,
-        default_naming_context="DC=logging,DC=htb",
+        default_naming_context="DC=corp,DC=local",
         dns_host_name="DC01.corp.local",
     )
     smb_ok = SmbProbeResult(host="192.168.10.182", port=445, reachable=True, null_session=False)

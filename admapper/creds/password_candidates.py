@@ -28,7 +28,7 @@ def propose_password_candidates(
       - parsed_from_loot: exact string from file
       - year_variant: adjacent year (log may embed stale 20xx)
       - stale_log_hint: log documents INVALID_CREDENTIALS / bind failure
-      - symbol_suffix: common HTB rotation (@ on trailing year)
+      - symbol_suffix: common AD rotation (@ on trailing year)
     """
     seen: set[str] = set()
     out: list[PasswordCandidate] = []

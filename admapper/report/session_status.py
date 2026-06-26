@@ -47,8 +47,8 @@ def build_session_status_lines(
 ) -> list[str]:
     """Session Manager dashboard (AdStrike-style) as text lines."""
     owned = list(owned_users or [])
-    pivot = pivot_user or (owned[-1] if owned else "(ninguno)")
-    domain_s = domain or "(sin dominio)"
+    pivot = pivot_user or (owned[-1] if owned else "(none)")
+    domain_s = domain or "(no domain)"
     phase = infer_kill_chain_phase(ws_path, owned)
     dc_ip, dc_host = _dc_info(ws_path, hosts)
     valid, invalid = count_credentials(ws_path)

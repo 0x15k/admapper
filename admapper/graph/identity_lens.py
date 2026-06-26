@@ -137,13 +137,13 @@ def build_selectable_identities(
         method_key = owned_methods.get(user.lower(), "")
         method_label = METHOD_LABELS.get(method_key, method_key)
         method_part = f" · {method_label}" if method_label else ""
-        cred_part = " · cred válida" if user.lower() in valid else " · sin cred verificada"
+        cred_part = " · valid cred" if user.lower() in valid else " · no verified cred"
         add(
             user,
             role="owned",
             selectable="pivot",
             cred_valid=user.lower() in valid,
-            detail=f"comprometido{method_part}{cred_part}",
+            detail=f"compromised{method_part}{cred_part}",
             auth_method=method_key,
         )
 
@@ -153,7 +153,7 @@ def build_selectable_identities(
             role="cred_valid",
             selectable="pivot",
             cred_valid=True,
-            detail="credencial válida — no marcado owned",
+            detail="valid credential — not marked owned",
         )
 
     for clue in filtered_loot_clues(ws_path, ops_progress):
@@ -167,7 +167,7 @@ def build_selectable_identities(
             role="loot_pending",
             selectable="verify",
             cred_valid=False,
-            detail=f"pista en {str(clue.get('source', ''))[:40]}",
+            detail=f"clue in {str(clue.get('source', ''))[:40]}",
         )
 
     from admapper.creds.common import collect_gained_hashes
@@ -205,7 +205,7 @@ def build_selectable_identities(
             role="enum_target",
             selectable="view",
             cred_valid=False,
-            detail="objetivo enum — " + ", ".join(flags),
+            detail="enum target — " + ", ".join(flags),
         )
 
     return rows
@@ -245,12 +245,12 @@ def build_identity_lens(
             "username": account,
             "node_id": f"gmsa:{pl}@{domain.lower()}",
             "status": "machine_pth",
-            "status_label": "gMSA / máquina — WinRM PTH (sin password LDAP)",
+            "status_label": "gMSA / machine — WinRM PTH (no LDAP password)",
             "read_only": False,
             "owned": True,
             "cred_valid": True,
             "cred_status": "nthash",
-            "access_matrix": [account, "skip", "skip", "skip", "sí*", "hash gMSA — WinRM PTH"],
+            "access_matrix": [account, "skip", "skip", "skip", "yes*", "gMSA hash — WinRM PTH"],
             "capabilities": [],
             "missions": [],
             "enabled_missions": [],
@@ -325,22 +325,22 @@ def build_identity_lens(
 
     if pl in owned and pl in valid:
         status = "owned_ready"
-        status_label = "Owned con credencial — rutas ejecutables"
+        status_label = "Owned with credential — executable paths"
     elif pl in owned:
         status = "owned_no_cred"
-        status_label = "Owned — falta credencial válida"
+        status_label = "Owned — missing valid credential"
     elif pl in valid:
         status = "cred_only"
-        status_label = "Cred válida — marca owned o enumera"
+        status_label = "Valid cred — mark owned or enumerate"
     elif loot_clue:
         status = "loot_pending"
-        status_label = "Pista de loot — verificar contraseña"
+        status_label = "Loot clue — verify password"
     elif enum_flags and pl not in owned and pl not in valid:
         status = "enum_target"
-        status_label = "Objetivo enum — " + ", ".join(enum_flags) + " (solo lectura)"
+        status_label = "Enum target — " + ", ".join(enum_flags) + " (read-only)"
     else:
         status = "unknown"
-        status_label = "Sin perfil operativo"
+        status_label = "No operational profile"
 
     read_only = status == "enum_target"
     inventory: dict[str, Any] | None = None

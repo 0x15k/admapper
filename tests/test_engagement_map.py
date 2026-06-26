@@ -75,7 +75,7 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
                 "groups": [
                     {
                         "name": "Protected Users",
-                        "members": ["CN=svc_sql,CN=Users,DC=logging,DC=htb"],
+                        "members": ["CN=svc_sql,CN=Users,DC=corp,DC=local"],
                     }
                 ]
             }
@@ -121,13 +121,13 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
         pivot_user="svc_sql",
     )
 
-    assert "MAPA DE ENGAGEMENT" in text
+    assert "ENGAGEMENT MAP" in text
     assert "svc_sql" in text
     assert "WelcomePassword123!" in text
-    assert "SIGUIENTE PASO" in text
+    assert "NEXT STEP" in text
     assert "genericwrite" in text
     assert "msa_health" in text
-    assert "BLOQUEO" in text
+    assert "BLOCK" in text
     assert "krb5-user" in text or "krb5" in text
 
 
@@ -171,11 +171,11 @@ def test_engagement_map_shows_hash_and_winrm_next_hop(tmp_path: Path) -> None:
         pivot_user="msa_health$",
     )
 
-    assert "HASH OBTENIDO" in text
+    assert "HASH OBTAINED" in text
     assert "0123456789abcdef0123456789abcdef" in text
     assert "dc01.corp.local" in text
     assert "WinRM" in text
-    assert "SIGUIENTE PASO" in text
+    assert "NEXT STEP" in text
     assert "──WinRM──►" in text
 
 
@@ -261,6 +261,6 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
     )
 
     assert "──WinRM──►" not in text
-    assert "SIGUIENTE PASO" in text
+    assert "NEXT STEP" in text
     assert "dll_hijack_scheduled_task" in text
     assert "jaylee.doe" in text

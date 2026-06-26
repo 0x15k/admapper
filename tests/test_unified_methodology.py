@@ -56,5 +56,5 @@ def test_methodology_lines_use_unified(tmp_path: Path) -> None:
     ws = tmp_path
     (ws / "unauth_scan.json").write_text(json.dumps({"hosts": [{}]}))
     lines = methodology_progress_lines(ws)
-    assert any("CADENA AD" in ln for ln in lines)
+    assert any("AD CHAIN" in ln for ln in lines)
     assert any("P02" in ln for ln in lines)

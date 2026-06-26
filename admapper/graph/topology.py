@@ -151,9 +151,9 @@ def build_network_topology(
         }
 
     discovered_domain = str(unauth.get("domain") or "").strip()
-    domain_known = bool(discovered_domain and discovered_domain not in {"(sin dominio)", "?"})
+    domain_known = bool(discovered_domain and discovered_domain not in {"(no domain)", "?"})
     if domain_known:
-        discoveries.append(f"Dominio: {discovered_domain}")
+        discoveries.append(f"Domain: {discovered_domain}")
 
     dc_id: str | None = None
     targets: list[dict[str, Any]] = []

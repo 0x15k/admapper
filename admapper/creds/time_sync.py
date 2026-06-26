@@ -219,7 +219,7 @@ def ensure_dc_clock(
         from admapper.core.provenance import Tool, print_step
 
         print_step(
-            f"usando clock skew Kerberos en caché {cached_skew} (workspace)",
+            f"using cached Kerberos clock skew {cached_skew} (workspace)",
             source=Tool.FAKETIME,
         )
     elif explicit_skew:

@@ -92,24 +92,24 @@ def test_build_ops_html_real_terms(tmp_path: Path) -> None:
     assert "boot-ip" in html
     assert "tab-network" in html
     assert "screen-play" in html
-    assert "ESCANEAR" in html
+    assert "SCAN" in html
     assert "CRTP" in html
     assert "TERMINAL" in html
-    assert "NOTAS" in html
+    assert "NOTES" in html
     assert "note-kv" in html
     assert "note-arr" in html
-    assert "Prerrequisitos por ataque" in html
+    assert "Attack prerequisites" in html
     assert "MANUAL" in html
     assert "book-reader" in html
-    assert "Identidades" in html
-    assert "AUTENTICAR" in html
-    assert "CONECTAR WINRM PTH" in html
+    assert "Identities" in html
+    assert "AUTHENTICATE" in html
+    assert "CONNECT WINRM PTH" in html
     assert "screen-hq" in html
     assert "hq-canvas" in html
     assert "tab-hq" in html
-    assert "Política de bloqueo" in html
-    assert "Usuarios del dominio" in html
-    assert "Análisis de pista" in html
+    assert "Lockout policy" in html
+    assert "Domain users" in html
+    assert "Clue analysis" in html
 
 
 def test_write_ops_html(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 """ACL attack-flow diagram for the pentest manual (generic, not lab-specific)."""
 
-ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" role="img" aria-label="Flujo de abuso ACL en AD">
+ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" role="img" aria-label="ACL abuse flow in AD">
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L6,3 L0,6 Z" fill="#8b9cb3"/>
@@ -19,11 +19,11 @@ ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92
     </style>
   </defs>
   <rect width="920" height="720" fill="#080b10"/>
-  <text x="460" y="28" text-anchor="middle" class="t" font-size="15">Abuso de ACLs — flujo de escalada (genérico)</text>
+  <text x="460" y="28" text-anchor="middle" class="t" font-size="15">ACL Abuse — escalation flow (generic)</text>
 
   <rect class="box crit" x="360" y="44" width="200" height="44"/>
-  <text x="460" y="64" text-anchor="middle" class="t">Atacante</text>
-  <text x="460" y="80" text-anchor="middle" class="s">usuario comprometido</text>
+  <text x="460" y="64" text-anchor="middle" class="t">Attacker</text>
+  <text x="460" y="80" text-anchor="middle" class="s">compromised user</text>
 
   <rect class="tool" x="80" y="108" width="200" height="40"/>
   <text x="180" y="133" text-anchor="middle" class="s">BloodHound / SharpHound</text>
@@ -34,19 +34,19 @@ ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92
 
   <rect class="perm crit" x="60" y="178" width="170" height="48"/>
   <text x="145" y="198" text-anchor="middle" class="t">GenericAll</text>
-  <text x="145" y="214" text-anchor="middle" class="s">control total</text>
+  <text x="145" y="214" text-anchor="middle" class="s">full control</text>
 
   <rect class="perm" x="250" y="178" width="170" height="48"/>
   <text x="335" y="198" text-anchor="middle" class="t">WriteDACL</text>
-  <text x="335" y="214" text-anchor="middle" class="s">modificar DACL</text>
+  <text x="335" y="214" text-anchor="middle" class="s">modify DACL</text>
 
   <rect class="perm" x="440" y="178" width="170" height="48"/>
   <text x="525" y="198" text-anchor="middle" class="t">WriteOwner</text>
-  <text x="525" y="214" text-anchor="middle" class="s">tomar ownership</text>
+  <text x="525" y="214" text-anchor="middle" class="s">take ownership</text>
 
   <rect class="perm" x="630" y="178" width="170" height="48"/>
   <text x="715" y="198" text-anchor="middle" class="t">ForceChangePassword</text>
-  <text x="715" y="214" text-anchor="middle" class="s">reset sin conocer pwd</text>
+  <text x="715" y="214" text-anchor="middle" class="s">reset without knowing pwd</text>
 
   <path class="edge" d="M180 148 L145 178"/>
   <path class="edge" d="M460 148 L335 178"/>
@@ -59,7 +59,7 @@ ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92
 
   <rect class="perm crit" x="270" y="268" width="160" height="48"/>
   <text x="350" y="288" text-anchor="middle" class="t">DCSync</text>
-  <text x="350" y="304" text-anchor="middle" class="s">replicación AD</text>
+  <text x="350" y="304" text-anchor="middle" class="s">AD replication</text>
 
   <rect class="attr" x="460" y="268" width="200" height="48"/>
   <text x="560" y="288" text-anchor="middle" class="t">RBCD Abuse</text>
@@ -77,15 +77,15 @@ ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92
   <path class="edge" d="M780 316 L350 340"/>
 
   <rect class="goal" x="80" y="358" width="200" height="44"/>
-  <text x="180" y="378" text-anchor="middle" class="t">Usuario / Admin</text>
-  <text x="180" y="394" text-anchor="middle" class="s">hash o reset pwd</text>
+  <text x="180" y="378" text-anchor="middle" class="t">User / Admin</text>
+  <text x="180" y="394" text-anchor="middle" class="s">hash or reset pwd</text>
 
   <rect class="goal" x="360" y="358" width="200" height="44"/>
-  <text x="460" y="378" text-anchor="middle" class="t">Grupo privilegiado</text>
+  <text x="460" y="378" text-anchor="middle" class="t">Privileged group</text>
   <text x="460" y="394" text-anchor="middle" class="s">AddMember / GPO</text>
 
   <rect class="goal" x="640" y="358" width="200" height="44"/>
-  <text x="740" y="378" text-anchor="middle" class="t">Objeto dominio</text>
+  <text x="740" y="378" text-anchor="middle" class="t">Domain object</text>
   <text x="740" y="394" text-anchor="middle" class="s">DCSync / Golden Ticket</text>
 
   <path class="edge" d="M140 316 L180 358"/>
@@ -95,18 +95,18 @@ ACL_ATTACK_FLOW_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92
 
   <rect class="box crit" x="330" y="448" width="260" height="52"/>
   <text x="460" y="472" text-anchor="middle" class="t">Domain Admin</text>
-  <text x="460" y="490" text-anchor="middle" class="s">objetivo final de la cadena ACL</text>
+  <text x="460" y="490" text-anchor="middle" class="s">final target of the ACL chain</text>
 
   <path class="edge" d="M180 402 L400 448"/>
   <path class="edge" d="M460 402 L460 448"/>
   <path class="edge" d="M740 402 L520 448"/>
 
-  <text x="40" y="540" class="s">Leyenda:</text>
-  <rect class="perm crit" x="40" y="552" width="14" height="14"/><text x="60" y="564" class="s">Crítico</text>
-  <rect class="perm" x="130" y="552" width="14" height="14"/><text x="150" y="564" class="s">ACL / permiso</text>
-  <rect class="attr" x="240" y="552" width="14" height="14"/><text x="260" y="564" class="s">Atributo AD</text>
-  <rect class="inj" x="350" y="552" width="14" height="14"/><text x="370" y="564" class="s">Inyección ACE</text>
-  <rect class="goal" x="470" y="552" width="14" height="14"/><text x="490" y="564" class="s">Objetivo intermedio</text>
+  <text x="40" y="540" class="s">Legend:</text>
+  <rect class="perm crit" x="40" y="552" width="14" height="14"/><text x="60" y="564" class="s">Critical</text>
+  <rect class="perm" x="130" y="552" width="14" height="14"/><text x="150" y="564" class="s">ACL / permission</text>
+  <rect class="attr" x="240" y="552" width="14" height="14"/><text x="260" y="564" class="s">AD attribute</text>
+  <rect class="inj" x="350" y="552" width="14" height="14"/><text x="370" y="564" class="s">ACE injection</text>
+  <rect class="goal" x="470" y="552" width="14" height="14"/><text x="490" y="564" class="s">Intermediate target</text>
   <line x1="600" y1="559" x2="630" y2="559" class="edge" marker-end="url(#arrow)"/>
-  <text x="640" y="564" class="s">Flujo de ataque</text>
+  <text x="640" y="564" class="s">Attack flow</text>
 </svg>"""

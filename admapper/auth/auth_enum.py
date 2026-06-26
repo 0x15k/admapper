@@ -227,11 +227,11 @@ def run_auth_enumeration(
         },
     )
     result.inventory_path = str(inv_path)
-    print_ok("inventario guardado → auth_inventory.json", source=Tool.ADMAPPER)
+    print_ok("inventory saved → auth_inventory.json", source=Tool.ADMAPPER)
 
     graph_store = GraphStore(session.workspaces, ws_name)
     _merge_graph_inventory(graph_store, domain, result.ldap)
-    print_ok("grafo actualizado → graph.json", source=Tool.ADMAPPER)
+    print_ok("graph updated → graph.json", source=Tool.ADMAPPER)
 
     bh_dir = session.workspaces.path_for(ws_name) / "bloodhound"
     export_bloodhound_minimal(

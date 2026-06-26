@@ -10,20 +10,20 @@ if TYPE_CHECKING:
     from admapper.core.session import Session
 
 _HELP_ESSENTIAL = """
-Essential (90% del engagement):
-  show                         Dashboard: fase, creds, siguiente acción
-  analyst [--deep]             Escenario completo + top 3 acciones
-  start_unauth                 Recon sin creds
-  start_auth                   Enum LDAP/SMB + BloodHound
+Essential (90% of the engagement):
+  show                         Dashboard: phase, creds, next action
+  analyst [--deep]             Complete scenario + top 3 actions
+  start_unauth                 Recon without credentials
+  start_auth                   LDAP/SMB enumeration + BloodHound
   exploit                      Loot shares → creds → ACLs
-  escalate                     Siguiente hop desde pivot
-  escalate exec                Ejecutar hop recomendado
-  creds list|add|verify        Gestión de credenciales
+  escalate                     Next hop from pivot
+  escalate exec                Execute recommended hop
+  creds list|add|verify        Credential management
   acls | acls show <id>        ACL abuse
-  adcs | postex | wsus         Módulos avanzados (show <id> en cada uno)
-  export                       Reportes JSON/TXT/HTML
-  guide <technique>            Pasos manuales MITRE
-  help all                     Lista completa de comandos
+  adcs | postex | wsus         Advanced modules (show <id> in each)
+  export                       JSON/TXT/HTML reports
+  guide <technique>            MITRE manual steps
+  help all                     Complete list of commands
   exit | quit
 """
 
@@ -34,7 +34,7 @@ All commands:
   creds remove <id>
   enum users | enum auth
   asreproast | kerberoast | spray <pass>
-  graph | graph show        Attack graph (ASCII, sin BloodHound CE)
+  graph | graph show        Attack graph (ASCII, without BloodHound CE)
   paths | paths show <id>
   kerberos | timeroast | coerce | chain | mssql | cves
   postex scan|deploy|run|show

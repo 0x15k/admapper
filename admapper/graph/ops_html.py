@@ -613,7 +613,7 @@ def build_ops_html(
   <!-- BLACKBOX BOOT -->
   <div id="screen-boot" class="screen active">
     <div class="boot-wrap">
-      <div class="boot-banner">AD OPS // BLACKBOX ENGAGEMENT — sin intel previa</div>
+      <div class="boot-banner">AD OPS // BLACKBOX ENGAGEMENT — no prior intel</div>
       <div id="boot-terminal"></div>
       <div class="boot-input-row">
         <span>target&gt;</span>
@@ -766,12 +766,12 @@ def build_ops_html(
         return {{
           username: pth.account,
           status: 'machine_pth',
-          status_label: 'gMSA / máquina — WinRM PTH (sin password LDAP)',
+          status_label: 'gMSA / machine — WinRM PTH (no LDAP password)',
           read_only: false,
           is_machine: true,
           nthash: pth.nthash,
           winrm_cmd: pth.winrm_cmd,
-          access_matrix: [pth.account, 'skip', 'skip', 'skip', 'sí*', 'hash gMSA — WinRM PTH'],
+          access_matrix: [pth.account, 'skip', 'skip', 'skip', 'yes*', 'gMSA hash — WinRM PTH'],
         }};
       }}
       if (username.toLowerCase() === activePivot()) return OPS.identity_lens || {{}};
@@ -868,11 +868,11 @@ def build_ops_html(
         i => i.username.toLowerCase() === username.toLowerCase()
       );
       if (!ident) {{
-        showUiToast('Sin perfil para ' + username);
+        showUiToast('No profile for ' + username);
         return;
       }}
       if (ident.selectable === 'view') {{
-        showUiToast(username + ' es solo lectura — enum sin credencial');
+        showUiToast(username + ' is read-only — enum without credential');
         return;
       }}
       if (ident.selectable === 'verify') {{
@@ -880,7 +880,7 @@ def build_ops_html(
         if (el) el.value = ident.username;
         graphFocus = ident.username;
         renderLeft();
-        showUiToast('Verifica la pista en el formulario y pulsa AUTENTICAR', true);
+        showUiToast('Verify the clue in the form and press AUTHENTICATE', true);
         return;
       }}
       await setPivot(username);
@@ -892,11 +892,11 @@ def build_ops_html(
         p => p.account.toLowerCase() === account.toLowerCase()
       );
       if (!pth) {{
-        showUiToast('Sin hash para ' + account + ' — ejecuta exploit gMSA');
+        showUiToast('No hash for ' + account + ' — run gMSA exploit');
         return;
       }}
       const ok = await postOp('/api/winrm', {{ account: pth.account }}, 'WINRM PTH ' + pth.account);
-      if (ok) showUiToast('WinRM PTH en curso — revisa terminal', true);
+      if (ok) showUiToast('WinRM PTH in progress — check terminal', true);
     }}
 
     function showScreen(name) {{
@@ -999,11 +999,11 @@ def build_ops_html(
       const t = $('boot-terminal');
       if (!t) return;
       t.innerHTML = '';
-      bootLine('AD Ops v1 — modo BLACKBOX');
-      bootLine('Sin dominio. Sin credenciales. Sin mapa.');
+      bootLine('AD Ops v1 — BLACKBOX mode');
+      bootLine('No domain. No credentials. No map.');
       bootLine('');
-      bootLine('Introduce la IP del objetivo y pulsa Enter.');
-      bootLine('Se ejecutará: admapper scan -H <IP>');
+      bootLine('Enter the target IP and press Enter.');
+      bootLine('Will run: admapper scan -H <IP>');
       bootLine('');
       const m = OPS.meta || {{}};
       const tip = m.target_ip || m.dc_ip;
@@ -1020,15 +1020,15 @@ def build_ops_html(
     async function submitBootIp() {{
       const ip = ($('boot-ip') || {{}}).value.trim();
       if (!isValidIp(ip)) {{
-        bootLine('IP inválida — formato 10.x.x.x', 'line-error');
+        bootLine('Invalid IP — format 10.x.x.x', 'line-error');
         return;
       }}
       if (!API_MODE) {{
-        bootLine('Inicia el servidor: admapper dashboard -H ' + ip, 'line-error');
+        bootLine('Start the server: admapper dashboard -H ' + ip, 'line-error');
         return;
       }}
       bootLine('> scan -H ' + ip, 'line-cmd');
-      bootLine('Enumerando Kerberos, LDAP, SMB…');
+      bootLine('Enumerating Kerberos, LDAP, SMB...');
       try {{
         const r = await fetch('/api/scan', {{
           method: 'POST',
@@ -1046,7 +1046,7 @@ def build_ops_html(
           clearInterval(poll);
           await fetchState();
           if ((OPS.topology || {{}}).has_scan) {{
-            bootLine('Recon completo — desplegando mapa…', 'line-phase');
+            bootLine('Recon complete — displaying map...', 'line-phase');
             setTimeout(() => enterHQ(), 600);
           }}
         }}, 800);
@@ -1422,7 +1422,7 @@ def build_ops_html(
       const dlg = $('hq-dialog');
       const txt = $('hq-dialog-text');
       if (near.id === 'laptop') {{
-        if (txt) txt.textContent = '¿Abrir AD OPS en la laptop?';
+        if (txt) txt.textContent = 'Open AD OPS on the laptop?';
         if (dlg) dlg.classList.remove('hidden');
         return;
       }}
@@ -1453,8 +1453,8 @@ def build_ops_html(
       termLine('workspace ' + ((OPS.meta || {{}}).workspace || ''));
       const scanned = (OPS.topology || {{}}).has_scan;
       termLine(scanned
-        ? 'Mapa NETWORK activo — clic en DC para servicios; AD MAP tras enum'
-        : 'Sin escaneo en esta partida — ▶ ESCANEAR o autentica con IP conocida');
+        ? 'Active NETWORK map — click on DC for services; AD MAP after enum'
+        : 'No scan in this game — ▶ SCAN or authenticate with a known IP');
     }}
 
     function renderHudMeta() {{
@@ -1518,18 +1518,18 @@ def build_ops_html(
       let html = '';
 
       if (viewMode === 'network') {{
-        html += `<div class="objective"><p class="sub"><strong>Mapa NETWORK</strong> — solo infra descubierta (scan + enum). Sin ACLs ni usuarios; cambia a <strong>AD MAP</strong> tras enum autenticada.</p></div>`;
+        html += `<div class="objective"><p class="sub"><strong>NETWORK Map</strong> — discovered infrastructure only (scan + enum). No ACLs or users; switch to <strong>AD MAP</strong> after authenticated enum.</p></div>`;
       }}
 
-      html += `<div class="objective"><h2>OPERADOR</h2>`;
+      html += `<div class="objective"><h2>OPERATOR</h2>`;
       html += `<p class="sub">Pivot: <strong>${{p.pivot || '—'}}</strong>`;
       if ((p.owned || []).length) html += ` · owned: ${{(p.owned || []).join(', ')}}`;
       html += '</p>';
-      html += `<p class="sub"><strong>ETAPA GENERAL: ${{g.stage_label || '—'}}</strong></p></div>`;
+      html += `<p class="sub"><strong>GENERAL STAGE: ${{g.stage_label || '—'}}</strong></p></div>`;
 
       const actions = getDisplayActions();
       if (actions.length) {{
-        html += '<h3>Acciones</h3>';
+        html += '<h3>Actions</h3>';
         actions.forEach((a, i) => {{
           const req = a.required ? ' *' : '';
           const cls = i === 0 ? 'action-btn mission-btn' : 'action-btn';
@@ -1537,7 +1537,7 @@ def build_ops_html(
           if (a.reason) html += `<p class="hl">${{a.reason}}</p>`;
         }});
       }} else {{
-        html += '<p class="hl">Nada habilitado — completa el paso anterior (ver NOTAS →)</p>';
+        html += '<p class="hl">Nothing enabled — complete the previous step (see NOTES →)</p>';
       }}
 
       if (g.stage === 'need_creds' && g.engagement_over) {{
@@ -1562,29 +1562,29 @@ def build_ops_html(
           }}
 
           if (lens.status === 'owned_ready') {{
-            userStatusLabel = isAdAdmin ? '🏆 Administrador de Dominio (Control Total)' : '⚡ Pivote Activo (Acceso de Red)';
+            userStatusLabel = isAdAdmin ? '🏆 Domain Admin (Full Control)' : '⚡ Active Pivot (Network Access)';
           }} else if (lens.status === 'owned_no_cred') {{
-            userStatusLabel = '🔑 Acceso Parcial (Falta verificar credencial)';
+            userStatusLabel = '🔑 Partial Access (Missing verified credential)';
           }} else if (lens.status === 'cred_only') {{
-            userStatusLabel = '🔑 Credencial Válida (Disponible para Pivote)';
+            userStatusLabel = '🔑 Valid Credential (Available for Pivot)';
           }} else if (lens.status === 'loot_pending') {{
-            userStatusLabel = '🔍 Indicio Descubierto (Pendiente verificar)';
+            userStatusLabel = '🔍 Discovered Clue (Pending verification)';
           }} else if (lens.status === 'machine_pth') {{
-            userStatusLabel = '💻 Cuenta de Máquina / gMSA (WinRM PTH)';
+            userStatusLabel = '💻 Machine Account / gMSA (WinRM PTH)';
           }} else {{
-            userStatusLabel = '👤 Usuario del Dominio (No comprometido)';
+            userStatusLabel = '👤 Domain User (Not compromised)';
           }}
         }} else {{
-          userStatusLabel = '👤 Usuario del Dominio (No comprometido)';
+          userStatusLabel = '👤 Domain User (Not compromised)';
         }}
 
         const readOnly = lens.read_only || isInspectingOther();
         const isPivotLens = lens.username.toLowerCase() === pivotNow;
-        html += `<div class="objective"><h2>PERFIL · ${{lens.username}}${{readOnly && !isPivotLens ? ' (inspección)' : (isPivotLens ? ' (pivot)' : '')}}</h2>`;
+        html += `<div class="objective"><h2>PROFILE · ${{lens.username}}${{readOnly && !isPivotLens ? ' (inspection)' : (isPivotLens ? ' (pivot)' : '')}}</h2>`;
         html += `<p class="sub">${{userStatusLabel}}</p>`;
         if (lens.inventory && lens.inventory.dn) html += `<p class="sub mono">${{lens.inventory.dn}}</p>`;
         if (readOnly) {{
-          html += '<p class="hl" style="color:var(--warn)">Sin credencial — no es pivot operativo</p>';
+          html += '<p class="hl" style="color:var(--warn)">No credential — not an active pivot</p>';
         }}
         if (lens.access_matrix) {{
           const r = lens.access_matrix;
@@ -1594,17 +1594,17 @@ def build_ops_html(
           html += `<p class="sub mono">${{lens.winrm_cmd}}</p>`;
         }}
         if (graphFocus && focusNow !== pivotNow) {{
-          html += `<button type="button" class="action-btn" id="btn-operar-como">▶ OPERAR COMO ${{graphFocus}}</button>`;
-          html += `<button type="button" class="action-btn secondary" id="btn-volver-pivot">← Volver al pivot (${{p.pivot || '—'}})</button>`;
+          html += `<button type="button" class="action-btn" id="btn-operar-como">▶ OPERATE AS ${{graphFocus}}</button>`;
+          html += `<button type="button" class="action-btn secondary" id="btn-volver-pivot">← Return to pivot (${{p.pivot || '—'}})</button>`;
         }} else if (graphFocus && focusNow === pivotNow) {{
-          html += `<button type="button" class="action-btn secondary" id="btn-clear-focus">← Deseleccionar nodo</button>`;
+          html += `<button type="button" class="action-btn secondary" id="btn-clear-focus">← Deselect node</button>`;
         }}
         html += '</div>';
       }}
 
       const identities = OPS.selectable_identities || [];
       if (identities.length) {{
-        html += '<h3>Identidades</h3><p class="sub">Clic = inspeccionar · Operar como = pivot (naranja)</p><p>';
+        html += '<h3>Identities</h3><p class="sub">Click = inspect · Operate as = pivot (orange)</p><p>';
         identities.forEach(id => {{
           const ul = id.username.toLowerCase();
           let active = '';
@@ -1619,7 +1619,7 @@ def build_ops_html(
       const creds = OPS.creds || [];
       const pthSessions = OPS.pth_sessions || [];
       if (creds.length) {{
-        html += '<h3>Credenciales (password)</h3><ul class="list">';
+        html += '<h3>Credentials (password)</h3><ul class="list">';
         creds.forEach(c => {{
           const cls = c.status === 'valid' ? 'valid' : '';
           html += `<li><button type="button" class="chip pivot-btn ${{cls}}" data-cred-user="${{c.user}}">${{c.user}}</button> <span class="chip">${{c.status}}</span></li>`;
@@ -1628,23 +1628,23 @@ def build_ops_html(
       }}
       if (pthSessions.length) {{
         html += '<div class="objective"><h2>WinRM PTH (hash)</h2>';
-        html += '<p class="sub">Cuenta gMSA/máquina — sin password LDAP. Conecta shell como evil-winrm.</p>';
+        html += '<p class="sub">gMSA/machine account — no LDAP password. Connects shell as evil-winrm.</p>';
         pthSessions.forEach(p => {{
           html += `<p class="sub"><strong>${{p.account}}</strong> <span class="mono">${{p.nthash}}</span></p>`;
-          html += `<button type="button" class="action-btn btn-pth-pivot" data-pth-user="${{p.account}}" style="margin:0.35rem 0">▶ CONECTAR WINRM PTH (${{p.account}})</button>`;
+          html += `<button type="button" class="action-btn btn-pth-pivot" data-pth-user="${{p.account}}" style="margin:0.35rem 0">▶ CONNECT WINRM PTH (${{p.account}})</button>`;
         }});
         html += '</div>';
       }}
 
       html += `<div class="cred-form">
-        <label>Autenticar (usuario humano + password)</label>
-        <input id="cred-user" placeholder="usuario (ej. svc_sql)" autocomplete="off"/>
-        <input id="cred-pass" type="password" placeholder="contraseña" autocomplete="off"/>
-        <button type="button" class="action-btn" id="cred-submit" style="margin-top:0.5rem">▶ AUTENTICAR</button>
+        <label>Authenticate (human user + password)</label>
+        <input id="cred-user" placeholder="user (e.g. svc_sql)" autocomplete="off"/>
+        <input id="cred-pass" type="password" placeholder="password" autocomplete="off"/>
+        <button type="button" class="action-btn" id="cred-submit" style="margin-top:0.5rem">▶ AUTHENTICATE</button>
       </div>
       <div class="cred-form">
         <label>Password spray</label>
-        <input id="spray-pass" type="password" placeholder="contraseña para spray" autocomplete="off"/>
+        <input id="spray-pass" type="password" placeholder="password for spray" autocomplete="off"/>
       </div>`;
 
       $('left').innerHTML = html;
@@ -1672,7 +1672,7 @@ def build_ops_html(
       }});
       const credSubmit = $('cred-submit');
       if (credSubmit) {{
-        credSubmit.onclick = () => runAction({{ action: 'run', button: 'AUTENTICAR' }});
+        credSubmit.onclick = () => runAction({{ action: 'run', button: 'AUTHENTICATE' }});
       }}
       document.querySelectorAll('.btn-pth-pivot').forEach(btn => {{
         btn.onclick = () => runWinrmPth(btn.dataset.pthUser || '');
@@ -1850,7 +1850,7 @@ def build_ops_html(
       const prog = opsProgress();
       const t = primaryTarget();
       if (!prog.scan && t.ip === '???') {{
-        return noteKv('Target', 'sin escanear', 'dim') + noteKv('TODO', 'scan -H &lt;IP&gt;', 'warn');
+        return noteKv('Target', 'unscanned', 'dim') + noteKv('TODO', 'scan -H &lt;IP&gt;', 'warn');
       }}
       let html = '<div class="note-block-label">Target</div>';
       html += noteKv('Target', t.ip);
@@ -1887,7 +1887,7 @@ def build_ops_html(
       }} else {{
         html += noteKv('Nodo', (node.title || node.label || node.id).replace(/\\n/g, ' · '));
       }}
-      html += '<button type="button" class="action-btn secondary" id="btn-clear-infra" style="margin-top:0.45rem">✕ Cerrar</button></div>';
+      html += '<button type="button" class="action-btn secondary" id="btn-clear-infra" style="margin-top:0.45rem">✕ Close</button></div>';
       return html;
     }}
 
@@ -1897,25 +1897,25 @@ def build_ops_html(
       if (!lens.username) return '';
       const readOnly = lens.read_only || isInspectingOther();
       let html = `<div class="note-callout focus"><div class="note-block-label">Focus</div>`;
-      html += noteKv('Usuario', lens.username, readOnly ? 'warn' : 'ok');
-      if (lens.status_label) html += noteKv('Estado', lens.status_label, 'dim');
+      html += noteKv('User', lens.username, readOnly ? 'warn' : 'ok');
+      if (lens.status_label) html += noteKv('Status', lens.status_label, 'dim');
       if ((lens.enum_flags || []).length) {{
         html += noteKv('Flags', lens.enum_flags.join(', '));
       }}
       const caps = (lens.capabilities || []).slice(0, 6);
       caps.forEach(c => {{
         const mark = c.verified ? '✓' : (c.graph_only ? '?' : '·');
-        const tail = c.enabled ? '' : ` (${{c.blocked_reason || 'bloqueado'}})`;
+        const tail = c.enabled ? '' : ` (${{c.blocked_reason || 'blocked'}})`;
         html += noteKvIndent(`${{mark}} ${{c.technique}}`, `${{c.target}}${{tail}}`);
       }});
       if (lens.loot_clue) {{
-        html += noteKv('Pista', `«${{lens.loot_clue.string}}»`, 'warn');
+        html += noteKv('Clue', `«${{lens.loot_clue.string}}»`, 'warn');
       }}
       const blocked = (lens.missions || []).filter(m => !m.enabled);
       blocked.slice(0, 3).forEach(m => {{
-        html += noteKvIndent('bloqueado', `${{m.technique}} → ${{m.target}}`, 'dim');
+        html += noteKvIndent('blocked', `${{m.technique}} → ${{m.target}}`, 'dim');
       }});
-      if (readOnly) html += noteKv('Nota', 'solo lectura — usa Operar como', 'warn');
+      if (readOnly) html += noteKv('Note', 'read-only — use Operate as', 'warn');
       html += '</div>';
       return html;
     }}
@@ -1979,14 +1979,14 @@ def build_ops_html(
       if (prog.acls && quests.length) {{
         html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">PrivEsc / ACL</div>';
         quests.forEach(q => {{
-          const st = q.enabled ? 'verificado' : 'bloqueado';
+          const st = q.enabled ? 'verified' : 'blocked';
           html += noteKv(`${{q.principal}}`, `${{q.technique}} → ${{q.target}} (${{st}})`, q.enabled ? 'ok' : 'warn');
         }});
         html += '</div>';
       }}
       const attackPaths = getDisplayAttackPaths();
       if (attackPaths.length) {{
-        html += '<div class="note-callout danger"><div class="note-block-label" style="color:var(--danger); margin-top:0">Caminos de ataque</div>';
+        html += '<div class="note-callout danger"><div class="note-block-label" style="color:var(--danger); margin-top:0">Attack paths</div>';
         attackPaths.slice(0, 10).forEach(p => {{
           const sev = (p.impact === 'critical' ? 'danger' : (p.impact === 'high' ? 'warn' : ''));
           html += noteKv(p.source_label || p.source, `${{p.target_label || p.target}} · ${{p.impact}}`, sev);
@@ -2028,14 +2028,14 @@ def build_ops_html(
       cmds.forEach(([label, cmd]) => {{
         html += noteKv(label, cmd, 'dim');
       }});
-      (setup.notes || []).forEach(n => {{ html += noteKvIndent('nota', n, 'dim'); }});
+      (setup.notes || []).forEach(n => {{ html += noteKvIndent('note', n, 'dim'); }});
       html += '</details>';
       return html;
     }}
 
     function renderAttackReadinessFull(intel) {{
       let vectors = filterAttackVectors((intel || {{}}).attack_readiness || []);
-      if (!vectors.length) return '<p class="hl">Sin vectores — escanea el objetivo</p>';
+      if (!vectors.length) return '<p class="hl">No vectors — scan the target</p>';
       const phaseOrder = ['recon', 'creds', 'enum', 'loot', 'escalate'];
       const sorted = [...vectors].sort((a, b) => {{
         const ia = phaseOrder.indexOf(a.phase);
@@ -2063,26 +2063,26 @@ def build_ops_html(
       const lp = (intel || {{}}).lockout_policy || {{}};
       const budget = (intel || {{}}).lockout_budget || [];
       if (!lp.lockout_enabled && !lp.lockout_threshold) {{
-        return noteKv('Lockout', 'sin datos LDAP aún', 'dim');
+        return noteKv('Lockout', 'no LDAP data yet', 'dim');
       }}
       const thresh = lp.lockout_threshold || 0;
       const dur = lp.duration_minutes != null ? lp.duration_minutes + ' min' : '—';
       const win = lp.window_minutes != null ? lp.window_minutes + ' min' : '—';
-      let html = noteKv('Umbral', String(thresh));
-      html += noteKv('Duración', dur, 'dim');
-      html += noteKv('Ventana', win, 'dim');
+      let html = noteKv('Threshold', String(thresh));
+      html += noteKv('Duration', dur, 'dim');
+      html += noteKv('Window', win, 'dim');
       if (lp.error) html += noteKv('Error', lp.error, 'warn');
       budget.slice(0, 12).forEach(b => {{
         const rem = b.attempts_remaining != null ? b.attempts_remaining : '∞';
-        html += noteKvIndent(b.username, `badPwd=${{b.bad_pwd_count}} · restantes ${{rem}}`, 'dim');
+        html += noteKvIndent(b.username, `badPwd=${{b.bad_pwd_count}} · remaining ${{rem}}`, 'dim');
       }});
-      if (budget.length > 12) html += noteKvIndent('…', `+${{budget.length - 12}} usuarios`, 'dim');
+      if (budget.length > 12) html += noteKvIndent('…', `+${{budget.length - 12}} users`, 'dim');
       return html;
     }}
 
     function renderDomainUsersReference(intel) {{
       const users = (intel || {{}}).domain_users || [];
-      if (!users.length) return noteKv('Users', 'sin enum LDAP', 'dim');
+      if (!users.length) return noteKv('Users', 'no LDAP enum', 'dim');
       let html = '';
       users.forEach(u => {{
         const en = u.enabled ? 'enabled' : 'disabled';
@@ -2099,15 +2099,15 @@ def build_ops_html(
       const inferences = pa.inferences || [];
       const transforms = pa.possible_transforms || [];
       if (!rules.length && !inferences.length) {{
-        return noteKv('Pista', 'sin reglas parseadas', 'dim');
+        return noteKv('Clue', 'no parsed rules', 'dim');
       }}
       let html = '';
       rules.forEach(r => {{
-        const label = r.label || r.rule || 'regla';
-        html += noteKvIndent('regla', `${{label}} · ${{r.user}}`, 'warn');
+        const label = r.label || r.rule || 'rule';
+        html += noteKvIndent('rule', `${{label}} · ${{r.user}}`, 'warn');
       }});
       inferences.forEach(inf => {{
-        html += noteKvIndent('inferencia', inf.summary || inf.label || inf.reasoning || '', 'dim');
+        html += noteKvIndent('inference', inf.summary || inf.label || inf.reasoning || '', 'dim');
       }});
       transforms.forEach(t => {{
         html += noteKvIndent(t.transform, `${{t.user}} — ${{t.description}}`, 'dim');
@@ -2125,29 +2125,29 @@ def build_ops_html(
           + `<td>${{r.crto !== '—' ? r.crto : ''}}</td>`
           + `<td>${{(r.mitre || []).join(', ')}}</td></tr>`;
       }});
-      return `<table class="study-map"><thead><tr><th>#</th><th>Fase</th><th>CRTP</th><th>CRTE</th><th>CRTO</th><th>MITRE</th></tr></thead>`
+      return `<table class="study-map"><thead><tr><th>#</th><th>Phase</th><th>CRTP</th><th>CRTE</th><th>CRTO</th><th>MITRE</th></tr></thead>`
         + `<tbody>${{body}}</tbody></table>`;
     }}
 
     function renderReferenceDetails(intel) {{
       const prog = opsProgress();
-      let html = '<div class="note-section"><div class="note-block-label">Referencia</div>';
-      html += '<details><summary>Mapa de estudio (CRTP · CRTE · CRTO)</summary>';
+      let html = '<div class="note-section"><div class="note-block-label">Reference</div>';
+      html += '<details><summary>Study map (CRTP · CRTE · CRTO)</summary>';
       html += renderStudyMapReference();
       html += '</details>';
-      html += '<details><summary>Prerrequisitos por ataque (matriz completa)</summary>';
+      html += '<details><summary>Attack prerequisites (full matrix)</summary>';
       html += renderAttackReadinessFull(intel);
       html += '</details>';
       if (prog.enum_users) {{
-        html += '<details><summary>Política de bloqueo</summary>';
+        html += '<details><summary>Lockout policy</summary>';
         html += renderLockoutReference(intel);
         html += '</details>';
-        html += '<details><summary>Usuarios del dominio</summary>';
+        html += '<details><summary>Domain users</summary>';
         html += renderDomainUsersReference(intel);
         html += '</details>';
       }}
       if (prog.loot) {{
-        html += '<details><summary>Análisis de pista</summary>';
+        html += '<details><summary>Clue analysis</summary>';
         html += renderPistaAnalysisReference(intel);
         html += '</details>';
       }}
@@ -2157,7 +2157,7 @@ def build_ops_html(
 
     function renderNotesDoc() {{
       const intel = OPS.engagement_intel || {{}};
-      let html = '<div class="notes-doc"><div class="notes-title">NOTAS</div>';
+      let html = '<div class="notes-doc"><div class="notes-title">NOTES</div>';
       html += renderNotesHeader();
       html += '<div class="note-section">';
       html += renderInfraFocusNote();
@@ -2463,7 +2463,7 @@ def build_ops_html(
     async function runAction(act) {{
       if (!act || opRunning) return;
       if (!API_MODE) {{
-        termLine('Modo estático — inicia: admapper dashboard -w <workspace>', 'line-error');
+        termLine('Static mode — start with: admapper dashboard -w <workspace>', 'line-error');
         return;
       }}
       const action = act.action || 'exploit';
@@ -2472,7 +2472,7 @@ def build_ops_html(
         body.username = ($('cred-user') || {{}}).value || '';
         body.password = ($('cred-pass') || {{}}).value || '';
         if (!body.username || !body.password) {{
-          termLine('Introduce usuario y contraseña', 'line-error');
+          termLine('Enter user and password', 'line-error');
           return;
         }}
       }}
@@ -2480,7 +2480,7 @@ def build_ops_html(
       if (action === 'spray') {{
         body.password = ($('spray-pass') || {{}}).value || '';
         if (!body.password) {{
-          termLine('Introduce contraseña para spray (campo spray-pass)', 'line-error');
+          termLine('Enter password for spray (spray-pass field)', 'line-error');
           return;
         }}
       }}

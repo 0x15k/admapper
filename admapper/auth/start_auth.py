@@ -112,7 +112,7 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
     from admapper.core.provenance import Tool, print_ok
 
     print_ok(
-        f"owned marcado: {domain}\\{cred.username} → graph.json",
+        f"owned marked: {domain}\\{cred.username} → graph.json",
         source=Tool.ADMAPPER,
         manual=f"admapper escalate mark {cred.username} -w <workspace>",
     )
@@ -186,5 +186,5 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
         + "\n",
         encoding="utf-8",
     )
-    print_ok("estado auth guardado → auth_scan.json", source=Tool.ADMAPPER)
+    print_ok("auth state saved → auth_scan.json", source=Tool.ADMAPPER)
     return result

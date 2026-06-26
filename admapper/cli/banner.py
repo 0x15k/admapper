@@ -3,11 +3,11 @@ from __future__ import annotations
 from admapper import __version__
 from admapper.core.output import print_banner, print_info
 
-# Tres pasos — menos es más (ADscan / AdStrike Smart Analyst).
+# Three steps — less is more (ADscan / AdStrike Smart Analyst).
 WORKFLOW_LINES = (
-    "  scan -H <DC_IP>                    # sin creds",
+    "  scan -H <DC_IP>                    # no creds",
     "  run -H <ip> -u <user> -p '<pass>'  # auth + analyst (default)",
-    "  analyst -w <workspace>             # refrescar escenario",
+    "  analyst -w <workspace>             # refresh scenario",
 )
 
 

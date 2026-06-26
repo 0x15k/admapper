@@ -77,7 +77,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                 "groups": [
                     {
                         "name": "Protected Users",
-                        "members": ["CN=svc_sql,CN=Users,DC=logging,DC=htb"],
+                        "members": ["CN=svc_sql,CN=Users,DC=corp,DC=local"],
                     }
                 ]
             }
@@ -98,9 +98,9 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
     assert "wallace.doe" in text
     assert "svc_sql" in text
     assert "WelcomePassword123!" in text
-    assert "ACCIONES RECOMENDADAS" in text
-    assert "[RECOMENDADO]" in text
-    assert "MATRIZ DE ACCESO" in text
+    assert "RECOMMENDED ACTIONS" in text
+    assert "RECOMMENDED" in text
+    assert "ACCESS MATRIX" in text
     assert "Logs" in text
 
 
@@ -211,7 +211,7 @@ def test_infer_kill_chain_phase_loot(tmp_path: Path) -> None:
 
 
 def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
-    ws = tmp_path / "logging"
+    ws = tmp_path / "pivot_test"
     ws.mkdir()
     (ws / "exploit_log.json").write_text(
         json.dumps(

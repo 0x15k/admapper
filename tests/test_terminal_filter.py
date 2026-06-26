@@ -24,10 +24,10 @@ def test_filter_folds_invalid_then_valid_cred() -> None:
     assert f.process("! credential invalid: corp.local\\svc_sql (def)") is None
     out = f.process("✓ credential valid: corp.local\\svc_sql (ghi)")
     assert out is not None
-    assert "Credencial válida" in out
+    assert "Credential valid" in out
 
 
 def test_filter_strips_rich_markup() -> None:
     f = TerminalFilter()
-    out = f.process("[green]✓[/green] owned marcado: alice")
-    assert out == "✓ owned marcado: alice"
+    out = f.process("[green]✓[/green] owned marked: alice")
+    assert out == "✓ owned marked: alice"

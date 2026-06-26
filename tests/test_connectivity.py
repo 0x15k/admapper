@@ -26,8 +26,8 @@ def test_format_unreachable_no_route() -> None:
     msg = format_unreachable_message(
         TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host")
     )
-    assert "no alcanzable" in msg
-    assert "apagada" in msg or "VPN" in msg
+    assert "unreachable" in msg
+    assert "powered off" in msg or "VPN" in msg
 
 
 def test_require_target_reachable_raises(tmp_path: Path) -> None:

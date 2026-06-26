@@ -39,4 +39,4 @@ def test_loot_clue_shows_file_string_not_verified_secret(tmp_path: Path) -> None
     clues = loot_clue_rows(ws)
     assert len(clues) == 1
     assert clues[0]["string"] == "WelcomePassword123!"
-    assert clues[0]["verify_state"] == "verificado"
+    assert clues[0]["verify_state"] == "verified"

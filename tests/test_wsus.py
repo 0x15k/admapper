@@ -4,11 +4,11 @@ from admapper.wsus.prerequisites import check_wsus_prerequisites, owned_groups_f
 
 def test_owned_groups_for_user() -> None:
     inventory = {
-        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=corp,DC=local"}],
         "groups": [
             {
                 "name": "IT",
-                "members": ["CN=jaylee,DC=logging,DC=htb"],
+                "members": ["CN=jaylee,DC=corp,DC=local"],
             }
         ],
     }
@@ -45,8 +45,8 @@ def test_build_wsus_cert_chain_when_enrollment_finding() -> None:
         ]
     }
     inventory = {
-        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
-        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=corp,DC=local"}],
+        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=corp,DC=local"]}],
         "smb_shares": ["WSUSTemp"],
     }
     ops = build_wsus_opportunities(

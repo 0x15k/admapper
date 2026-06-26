@@ -413,7 +413,7 @@ def build_attack_graph_html(
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
 ) -> str:
-    domain_s = domain or "(sin dominio)"
+    domain_s = domain or "(no domain)"
     payload = build_graph_payload(
         ws_path,
         domain=domain_s,

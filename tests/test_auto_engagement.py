@@ -298,7 +298,7 @@ def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
     mock_exec.assert_not_called()
     mock_analysis.assert_called_once()
     mock_err.assert_called_once()
-    assert "no alcanzable" in str(mock_err.call_args)
+    assert "unreachable" in str(mock_err.call_args)
 
 
 def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
@@ -338,7 +338,7 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
         patch("admapper.postex.deploy.prepare_hijack_payload") as mock_build,
         patch("admapper.postex.deploy.resolve_winrm_cred"),
     ):
-        with pytest.raises(RuntimeError, match="no alcanzable"):
+        with pytest.raises(RuntimeError, match="unreachable"):
             deploy_dll_hijack(session)
 
     mock_build.assert_not_called()

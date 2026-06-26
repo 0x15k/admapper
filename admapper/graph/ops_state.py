@@ -107,13 +107,13 @@ def _edge_enabled(
 ) -> tuple[bool, str | None]:
     pl = principal.lower()
     if pl not in owned and pl not in valid_users:
-        return False, f"Primero compromete a {principal}"
+        return False, f"Compromise {principal} first"
     if pl not in valid_users:
-        return False, f"Falta credencial válida de {principal} (LDAP/Kerberos)"
+        return False, f"Missing valid credential for {principal} (LDAP/Kerberos)"
     if edge.target_owned:
-        return False, f"{edge.target} ya está comprometido"
+        return False, f"{edge.target} is already compromised"
     if not edge.ready:
-        return False, "Prerrequisitos no cumplidos"
+        return False, "Prerequisites not met"
     return True, None
 
 
@@ -172,7 +172,7 @@ def collect_identity_capabilities(
                     "blocked_reason": block
                     if not enabled
                     else (
-                        "Solo en grafo — ejecuta acls para verificar"
+                        "Only in graph — run acls to verify"
                         if graph_only
                         else None
                     ),
@@ -214,9 +214,9 @@ def collect_verified_missions(
         enabled = pl in owned and pl in valid
         block: str | None = None
         if pl not in owned:
-            block = f"Compromete a {principal} antes (loot / credencial)"
+            block = f"Compromise {principal} first (loot / credential)"
         elif pl not in valid:
-            block = f"Verifica credencial de {principal} (creds verify)"
+            block = f"Verify credential for {principal} (creds verify)"
 
         missions.append(
             {
@@ -316,7 +316,7 @@ def explain_target_access(
                 continue
             right = str(e.get("type", ""))
             if not _acl_confirms(findings, principal=user, target=target, right=right):
-                direct_graph_only.append(f"{user} ({right}) — no verificado en ACL")
+                direct_graph_only.append(f"{user} ({right}) — unverified in ACL")
 
     needs_chain = bool(direct_verified) and not any(
         p.split("(")[0].strip().lower() in owned for p in direct_verified
@@ -327,12 +327,12 @@ def explain_target_access(
         "direct_graph_only": direct_graph_only,
         "needs_intermediate": needs_chain,
         "note": (
-            f"Solo {', '.join(direct_verified)} tiene ACL verificada sobre {target}"
+            f"Only {', '.join(direct_verified)} has verified ACL on {target}"
             if direct_verified
             else (
-                f"Nadie con ACL verificada — ejecuta acls con cada owned"
+                f"No verified ACL — run acls with each owned principal"
                 if not direct_graph_only
-                else f"Grafo sugiere {', '.join(direct_graph_only)} — verificar con acls"
+                else f"Graph suggests {', '.join(direct_graph_only)} — verify with acls"
             )
         ),
     }
@@ -406,7 +406,7 @@ def compute_stage_and_actions(
         )
         return {
             "stage": "enum",
-            "stage_label": "Recon OK — enumera identidades",
+            "stage_label": "Recon OK — enumerate identities",
             "engagement_over": False,
             "actions": actions,
         }
@@ -419,7 +419,7 @@ def compute_stage_and_actions(
                     "action": "asreproast",
                     "button": "▶ AS-REP ROAST",
                     "enabled": True,
-                    "reason": "P04 Credential access — cuentas sin pre-auth",
+                    "reason": "P04 Credential access — accounts without pre-auth",
                     "required": False,
                 },
                 {
@@ -427,7 +427,7 @@ def compute_stage_and_actions(
                     "action": "kerberoast",
                     "button": "▶ KERBEROAST",
                     "enabled": True,
-                    "reason": "P04 — SPNs con TGS roastable",
+                    "reason": "P04 — SPNs with roastable TGS",
                     "required": False,
                 },
                 {
@@ -435,22 +435,22 @@ def compute_stage_and_actions(
                     "action": "spray",
                     "button": "▶ PASSWORD SPRAY",
                     "enabled": True,
-                    "reason": "P04 — prueba una contraseña en el user list",
+                    "reason": "P04 — test one password against the user list",
                     "required": False,
                 },
                 {
                     "id": "cred",
                     "action": "run",
-                    "button": "▶ INTRODUCIR CREDENCIALES",
+                    "button": "▶ ENTER CREDENTIALS",
                     "enabled": True,
-                    "reason": "Si tienes una credencial correcta, validarla desbloquea el resto",
+                    "reason": "If you have a correct credential, validating it unlocks the rest",
                     "required": True,
                 },
             ]
         )
         return {
             "stage": "need_creds",
-            "stage_label": "Enum OK — falta credencial válida",
+            "stage_label": "Enum OK — missing valid credential",
             "engagement_over": False,
             "actions": actions,
         }
@@ -460,7 +460,7 @@ def compute_stage_and_actions(
             {
                 "id": "enum_users",
                 "action": "enum",
-                "button": "▶ ENUMERAR USUARIOS (IDENT)",
+                "button": "▶ ENUMERATE USERS (IDENT)",
                 "enabled": True,
                 "reason": "SAMR · LDAP · AS-REP / Kerberoast surface",
                 "required": True,
@@ -472,17 +472,17 @@ def compute_stage_and_actions(
             {
                 "id": "cred",
                 "action": "run",
-                "button": "▶ INTRODUCIR CREDENCIALES",
+                "button": "▶ ENTER CREDENTIALS",
                 "enabled": True,
-                "reason": "Sin credencial válida no hay enum ni loot — fin del engagement",
+                "reason": "Without a valid credential there is no enum or loot — end of engagement",
                 "required": True,
             }
         )
         return {
             "stage": "need_creds",
-            "stage_label": "Recon OK — necesitas credenciales",
+            "stage_label": "Recon OK — credentials needed",
             "engagement_over": True,
-            "engagement_over_message": "Sin credenciales válidas el dominio no es accesible.",
+            "engagement_over_message": "Without valid credentials, the domain is not accessible.",
             "actions": actions,
         }
 
@@ -491,7 +491,7 @@ def compute_stage_and_actions(
             {
                 "id": "enum",
                 "action": "run",
-                "button": "▶ ENUMERAR LDAP (autenticado)",
+                "button": "▶ ENUMERATE LDAP (authenticated)",
                 "enabled": True,
                 "reason": "BloodHound / auth_inventory",
                 "required": True,
@@ -503,9 +503,9 @@ def compute_stage_and_actions(
             {
                 "id": "loot",
                 "action": "exploit",
-                "button": "▶ RECOLECTAR LOOT SMB",
+                "button": "▶ COLLECT SMB LOOT",
                 "enabled": True,
-                "reason": "SYSVOL · Logs · parse credenciales",
+                "reason": "SYSVOL · Logs · parse credentials",
                 "required": False,
             }
         )
@@ -515,7 +515,7 @@ def compute_stage_and_actions(
             {
                 "id": "acls",
                 "action": "acls",
-                "button": "▶ ANALIZAR ACLs (owned)",
+                "button": "▶ ANALYZE ACLs (owned)",
                 "enabled": True,
                 "reason": "GenericWrite · ReadGMSAPassword · DCSync",
                 "required": False,
@@ -537,9 +537,9 @@ def compute_stage_and_actions(
             {
                 "id": "verify_loot",
                 "action": "run",
-                "button": f"▶ VERIFICAR CREDENCIAL ({user})",
+                "button": f"▶ VERIFY CREDENTIAL ({user})",
                 "enabled": True,
-                "reason": f"Pista en {src}: «{clue}» — tú eliges la contraseña",
+                "reason": f"Clue in {src}: «{clue}» — you choose the password",
                 "required": False,
                 "principal": user,
             }
@@ -566,18 +566,18 @@ def compute_stage_and_actions(
     stage = "authenticated"
     if enabled_missions:
         stage = "escalate"
-        stage_label = f"Escalada — {len(enabled_missions)} ruta(s) verificada(s)"
+        stage_label = f"Escalation — {len(enabled_missions)} verified path(s)"
     elif has_acls:
         stage = "escalate_blocked"
-        stage_label = "ACLs conocidas — falta owned/cred del principal"
+        stage_label = "Known ACLs — missing owned/cred of principal"
     elif has_loot:
         stage = "loot_done"
-        stage_label = "Loot OK — analiza ACLs"
+        stage_label = "Loot OK — analyze ACLs"
     elif has_enum:
         stage = "enum_done"
-        stage_label = "Enum OK — loot o ACLs"
+        stage_label = "Enum OK — loot or ACLs"
     else:
-        stage_label = "Autenticado — enumera el dominio"
+        stage_label = "Authenticated — enumerate domain"
 
     return {
         "stage": stage,

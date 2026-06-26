@@ -35,7 +35,7 @@ def test_group_enroll_hints_only_confirmed_aces() -> None:
     principals = [
         PrincipalContext(
             username="jaylee.doe",
-            user_dn="CN=jaylee,DC=logging,DC=htb",
+            user_dn="CN=jaylee,DC=corp,DC=local",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
             sid_to_name={it_sid: "IT"},

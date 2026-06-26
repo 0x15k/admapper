@@ -10,7 +10,7 @@ from admapper.wsus.prerequisites import owned_groups_for_user
 
 _SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
-# Prefer direct/simple hops; WSUS+AD CS chain is the DA path on Logging-style boxes
+# Prefer direct/simple hops; WSUS+AD CS chain is the preferred DA path when chain is available
 _TECHNIQUE_RANK = {
     "forcechangepassword": 10,
     "genericall": 9,

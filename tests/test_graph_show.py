@@ -32,6 +32,6 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
         pivot_user="svc_sql",
         owned_users=["svc_sql"],
     )
-    assert "GRAFO DE ATAQUE" in text
+    assert "ATTACK GRAPH" in text
     assert "genericwrite" in text
     assert "msa_health" in text

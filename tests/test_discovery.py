@@ -9,7 +9,7 @@ from admapper.recon.dns import dn_to_domain
 
 
 def test_dn_to_domain() -> None:
-    assert dn_to_domain("DC=logging,DC=htb") == "corp.local"
+    assert dn_to_domain("DC=corp,DC=local") == "corp.local"
 
 
 def test_default_workspace_name_from_ip() -> None:

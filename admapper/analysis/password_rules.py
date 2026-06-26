@@ -63,10 +63,10 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 {
                     "id": f"{clue_id}:year_suffix",
                     "rule": "year_suffix",
-                    "label": "Sufijo de año en la cadena",
+                    "label": "Year suffix in string",
                     "detail": (
-                        f"La cadena del archivo termina en año {trailing_year}"
-                        + (f" seguido de «{symbol_after_year}»" if symbol_after_year else "")
+                        f"The string ends with year {trailing_year}"
+                        + (f" followed by '{symbol_after_year}'" if symbol_after_year else "")
                     ),
                     "user": user,
                     "source": source,
@@ -78,8 +78,8 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                     {
                         "transform": "adjacent_year",
                         "description": (
-                            "Probar años adyacentes al sufijo final "
-                            f"(±1..+3 respecto a {trailing_year}) — el log puede estar desactualizado"
+                            "Try adjacent years to the final suffix "
+                            f"(±1..+3 relative to {trailing_year}) — the log might be outdated"
                         ),
                         "user": user,
                         "source": source,
@@ -96,10 +96,10 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                     {
                         "id": f"{clue_id}:filename_year_mismatch",
                         "rule": "filename_year_mismatch",
-                        "label": "Año del archivo ≠ año en la cadena",
+                        "label": "File year ≠ year in string",
                         "detail": (
-                            f"El nombre del archivo sugiere {file_year} "
-                            f"pero la cadena termina en {trailing_year}"
+                            f"The filename suggests {file_year} "
+                            f"but the string ends in {trailing_year}"
                         ),
                         "user": user,
                         "source": source,
@@ -107,10 +107,10 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 )
                 inferences.append(
                     {
-                        "label": "Log posterior a la contraseña",
+                        "label": "Log is newer than password",
                         "reasoning": (
-                            f"El archivo ({source}) referencia {file_year} mientras la cadena "
-                            f"conserva {trailing_year} — rotación de año plausible"
+                            f"The file ({source}) references {file_year} while the string "
+                            f"retains {trailing_year} — plausible year rotation"
                         ),
                         "user": user,
                         "source": source,
@@ -120,7 +120,7 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                     {
                         "transform": "replace_trailing_year_with_filename_year",
                         "description": (
-                            f"Sustituir el año final ({trailing_year}) por el año del archivo ({file_year})"
+                            f"Substitute the final year ({trailing_year}) with the file year ({file_year})"
                         ),
                         "user": user,
                         "source": source,
@@ -135,8 +135,8 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 {
                     "id": f"{clue_id}:symbol_suffix",
                     "rule": "symbol_suffix",
-                    "label": "Sufijo simbólico",
-                    "detail": f"La cadena termina en carácter especial «{sym}»",
+                    "label": "Symbol suffix",
+                    "detail": f"The string ends with special character '{sym}'",
                     "user": user,
                     "source": source,
                 }
@@ -145,7 +145,7 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 possible_transforms.append(
                     {
                         "transform": "append_at_after_year",
-                        "description": "Añadir «@» tras el sufijo de año (rotación común en labs)",
+                        "description": "Append '@' after the year suffix (common rotation in labs)",
                         "user": user,
                         "source": source,
                         "rule_ids": [f"{clue_id}:year_suffix"],
@@ -155,7 +155,7 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 possible_transforms.append(
                     {
                         "transform": "strip_trailing_symbol",
-                        "description": "Quitar el sufijo «@» y reevaluar el año final",
+                        "description": "Remove the trailing '@' and re-evaluate the year suffix",
                         "user": user,
                         "source": source,
                         "rule_ids": [f"{clue_id}:symbol_suffix", f"{clue_id}:year_suffix"],
@@ -167,10 +167,10 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
                 {
                     "id": f"{clue_id}:medium_confidence",
                     "rule": "stale_log",
-                    "label": "Confianza media — log posiblemente obsoleto",
+                    "label": "Medium confidence — log possibly stale",
                     "detail": (
-                        "El parser marcó confianza media: puede reflejar intento fallido "
-                        "o credencial antigua en el log"
+                        "Parser marked medium confidence: may reflect a failed login attempt "
+                        "or a stale credential in the log"
                     ),
                     "user": user,
                     "source": source,
@@ -178,20 +178,20 @@ def analyze_password_clues(clue_rows: list[dict[str, str]]) -> dict[str, Any]:
             )
             inferences.append(
                 {
-                    "label": "Cadena no verificada automáticamente",
+                    "label": "String not verified automatically",
                     "reasoning": (
-                        "Confianza media: trata la cadena como pista, no como contraseña confirmada"
+                        "Medium confidence: treat the string as a clue, not as a confirmed password"
                     ),
                     "user": user,
                     "source": source,
                 }
             )
 
-        if verify_state not in {"", "sin verificar"} and verify_state != "verificado":
+        if verify_state not in {"", "unverified"} and verify_state != "verified":
             inferences.append(
                 {
-                    "label": f"Estado de verificación: {verify_state}",
-                    "reasoning": "La cadena del archivo no coincide con una credencial válida aún",
+                    "label": f"Verification status: {verify_state}",
+                    "reasoning": "The string from the file does not match a valid credential yet",
                     "user": user,
                     "source": source,
                 }

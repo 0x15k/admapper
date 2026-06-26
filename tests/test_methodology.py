@@ -14,5 +14,5 @@ def test_methodology_shows_phases(tmp_path: Path) -> None:
     )
     lines = methodology_lines(ws)
     text = "\n".join(lines)
-    assert "CADENA AD" in text
-    assert "PROGRESO OPERATIVO" in text
+    assert "AD CHAIN" in text
+    assert "OPERATIONAL PROGRESS" in text

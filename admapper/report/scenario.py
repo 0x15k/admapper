@@ -98,7 +98,7 @@ def _loot_cred_rows(ws_path: Path) -> list[list[str]]:
 
 
 def _access_matrix_rows(ws_path: Path) -> list[list[str]]:
-    """Matriz LDAP/SMB/Kerberos/WinRM por credencial (estilo ADscan/AdStrike)."""
+    """LDAP/SMB/Kerberos/WinRM matrix by credential (ADscan/AdStrike style)."""
     protected = load_protected_users(str(ws_path))
     cred_data = _load_json(ws_path / "credentials.json") or {}
     exploit_log = _load_json(ws_path / "exploit_log.json") or {}
@@ -118,18 +118,18 @@ def _access_matrix_rows(ws_path: Path) -> list[list[str]]:
         is_machine = user.endswith("$") or ctype == "ntlm"
 
         if status != "valid":
-            rows.append([user, "-", "-", "-", "-", "no verificada"])
+            rows.append([user, "-", "-", "-", "-", "unverified"])
             continue
 
         if is_machine or user_l.rstrip("$") in machine_winrm:
-            rows.append([user, "skip", "skip", "skip", "sí*", "hash gMSA/machine"])
+            rows.append([user, "skip", "skip", "skip", "yes*", "gMSA/machine hash"])
             continue
 
         if is_pu:
-            rows.append([user, "skip", "skip", "sí", "no*", "Protected Users"])
+            rows.append([user, "skip", "skip", "yes", "no*", "Protected Users"])
             continue
 
-        rows.append([user, "sí", "sí", "?", "no*", "usuario estándar — sin WinRM DC"])
+        rows.append([user, "yes", "yes", "?", "no*", "standard user — no DC WinRM"])
     return rows
 
 
@@ -139,7 +139,7 @@ def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
     inv = _load_json(ws_path / "auth_inventory.json") or {}
     if inv:
         lines.append(
-            f"  • Inventario LDAP: {len(inv.get('users') or [])} users, "
+            f"  • LDAP Inventory: {len(inv.get('users') or [])} users, "
             f"{len(inv.get('groups') or [])} groups, "
             f"{len(inv.get('computers') or [])} computers"
         )
@@ -147,21 +147,21 @@ def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
     manifest = _load_json(ws_path / "loot_manifest.json") or {}
     shares = manifest.get("shares_looted") or []
     if shares:
-        lines.append(f"  • SMB loot: {manifest.get('file_count', 0)} archivos en {', '.join(shares)}")
+        lines.append(f"  • SMB loot: {manifest.get('file_count', 0)} files in {', '.join(shares)}")
 
     for item in manifest.get("parsed_credentials") or []:
         password = str(item.get("password") or "")
-        pwd_hint = f" → contraseña: {password}" if password else ""
+        pwd_hint = f" → password: {password}" if password else ""
         lines.append(
-            f"  • Credencial en archivo: {item.get('username')}{pwd_hint} "
-            f"({item.get('source_file')}, confianza {item.get('confidence')})"
+            f"  • Credential in file: {item.get('username')}{pwd_hint} "
+            f"({item.get('source_file')}, confidence {item.get('confidence')})"
         )
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     for finding in unauth.get("findings") or []:
         title = str(finding.get("title", ""))
         if any(k in title.lower() for k in ("null", "kerberos", "ldap", "controller")):
-            lines.append(f"  • Recon sin creds: {title}")
+            lines.append(f"  • Unauth recon: {title}")
 
     acl = _load_json(ws_path / "acl_findings.json") or {}
     acl_for_pivot = [
@@ -172,21 +172,21 @@ def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
     if acl_for_pivot:
         for f in acl_for_pivot[:5]:
             lines.append(
-                f"  • ACL: {f.get('right')} sobre {f.get('target_name')} "
+                f"  • ACL: {f.get('right')} on {f.get('target_name')} "
                 f"({f.get('severity')})"
             )
-    elif pivot != "(ninguno)":
+    elif pivot != "(none)":
         lines.append(
-            f"  • ACLs explotables como {pivot}: ninguna "
-            "(normal — el pivot suele ser usuario de loot, no de escalada)"
+            f"  • Exploitable ACLs as {pivot}: none "
+            "(normal — pivot is usually loot user, not escalation principal)"
         )
 
     exploit_log = _load_json(ws_path / "exploit_log.json") or {}
     for entry in exploit_log.get("new_hashes") or []:
-        lines.append(f"  • Hash obtenido: {entry.get('account')} (gMSA/ACL)")
+        lines.append(f"  • Hash obtained: {entry.get('account')} (gMSA/ACL)")
 
     if not lines:
-        lines.append("  • (ejecuta start_auth y exploit para poblar hallazgos)")
+        lines.append("  • (run start_auth and exploit to populate findings)")
     return lines
 
 
@@ -201,7 +201,7 @@ def _attack_path_rows(ws_path: Path, *, pivot: str, owned: list[str], domain: st
     )
     rows: list[list[str]] = []
     for idx, edge in enumerate(edges[:10], start=1):
-        state = "LISTO" if edge.ready and not edge.target_owned else "bloqueado"
+        state = "READY" if edge.ready and not edge.target_owned else "blocked"
         rows.append(
             [
                 str(idx),
@@ -254,7 +254,7 @@ def roast_candidates_line(ws_path: Path) -> str | None:
 def infer_kill_chain_phase(ws_path: Path, owned: list[str]) -> str:
     exploit_log = _load_json(ws_path / "exploit_log.json") or {}
     if exploit_log.get("new_hashes"):
-        return "Fase 4 — Lateral / WinRM (machine account)"
+        return "Phase 4 — Lateral / WinRM (machine account)"
     cred_data = _load_json(ws_path / "credentials.json") or {}
     pending_loot = any(
         str(c.get("status")) != "valid"
@@ -262,13 +262,13 @@ def infer_kill_chain_phase(ws_path: Path, owned: list[str]) -> str:
         if str(c.get("source")) == "share_loot"
     )
     if pending_loot:
-        return "Fase 3 — Privilege escalation (credencial de loot pendiente)"
+        return "Phase 3 — Privilege escalation (pending loot credentials)"
     if owned:
-        return "Fase 2 — Enumeración autenticada (pivot activo)"
+        return "Phase 2 — Authenticated enum (active pivot)"
     loot = _load_json(ws_path / "loot_manifest.json")
     if loot:
-        return "Fase 1 — Loot / cred harvesting"
-    return "Fase 0 — Recon sin credenciales"
+        return "Phase 1 — Loot / cred harvesting"
+    return "Phase 0 — Unauth recon"
 
 
 def _is_gmsa_edge(edge) -> bool:
@@ -377,7 +377,7 @@ def resolve_top_actions(
             candidates.append(
                 RankedAction(
                     command=winrm_cmd,
-                    reason=f"WinRM PTH con {account} (postex)",
+                    reason=f"WinRM PTH with {account} (postex)",
                     score=95,
                 )
             )
@@ -387,7 +387,7 @@ def resolve_top_actions(
                         f"admapper winrm -H {host} -d {domain} -u '{account}' "
                         f"--hash {nthash} -x whoami"
                     ),
-                    reason="shell postex nativa",
+                    reason="native postex shell",
                     score=92,
                 )
             )
@@ -449,10 +449,10 @@ def resolve_top_actions(
     for edge in sort_edges(edges):
         if edge.ready or edge.target_owned:
             continue
-        detail = edge.summary[:60] if edge.summary else "revisar prerequisitos"
+        detail = edge.summary[:60] if edge.summary else "check prerequisites"
         candidates.append(
             RankedAction(
-                command=f"Bloqueo: {edge.title} — {detail}",
+                command=f"Block: {edge.title} — {detail}",
                 reason="blocked edge",
                 score=5,
             )
@@ -519,8 +519,8 @@ def build_scenario_report(
     pivot_user: str | None = None,
 ) -> str:
     owned = list(owned_users or [])
-    pivot = pivot_user or (owned[-1] if owned else "(ninguno)")
-    domain = domain or "(sin dominio)"
+    pivot = pivot_user or (owned[-1] if owned else "(none)")
+    domain = domain or "(no domain)"
     phase = infer_kill_chain_phase(ws_path, owned)
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
@@ -537,22 +537,22 @@ def build_scenario_report(
 
     lines = [
         "═" * 64,
-        "  ADMAPPER ANALYST  (escenario — estilo ADscan / AdStrike Smart Analyst)",
+        "  ADMAPPER ANALYST  (scenario — ADscan / AdStrike Smart Analyst style)",
         "═" * 64,
         f"  Workspace : {workspace}",
-        f"  Dominio   : {domain}",
-        f"  DC        : {dc_ip or '-'} ({dc_host or 'sin PTR'})",
+        f"  Domain    : {domain}",
+        f"  DC        : {dc_ip or '-'} ({dc_host or 'no PTR'})",
         f"  Pivot     : {pivot}",
-        f"  Owned     : {', '.join(owned) if owned else '(ninguno)'}",
-        f"  Fase      : {phase}",
+        f"  Owned     : {', '.join(owned) if owned else '(none)'}",
+        f"  Phase     : {phase}",
         "",
-        f"CON {pivot.upper()} SE ENCONTRÓ",
+        f"FOUND WITH {pivot.upper()}",
         "─" * 64,
         *_pivot_findings(ws_path, pivot=pivot, domain=domain),
         "",
-        "MATRIZ DE ACCESO (validado / inferido)",
+        "ACCESS MATRIX (validated / inferred)",
         "─" * 64,
-        "  usuario              ldap  smb  krb  winrm   nota",
+        "  user                 ldap  smb  krb  winrm   note",
     ]
     for row in _access_matrix_rows(ws_path):
         lines.append(
@@ -570,7 +570,7 @@ def build_scenario_report(
             ]
         )
 
-    lines.extend(["", "RUTAS DE ATAQUE (1-hop desde pivot)", "─" * 64])
+    lines.extend(["", "ATTACK PATHS (1-hop from pivot)", "─" * 64])
     path_rows = _attack_path_rows(ws_path, pivot=pivot, owned=owned, domain=domain)
     if path_rows:
         for row in path_rows:
@@ -578,7 +578,7 @@ def build_scenario_report(
                 f"  #{row[0]} [{row[5]}] {row[1]}/{row[2]} → {row[3]} ({row[4]})"
             )
     else:
-        lines.append("  (sin rutas — gana credencial de loot o cambia pivot)")
+        lines.append("  (no paths — obtain loot credential or change pivot)")
 
     top_actions = resolve_top_actions(
         ws_path,
@@ -588,9 +588,9 @@ def build_scenario_report(
         workspace=workspace,
         limit=3,
     )
-    lines.extend(["", "ACCIONES RECOMENDADAS (top 3)", "─" * 64])
+    lines.extend(["", "RECOMMENDED ACTIONS (top 3)", "─" * 64])
     for idx, action in enumerate(top_actions, start=1):
-        tag = "RECOMENDADO" if idx == 1 else f"#{idx}"
+        tag = "RECOMMENDED" if idx == 1 else f"#{idx}"
         lines.append(f"  [{tag}] {action.command}")
         if action.reason and idx == 1:
             lines.append(f"         ({action.reason})")
@@ -622,15 +622,15 @@ def print_scenario_report(
         owned_users=owned_users,
         pivot_user=pivot_user,
     )
-    print_success("ADMapper Analyst — escenario del engagement")
+    print_success("ADMapper Analyst — engagement scenario")
     for line in text.splitlines():
-        if line.startswith("ACCIONES RECOMENDADAS") or line.startswith("ROAST CANDIDATES"):
+        if line.startswith("RECOMMENDED ACTIONS") or line.startswith("ROAST CANDIDATES"):
             print_info(line)
-        elif line.startswith("  [RECOMENDADO]") or line.startswith("  [#"):
+        elif line.startswith("  [RECOMMENDED]") or line.startswith("  [#"):
             print_warning(line)
         elif line.startswith("  admapper") or line.startswith("  start_auth") or line.startswith("  acls"):
             print_warning(line)
-        elif line.startswith("  Bloqueo:"):
+        elif line.startswith("  Blocker:"):
             print_warning(line)
         else:
             print(line)
@@ -638,21 +638,21 @@ def print_scenario_report(
     cred_rows = _cred_rows(ws_path)
     if cred_rows:
         print_table(
-            "Credenciales",
-            ["id", "usuario", "estado", "tipo", "origen"],
+            "Credentials",
+            ["id", "user", "status", "type", "source"],
             cred_rows,
         )
     loot_rows = _loot_cred_rows(ws_path)
     if loot_rows:
         print_table(
-            "Contraseñas del loot",
-            ["usuario", "contraseña", "confianza", "patrón", "archivo"],
+            "Loot passwords",
+            ["user", "password", "confidence", "pattern", "file"],
             loot_rows,
         )
     access = _access_matrix_rows(ws_path)
     if access:
         print_table(
-            "Acceso por credencial",
-            ["usuario", "ldap", "smb", "kerberos", "winrm", "nota"],
+            "Access by credential",
+            ["user", "ldap", "smb", "kerberos", "winrm", "note"],
             access,
         )

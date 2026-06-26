@@ -13,7 +13,7 @@ def test_discover_domain_from_rootdse_without_anonymous_bind() -> None:
         port=389,
         reachable=True,
         anonymous_bind=False,
-        default_naming_context="DC=logging,DC=htb",
+        default_naming_context="DC=corp,DC=local",
         dns_host_name="DC01.corp.local",
     )
     with (

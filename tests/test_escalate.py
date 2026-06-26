@@ -41,8 +41,8 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
     ws.mkdir()
     (ws / "auth_inventory.json").write_text(
         """
-        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
-         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}]}
+        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=corp,DC=local"}],
+         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=corp,DC=local"]}]}
         """,
         encoding="utf-8",
     )

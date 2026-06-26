@@ -64,11 +64,11 @@ def loot_clue_rows(ws_path: Path) -> list[dict[str, str]]:
             continue
         match = best.get(user.lower())
         if match and str(match.get("status")) == "valid":
-            state = "verificado"
+            state = "verified"
         elif match:
-            state = str(match.get("status", "sin verificar"))
+            state = str(match.get("status", "unverified"))
         else:
-            state = "sin verificar"
+            state = "unverified"
         clues.append(
             {
                 "user": user,
@@ -109,35 +109,35 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
             continue
         detail = str(step.get("detail", "")).strip()
         if not detail:
-            return "exploit ACL omitido — revisa exploit_log.json"
+            return "ACL exploit skipped — check exploit_log.json"
         detail_l = detail.lower()
         if "krb5" in detail_l or "kinit" in detail_l or "mit krb5" in detail_l:
             from admapper.core.platform import mit_krb5_install_hint
-
-            return f"Falta MIT krb5 — {mit_krb5_install_hint()}"
+ 
+            return f"Missing MIT krb5 — {mit_krb5_install_hint()}"
         if "http service ticket" in detail_l:
             return (
-                "gMSA necesita solo TGT (no ticket HTTP WinRM) — "
-                "actualiza admapper y vuelve a ejecutar brief"
+                "gMSA needs only TGT (no WinRM HTTP ticket) — "
+                "update admapper and rerun brief"
             )
         if "preauth_failed" in detail_l or "pre-authentication" in detail_l:
             return (
-                "Contraseña Kerberos rechazada — prueba variante de año del loot "
-                "(p. ej. 2026 vs 2025) y vuelve a ejecutar exploit"
+                "Kerberos password rejected — try year variant from loot "
+                "(e.g. 2026 vs 2025) and rerun exploit"
             )
         if "clock skew" in detail_l or "krb_ap_err_skew" in detail_l:
             skew = load_workspace_clock_skew(ws_path)
             if skew:
                 from admapper.core.platform import resolve_faketime
-
+ 
                 if resolve_faketime():
                     return (
-                        f"Kerberos skew (offset {skew}) — libfaketime activo; "
-                        "re-ejecuta ▶ genericwrite (o `admapper exploit -w …`)"
+                        f"Kerberos skew (offset {skew}) — libfaketime active; "
+                        "rerun ▶ genericwrite (or `admapper exploit -w …`)"
                     )
                 return (
                     f"Kerberos clock skew (offset {skew}) — "
-                    "instala libfaketime y re-ejecuta exploit"
+                    "install libfaketime and rerun exploit"
                 )
             creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
             valid_users = {
@@ -149,8 +149,8 @@ def _acl_exploit_blocker(ws_path: Path) -> str | None:
             if valid_users:
                 return None
             return (
-                "Kerberos clock skew — sincroniza reloj (`sntp -sS <DC_IP>`) "
-                "o instala libfaketime y re-ejecuta exploit"
+                "Kerberos clock skew — sync clock (`sntp -sS <DC_IP>`) "
+                "or install libfaketime and rerun exploit"
             )
         return detail[:220]
     return None
@@ -160,7 +160,7 @@ def _hash_section_lines(ws_path: Path, *, domain: str | None) -> list[str]:
     hashes = collect_gained_hashes(ws_path)
     if not hashes:
         return []
-    lines = ["", "  HASH OBTENIDO"]
+    lines = ["", "  HASH OBTAINED"]
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
     dc_ip = ""
     for host in unauth.get("hosts") or []:
@@ -202,7 +202,7 @@ def _winrm_confirmed(ws_path: Path, account: str) -> bool:
     for row in _access_matrix_rows(ws_path):
         user = str(row[0] or "").lower().rstrip("$")
         winrm = str(row[4] or "").lower()
-        if user == account_l and winrm.startswith("sí"):
+        if user == account_l and winrm.startswith("yes"):
             return True
     return False
 
@@ -239,10 +239,10 @@ def _winrm_next_hop_lines(
     )
     return [
         "",
-        "  SIGUIENTE PASO  [listo]",
+        "  NEXT STEP  [ready]",
         f"  {account} ──WinRM──► {host}",
-        "  Técnica   : Pass-the-Hash → shell remota (postex)",
-        f"  Comando   : {winrm_cmd}",
+        "  Technique : Pass-the-Hash → remote shell (postex)",
+        f"  Command   : {winrm_cmd}",
         f"  Alt       : {admapper_cmd}",
     ]
 
@@ -259,8 +259,8 @@ def _format_edge_line(
         target = f"{target} (gMSA)"
     return [
         f"  {pivot} ──{edge.technique}──► {target}",
-        f"  Técnica   : {_edge_technique_detail(edge)}",
-        f"  Comando   : {_edge_command(edge, workspace=workspace, ws_path=ws_path)}",
+        f"  Technique : {_edge_technique_detail(edge)}",
+        f"  Command   : {_edge_command(edge, workspace=workspace, ws_path=ws_path)}",
     ]
 
 
@@ -273,8 +273,8 @@ def build_engagement_map(
     pivot_user: str | None = None,
 ) -> str:
     owned = list(owned_users or [])
-    pivot = pivot_user or (owned[-1] if owned else "(ninguno)")
-    domain = domain or "(sin dominio)"
+    pivot = pivot_user or (owned[-1] if owned else "(none)")
+    domain = domain or "(no domain)"
     protected = load_protected_users(str(ws_path))
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
@@ -295,13 +295,13 @@ def build_engagement_map(
 
     lines = [
         "═" * 39,
-        "  MAPA DE ENGAGEMENT  (estilo BloodHound)",
+        "  ENGAGEMENT MAP  (BloodHound style)",
         "═" * 39,
-        f"  Dominio   : {domain}",
-        f"  DC        : {dc_ip or '-'} ({dc_host or 'sin PTR'})",
+        f"  Domain    : {domain}",
+        f"  DC        : {dc_ip or '-'} ({dc_host or 'no PTR'})",
         "",
-        "  ESTÁS AQUÍ",
-        f"  ● owned   : {', '.join(owned) if owned else '(ninguno)'}",
+        "  YOU ARE HERE",
+        f"  ● owned   : {', '.join(owned) if owned else '(none)'}",
         f"  ● pivot   : {pivot}{pivot_note}",
     ]
     lines.extend(methodology_lines(ws_path))
@@ -309,7 +309,7 @@ def build_engagement_map(
 
     cred_rows = _discovered_cred_rows(ws_path)
     if cred_rows:
-        lines.extend(["", "  CREDENCIALES DESCUBIERTAS"])
+        lines.extend(["", "  DISCOVERED CREDENTIALS"])
         col_w = [17, 20, 10, 28]
         header = ["user", "password (loot)", "verified", "source"]
         lines.append(
@@ -341,7 +341,7 @@ def build_engagement_map(
             + "┘"
         )
         lines.append(
-            "  * cadena del archivo = pista — el operador decide qué probar (creds add / verify)"
+            "  * string from file = clue — operator decides what to spray/verify (creds add / verify)"
         )
 
     lines.extend(_hash_section_lines(ws_path, domain=domain))
@@ -353,7 +353,7 @@ def build_engagement_map(
         wordlist = pw_data.get("wordlist") or []
         if wordlist:
             lines.append(
-                f"  (verbose) variantes internas → {ws_path / 'password_candidates.json'}"
+                f"  (verbose) internal variants → {ws_path / 'password_candidates.json'}"
             )
 
     intel = _load_json(ws_path / "user_intel.json") or {}
@@ -365,10 +365,10 @@ def build_engagement_map(
         and str(u.get("cred_status", "")).lower() not in {"valid", "verified"}
     ]
     if loot_anomalies:
-        lines.extend(["", "  LOOT SIN VERIFICAR (usuario en LDAP, cred pendiente)"])
+        lines.extend(["", "  UNVERIFIED LOOT (user in LDAP, pending credentials)"])
         for u in loot_anomalies[:6]:
             lines.append(
-                f"  {u.get('username'):<20} cred={u.get('cred_status') or 'pendiente'}  "
+                f"  {u.get('username'):<20} cred={u.get('cred_status') or 'pending'}  "
                 f"→ creds add + creds verify"
             )
 
@@ -377,7 +377,7 @@ def build_engagement_map(
         lines.extend(
             [
                 "",
-                "  ⚠ BLOQUEO",
+                "  ⚠ BLOCK",
                 f"  {acl_blocker}",
             ]
         )
@@ -400,7 +400,7 @@ def build_engagement_map(
     if winrm_hop:
         lines.extend(winrm_hop)
     elif next_edge:
-        lines.extend(["", "  SIGUIENTE PASO  [listo]"])
+        lines.extend(["", "  NEXT STEP  [ready]"])
         lines.extend(
             _format_edge_line(
                 next_edge,
@@ -421,10 +421,10 @@ def build_engagement_map(
             lines.extend(
                 [
                     "",
-                    "  SIGUIENTE PASO  [listo]",
+                    "  NEXT STEP  [ready]",
                     f"  {pivot} ──dll_hijack_scheduled_task──► {run_as}",
-                    f"  Técnica   : {task} → {drop}\\{zip_name}",
-                    f"  Comando   : admapper postex run -w {workspace}",
+                    f"  Technique : {task} → {drop}\\{zip_name}",
+                    f"  Command   : admapper postex run -w {workspace}",
                 ]
             )
 
@@ -438,17 +438,17 @@ def build_engagement_map(
         blocked.append(edge)
 
     if blocked:
-        lines.extend(["", "  BLOQUEADO / DESPUÉS"])
+        lines.extend(["", "  BLOCKED / FUTURE"])
         for edge in blocked[:5]:
-            state = "bloqueado" if not edge.ready else "owned"
+            state = "blocked" if not edge.ready else "owned"
             lines.append(f"  {edge.target} ──{edge.technique}──► {edge.module} ({state})")
 
     access = _access_matrix_rows(ws_path)
     owned_l = {u.lower() for u in owned}
     access_owned = [row for row in access if str(row[0]).lower() in owned_l]
     if access_owned:
-        lines.extend(["", "  ACCESO PIVOT / OWNED (ldap · smb · krb · winrm)"])
-        lines.append("  usuario              ldap  smb  krb  winrm   nota")
+        lines.extend(["", "  PIVOT / OWNED ACCESS (ldap · smb · krb · winrm)"])
+        lines.append("  user                 ldap  smb  krb  winrm   note")
         for row in access_owned:
             lines.append(
                 f"  {row[0]:<20} {row[1]:<5} {row[2]:<5} {row[3]:<5} {row[4]:<5} {row[5]}"
@@ -469,7 +469,7 @@ def build_engagement_summary(
     """Structured rollup for dashboard UI / compact terminal (learner-friendly)."""
     owned = list(owned_users or [])
     pivot = pivot_user or (owned[-1] if owned else "")
-    domain_s = domain or "(sin dominio)"
+    domain_s = domain or "(no domain)"
     from admapper.report.methodology import methodology_lines
 
     phases = [
@@ -508,7 +508,7 @@ def build_engagement_summary(
 
 
 def format_engagement_summary_lines(summary: dict[str, object]) -> list[str]:
-    lines = ["── RESUMEN ──"]
+    lines = ["── SUMMARY ──"]
     owned = summary.get("owned") or []
     pivot = summary.get("pivot") or "—"
     lines.append(f"Owned: {', '.join(owned) if owned else '—'} · Pivot: {pivot}")
@@ -516,10 +516,10 @@ def format_engagement_summary_lines(summary: dict[str, object]) -> list[str]:
         lines.append(f"  ✓ {phase}")
     blocker = summary.get("blocker")
     if blocker:
-        lines.append(f"⚠ Bloqueo: {blocker}")
+        lines.append(f"⚠ Blocker: {blocker}")
     next_title = summary.get("next_title")
     if next_title:
-        lines.append(f"→ Siguiente: {next_title}")
+        lines.append(f"→ Next: {next_title}")
         tech = summary.get("next_technique")
         if tech:
             lines.append(f"  {tech}")
@@ -560,13 +560,13 @@ def print_engagement_map(
         owned_users=owned_users,
         pivot_user=pivot_user,
     )
-    print_success("ADMapper — mapa de engagement")
+    print_success("ADMapper — Engagement Map")
     for line in text.splitlines():
-        if line.startswith("  ⚠") or "BLOQUEO" in line:
+        if line.startswith("  ⚠") or "BLOCK" in line:
             print_warning(line)
-        elif line.startswith("  SIGUIENTE PASO") or "[listo]" in line:
+        elif line.startswith("  NEXT STEP") or "[ready]" in line:
             print_warning(line)
-        elif line.startswith("  HASH OBTENIDO"):
+        elif line.startswith("  HASH OBTAINED"):
             print_success(line)
         elif line.startswith("  ") and ": " in line and len(line.split(": ", 1)[-1]) == 32:
             print_success(line)

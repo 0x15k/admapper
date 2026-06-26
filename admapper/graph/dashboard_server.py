@@ -649,17 +649,17 @@ class DashboardContext:
     def run_auth(self, username: str, password: str, ip: str | None = None) -> None:
         target = (ip or self._dc_ip() or self.host or "").strip()
         if not target:
-            self.emit("sin IP — escribe la IP del objetivo antes de autenticar", kind="error")
+            self.emit("no IP — enter target IP before authenticating", kind="error")
             return
         if not username or not password:
-            self.emit("usuario y contraseña requeridos", kind="error")
+            self.emit("user and password required", kind="error")
             return
         self._persist_target_ip(target)
         _server_log(f"[auth] target={target} user={username}")
 
         # Phase 02 — make sure we have discovered the domain / DC before verifying creds.
         if not self.domain:
-            self.emit("descubriendo dominio/DC antes de validar credenciales", kind="phase")
+            self.emit("discovering domain/DC before validating credentials", kind="phase")
             ok = self._run_workspace_script(
                 "from admapper.cli.commands import dispatch\n"
                 f"dispatch(session, 'set hosts {target}')\n"
@@ -667,19 +667,19 @@ class DashboardContext:
                 label=f"scan {target}",
             )
             if not ok:
-                self.emit("no se pudo descubrir el dominio — ejecuta ESCANEAR primero", kind="error")
+                self.emit("could not discover domain — run SCAN first", kind="error")
                 return
             self.progress.scan = True
             self.progress.save(self.ws_path)
             self.domain = self._load_domain_from_state() or self.domain
             if not self.domain:
-                self.emit("el escaneo no descubrió el dominio — verifica VPN/objetivo", kind="error")
+                self.emit("scan did not discover domain — verify VPN/target", kind="error")
                 return
 
         auth_ok = self._run_workspace_script(
             "from admapper.graph.dashboard_auth import run_dashboard_credential_auth\n"
             f"run_dashboard_credential_auth(session, username={username!r}, password={password!r}, domain={self.domain!r})\n",
-            label=f"autenticar como {username}",
+            label=f"authenticate as {username}",
         )
         if auth_ok:
             self.progress.remember_auth(username, method="password")

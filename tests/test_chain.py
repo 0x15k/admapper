@@ -36,8 +36,8 @@ def test_build_dll_hijack_chain_detects_pivot() -> None:
         ]
     }
     inventory = {
-        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
-        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=corp,DC=local"}],
+        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=corp,DC=local"]}],
     }
     chains = build_attack_chains(
         session,  # type: ignore[arg-type]

@@ -11,10 +11,10 @@ def test_year_suffix_detection() -> None:
     clues = [
         {
             "user": "svc_sql",
-            "string": "WelcomePassword123!",
+            "string": "Welcome2026",
             "source": "Logs/trace.log",
             "confidence": "medium",
-            "verify_state": "sin verificar",
+            "verify_state": "unverified",
         }
     ]
     result = analyze_password_clues(clues)
@@ -28,10 +28,10 @@ def test_filename_year_mismatch_inference() -> None:
     clues = [
         {
             "user": "svc_sql",
-            "string": "WelcomePassword123!",
+            "string": "Welcome2025",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
-            "verify_state": "sin verificar",
+            "verify_state": "unverified",
         }
     ]
     result = analyze_password_clues(clues)
@@ -49,15 +49,15 @@ def test_no_raw_password_list_in_output() -> None:
     clues = [
         {
             "user": "svc_sql",
-            "string": "WelcomePassword123!",
+            "string": "Welcome2026",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
-            "verify_state": "sin verificar",
+            "verify_state": "unverified",
         }
     ]
     result = analyze_password_clues(clues)
     blob = json.dumps(result)
-    assert "WelcomePassword123!" not in blob
+    assert "Welcome2026" not in blob
     assert "candidates" not in blob
     assert "wordlist" not in blob
     for key in ("rules", "inferences", "possible_transforms"):
@@ -74,7 +74,7 @@ def test_loot_clue_rows_feed_rules(tmp_path: Path) -> None:
                 "parsed_credentials": [
                     {
                         "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "password": "Welcome2026",
                         "source_file": "Logs/IdentitySync_Trace_20260219.log",
                         "confidence": "medium",
                     }

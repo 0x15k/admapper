@@ -33,7 +33,7 @@ def test_admapper_winrm_pth_no_dc_ip_flag() -> None:
 
 
 def test_run_winrm_shell_pth_accepts_fqdn_without_dc_ip() -> None:
-    mock_result = MagicMock(stdout="logging\\msa_health$\n", stderr="", returncode=0, shell="cmd")
+    mock_result = MagicMock(stdout="corp\\msa_health$\n", stderr="", returncode=0, shell="cmd")
     with patch("admapper.winrm.shell_cli.WinRMClient") as mock_cls:
         mock_cls.return_value.execute.return_value = mock_result
         run_winrm_shell(

@@ -65,7 +65,7 @@ def _warn_protected_user_winrm(*, domain: str, username: str, dc_ip: str) -> Non
             ws_path=None,
             fallback_ip=dc_ip if dc_ip and dc_ip[0].isdigit() else None,
         )
-        print_success("Usa el hash de máquina del workspace en su host WinRM:")
+        print_success("Use the workspace machine hash on its WinRM host:")
         print_info(f"  {cmd}")
     else:
         print_info("  admapper exploit -w <workspace>   # then WinRM with dumped machine hash")

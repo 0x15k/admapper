@@ -129,7 +129,7 @@ def ensure_system_hosts_entry(
     use_sudo: bool = True,
     hosts_path: Path | None = None,
 ) -> HostsSyncResult:
-    """Ensure ``ip hostname`` exists in the system hosts file (HTB respawn-safe)."""
+    """Ensure ``ip hostname`` exists in the system hosts file (target respawn-safe)."""
     ip = ip.strip()
     hostname = hostname.strip().rstrip(".")
     if not ip or not _valid_hostname(hostname):
@@ -188,16 +188,16 @@ def format_hosts_sync_message(result: HostsSyncResult) -> str:
     if result.status == HostsSyncStatus.PRESENT:
         return f"/etc/hosts OK — {result.ip}  {result.hostname}"
     if result.status == HostsSyncStatus.ADDED:
-        return f"/etc/hosts actualizado — añadido {result.ip}  {result.hostname}"
+        return f"/etc/hosts updated — added {result.ip}  {result.hostname}"
     if result.status == HostsSyncStatus.UPDATED:
         prev = result.previous_ip or "?"
         return (
-            f"/etc/hosts actualizado — {result.hostname}: {prev} → {result.ip} "
-            "(respawn HTB)"
+            f"/etc/hosts updated — {result.hostname}: {prev} → {result.ip} "
+            "(machine respawned)"
         )
     if result.status == HostsSyncStatus.SKIPPED:
-        return f"/etc/hosts omitido — {result.detail}"
-    return f"/etc/hosts falló — {result.detail}"
+        return f"/etc/hosts skipped — {result.detail}"
+    return f"/etc/hosts failed — {result.detail}"
 
 
 def hosts_entry_exists(

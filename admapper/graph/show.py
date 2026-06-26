@@ -66,10 +66,10 @@ def build_graph_view(
 
     lines = [
         "═" * 48,
-        "  GRAFO DE ATAQUE  (admapper — sin BloodHound CE)",
+        "  ATTACK GRAPH  (admapper — without BloodHound CE)",
         "═" * 48,
-        f"  pivot : {pivot or '(ninguno)'}",
-        f"  owned : {', '.join(owned_users or []) or '(ninguno)'}",
+        f"  pivot : {pivot or '(none)'}",
+        f"  owned : {', '.join(owned_users or []) or '(none)'}",
         "",
     ]
 
@@ -86,9 +86,9 @@ def build_graph_view(
         )
         lines.extend(
             [
-                "  SIGUIENTE PASO  [listo]",
+                "  NEXT STEP  [ready]",
                 f"  {account} ──WinRM──► {host}",
-                f"  Comando   : {winrm_cmd}",
+                f"  Command   : {winrm_cmd}",
                 "",
             ]
         )
@@ -102,7 +102,7 @@ def build_graph_view(
         )
         ready = [e for e in sort_edges(edges) if e.ready and not e.target_owned and e.technique != "member_of"]
         if ready:
-            lines.append("  DESDE PIVOT (1-hop — estilo BloodHound)")
+            lines.append("  FROM PIVOT (1-hop — BloodHound style)")
             for edge in ready[:8]:
                 mark = "✓" if edge.ready else "○"
                 lines.append(
@@ -114,7 +114,7 @@ def build_graph_view(
     if pivot_node_id:
         hop_edges = _outbound_edges(graph, node_id=pivot_node_id, owned=owned)
         if hop_edges:
-            lines.append("  ARISTAS DEL GRAFO (member_of / ACL desde graph.json)")
+            lines.append("  GRAPH EDGES (member_of / ACL from graph.json)")
             for label, etype, status in hop_edges[:12]:
                 lines.append(f"    {pivot} ──{etype}──► {label}  ({status})")
             lines.append("")
@@ -123,7 +123,7 @@ def build_graph_view(
         principal = str(finding.get("principal", "")).lower()
         if principal and principal != pivot.lower():
             continue
-        lines.append("  ABUSO ACL")
+        lines.append("  ACL ABUSE")
         lines.append(
             f"    {finding.get('principal')} ──{finding.get('right')}──► "
             f"{finding.get('target_name')}  [{finding.get('severity')}]"
@@ -132,7 +132,7 @@ def build_graph_view(
 
     path_list = paths.get("paths") or []
     if path_list:
-        lines.append("  RUTAS MULTI-HOP (paths.json)")
+        lines.append("  MULTI-HOP PATHS (paths.json)")
         for path in path_list[:5]:
             steps = path.get("steps") or []
             chain = " → ".join(
@@ -149,13 +149,13 @@ def build_graph_view(
     nodes = graph.get("nodes", [])
     owned_nodes = [n for n in nodes if n.get("owned")]
     if owned_nodes:
-        lines.append("  NODOS OWNED")
+        lines.append("  OWNED NODES")
         for node in owned_nodes[:15]:
             lines.append(f"    ★ {_node_label(node, owned_mark=False)}")
         lines.append("")
 
     if len(lines) <= 8:
-        lines.append("  (grafo vacío — run start_auth + acls + paths)")
+        lines.append("  (empty graph — run start_auth + acls + paths)")
         lines.append("")
 
     lines.append("═" * 48)
@@ -169,16 +169,16 @@ def print_attack_graph(
     pivot_user: str | None = None,
     owned_users: list[str] | None = None,
 ) -> None:
-    domain = domain or "(sin dominio)"
+    domain = domain or "(no domain)"
     text = build_graph_view(
         ws_path,
         domain=domain,
         pivot_user=pivot_user,
         owned_users=owned_users,
     )
-    print_success("ADMapper — grafo de ataque")
+    print_success("ADMapper — Attack Graph")
     for line in text.splitlines():
-        if line.strip().startswith("✓") or "──" in line or "SIGUIENTE PASO" in line:
+        if line.strip().startswith("✓") or "──" in line or "NEXT STEP" in line:
             print_warning(line)
         else:
             print(line)

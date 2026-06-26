@@ -21,17 +21,17 @@ _SUPPRESS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"^! clock sync failed:",
         r"^→ continuing — Kerberos will auto-probe",
         r"^\[libfaketime\]",
-        r"^→ usando clock skew Kerberos en caché",
+        r"^→ using cached Kerberos clock skew",
         r"^→ \[admapper\] automático:",
         r"^→ automático:",
         r"^✓ graph updated",
-        r"^✓ estado auth guardado",
-        r"^✓ inventario guardado",
-        r"^✓ grafo actualizado",
+        r"^✓ auth state saved",
+        r"^✓ inventory saved",
+        r"^✓ graph updated",
         r"^✓ export BloodHound",
         r"^→ reportes →",
         r"^✓ post-ex playbook saved",
-        r"^✓ ADMapper — mapa de engagement",
+        r"^✓ ADMapper — engagement map",
         r"^✓ ADMapper session status",
         r"^  SESSION MANAGER",
         r"^  Workspace\s*:",
@@ -48,31 +48,31 @@ _SUPPRESS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"^!     admapper analyst",
         r"^→ Credentials:",
         r"^→ workspace:",
-        r"^✓  owned marcado:",
+        r"^✓  owned marked:",
         r"^✓ pivot →",
-        r"^→ grafo → file://",
+        r"^→ graph → file://",
         r"^═+$",
-        r"^  MAPA DE ENGAGEMENT",
-        r"^  Dominio\s*:",
+        r"^  ENGAGEMENT MAP",
+        r"^  Domain\s*:",
         r"^  DC\s*:",
-        r"^  ESTÁS AQUÍ",
+        r"^  YOU ARE HERE",
         r"^  ● owned",
         r"^  ● pivot",
-        r"^  METODOLOGÍA",
-        r"^  ENUM DESTACADA",
-        r"^  CREDENCIALES DESCUBIERTAS",
+        r"^  METHODOLOGY",
+        r"^  FEATURED ENUM",
+        r"^  DISCOVERED CREDENTIALS",
         r"^  ┌",
         r"^  ├",
         r"^  └",
         r"^  │",
-        r"^  ACCESO PIVOT",
-        r"^  usuario\s+ldap",
-        r"^  \* cadena del archivo",
-        r"^  BLOQUEADO / DESPUÉS",
-        r"^  SIGUIENTE PASO\s+\[listo\]",
-        r"^  Técnica\s*:",
-        r"^  Comando\s*:",
-        r"^  ⚠ BLOQUEO",
+        r"^  PIVOT ACCESS",
+        r"^  user\s+ldap",
+        r"^  \* string from file",
+        r"^  BLOCKED / FUTURE",
+        r"^  NEXT STEP\s+\[ready\]",
+        r"^  Technique\s*:",
+        r"^  Command\s*:",
+        r"^  ⚠ BLOCK",
         r"^┏",
         r"^┡",
         r"^┃",
@@ -135,9 +135,9 @@ class TerminalFilter:
             user = line.split(":", 1)[-1].strip().split("(")[0].strip()
             if user in self._pending_invalid:
                 self._pending_invalid.remove(user)
-            return f"✓ Credencial válida: {user}"
+            return f"✓ Credential valid: {user}"
         if line.startswith("→ Protected Users — only Kerberos"):
-            return "→ Protected Users: solo Kerberos (NTLM bloqueado)"
+            return "→ Protected Users: Kerberos only (NTLM blocked)"
         if line.startswith("! credential invalid:"):
             return None
         if line.startswith("! Protected Users — Kerberos required"):
@@ -163,6 +163,6 @@ class TerminalFilter:
         if line.startswith("→  exploit acl-"):
             return line.replace("→  ", "→ ")
         if line.startswith("→ Phase "):
-            return line.replace("Phase 14", "Fase POST-EX").replace("Phase 18", "Fase EXPLOIT")
+            return line.replace("Phase 14", "POST-EX Phase").replace("Phase 18", "EXPLOIT Phase")
 
         return line

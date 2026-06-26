@@ -9,7 +9,6 @@ _NXC_GENERIC_LINE = re.compile(r"^\s*\S+\s+\S+\s+\d+\s+\S+\s+(.*)$")
 _SKIP_MSG_PREFIXES = (
     "[*]",
     "[-]",
-    "[+] logging",
 )
 _SKIP_MSG_CONTAINS = ("(Pwn3d!)",)
 
@@ -20,15 +19,18 @@ def _keep_message(msg: str) -> bool:
     for prefix in _SKIP_MSG_PREFIXES:
         if msg.startswith(prefix):
             return False
+    # Skip [+] credential lines, e.g. [+] CORP\\username:password
+    if msg.startswith("[+]"):
+        if msg.startswith("[+] Executed command"):
+            # nxc 1.4: output may trail after colon
+            if ":" in msg:
+                tail = msg.split(":", 1)[1].strip()
+                return bool(tail) and not tail.startswith("(")
+            return False
+        return False
     for needle in _SKIP_MSG_CONTAINS:
         if needle in msg:
             return False
-    if msg.startswith("[+] Executed command"):
-        # nxc 1.4: output may trail after colon
-        if ":" in msg:
-            tail = msg.split(":", 1)[1].strip()
-            return bool(tail) and not tail.startswith("(")
-        return False
     return True
 
 

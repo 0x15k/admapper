@@ -94,7 +94,7 @@ def _port_check(ports: set[int], port: int, label: str) -> PrerequisiteCheck:
         key=f"port_{port}",
         label=label,
         met=met,
-        detail=f"TCP/{port} {'abierto' if met else 'no visto en scan'}",
+        detail=f"TCP/{port} {'open' if met else 'not seen in scan'}",
     )
 
 
@@ -103,9 +103,9 @@ def _lockout_loaded(ws_path: Path, policy: DomainLockoutPolicy) -> PrerequisiteC
     met = bool(cached and (policy.lockout_threshold or cached.get("policy")))
     return PrerequisiteCheck(
         key="lockout_policy",
-        label="Política de bloqueo (GPO) consultada",
+        label="Lockout policy (GPO) retrieved",
         met=met,
-        detail="enum LDAP persiste lockout_policy.json" if not met else f"umbral={policy.lockout_threshold}",
+        detail="LDAP enum persists lockout_policy.json" if not met else f"threshold={policy.lockout_threshold}",
     )
 
 
@@ -113,9 +113,9 @@ def _kerberos_clock(ws_path: Path) -> PrerequisiteCheck:
     skew = load_workspace_clock_skew(ws_path)
     return PrerequisiteCheck(
         key="kerberos_clock",
-        label="Reloj Kerberos alineado o skew guardado",
+        label="Kerberos clock aligned or skew saved",
         met=bool(skew),
-        detail=skew or "sincroniza reloj con DC o --clock-skew",
+        detail=skew or "sync clock with DC or use --clock-skew",
     )
 
 

@@ -64,11 +64,11 @@ def run_dashboard_credential_auth(
     result = run_credential_verify(session, cred.id)
     verified = result.credential
     if verified.status != CredentialStatus.VALID:
-        raise ValueError(f"credencial inválida para {username}")
+        raise ValueError(f"invalid credential for {username}")
 
     mark_user_owned(session, verified.username, refresh=True)
     set_pivot_user(session, verified.username)
-    print_success(f"Credencial válida: {verified.display_user()}")
+    print_success(f"Valid credential: {verified.display_user()}")
     return verified
 
 

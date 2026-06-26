@@ -1157,8 +1157,8 @@ def brief(
 
 @app.command()
 def winrm(
-    host: Annotated[str, typer.Option("--host", "-H", help="DC IP or FQDN (e.g. DC01.logging.htb)")],
-    domain: Annotated[str, typer.Option("--domain", "-d", help="AD domain (e.g. logging.htb)")],
+    host: Annotated[str, typer.Option("--host", "-H", help="DC IP or FQDN (e.g. dc01.corp.local)")],
+    domain: Annotated[str, typer.Option("--domain", "-d", help="AD domain (e.g. corp.local)")],
     user: Annotated[str, typer.Option("--user", "-u", help="Username")],
     password: Annotated[
         str | None,
@@ -1359,7 +1359,7 @@ def opsec_set(
     \b
     stealth  Minimum footprint: delays 3-10s, no spray, no coerce, confirms required
     normal   Balanced defaults (current ADMapper behaviour)
-    lab      Maximum aggression: no delays, no confirmations (HTB/lab use)
+    lab      Maximum aggression: no delays, no confirmations (lab/testing use)
     """
     from admapper.core.output import print_error, print_success as _ps
     from admapper.core.opsec import OpsecProfile, save_workspace_profile, print_opsec_status

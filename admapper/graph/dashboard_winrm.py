@@ -36,11 +36,11 @@ def run_dashboard_winrm_pth(session: Session, account: str) -> str:
     ws_path = session.workspaces.path_for(session.workspace.name)
     domain = session.workspace.domain or ""
     if not domain:
-        raise ValueError("sin dominio — escanea primero")
+        raise ValueError("no domain — scan first")
 
     match = lookup_machine_hash(ws_path, account)
     if not match:
-        raise ValueError(f"sin hash NTLM para {account} — ejecuta exploit ACL gMSA")
+        raise ValueError(f"no NTLM hash for {account} — run gMSA ACL exploit")
 
     machine_user, nthash = match
     dc_ip = pick_dc_ip(session)

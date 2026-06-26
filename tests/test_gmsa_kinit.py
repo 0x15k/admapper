@@ -68,7 +68,7 @@ def test_gssapi_modify_uses_faketime_subprocess_when_skew_set(tmp_path) -> None:
         )
         ok, err = _modify_gmsa_membership_gssapi(
             ldap_host="dc01.corp.local",
-            gmsa_dn="CN=msa_health,CN=Managed Service Accounts,DC=logging,DC=htb",
+            gmsa_dn="CN=msa_health,CN=Managed Service Accounts,DC=corp,DC=local",
             principal_sid="S-1-5-21-1-2-3-1000",
             krb5_conf=krb5_conf,
             ccache=ccache,

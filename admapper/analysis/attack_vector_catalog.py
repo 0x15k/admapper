@@ -162,27 +162,27 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "unauth_recon",
-            "Recon sin autenticación",
+            "Recon without authentication",
             "recon",
             [
-                PrerequisiteCheck("target_ip", "IP / scan completado", ctx.has_scan, "unauth_scan.json"),
+                PrerequisiteCheck("target_ip", "IP / scan completed", ctx.has_scan, "unauth_scan.json"),
                 _port_check(ctx.ports, 389, "LDAP"),
                 _port_check(ctx.ports, 88, "Kerberos KDC"),
                 _port_check(ctx.ports, 445, "SMB"),
             ],
-            note="DNS · SRV · superficie de servicios",
+            note="DNS · SRV · service surface",
         )
     )
     vectors.append(
         _vec(
             "ldap_anonymous",
-            "LDAP anónimo (RootDSE / enum)",
+            "Anonymous LDAP (RootDSE / enum)",
             "recon",
             [
                 _port_check(ctx.ports, 389, "LDAP TCP/389"),
-                PrerequisiteCheck("scan", "Scan previo", ctx.has_scan, "descubre DC y dominio"),
+                PrerequisiteCheck("scan", "Prior scan", ctx.has_scan, "discovers DC and domain"),
             ],
-            note="Depende de GPO — puede estar deshabilitado",
+            note="GPO dependent — may be disabled",
         )
     )
     vectors.append(
@@ -192,9 +192,9 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "recon",
             [
                 _port_check(ctx.ports, 445, "SMB TCP/445"),
-                PrerequisiteCheck("restrict_anon", "RestrictAnonymous no bloquea", False, "verificar manualmente"),
+                PrerequisiteCheck("restrict_anon", "RestrictAnonymous not blocking", False, "verify manually"),
             ],
-            note="GPP en SYSVOL si hay lectura",
+            note="GPP in SYSVOL if read access is available",
         )
     )
     vectors.append(
@@ -203,8 +203,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "SAMR / RID cycling",
             "recon",
             [
-                _port_check(ctx.ports, 445, "SMB para SAMR pipe"),
-                PrerequisiteCheck("user_list", "Lista parcial de usuarios", ctx.has_enum, "mejor con LDAP/SAMR"),
+                _port_check(ctx.ports, 445, "SMB for SAMR pipe"),
+                PrerequisiteCheck("user_list", "Partial user list", ctx.has_enum, "better with LDAP/SAMR"),
             ],
             note="Impacket lookupsid / enum4linux",
         )
@@ -212,10 +212,10 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "dns_enum",
-            "Enumeración DNS / SRV",
+            "DNS / SRV enumeration",
             "recon",
             [
-                PrerequisiteCheck("domain", "Nombre de dominio conocido", ctx.has_scan, "del scan o operador"),
+                PrerequisiteCheck("domain", "Known domain name", ctx.has_scan, "from scan or operator"),
             ],
             note="_ldap._tcp · _kerberos._tcp",
         )
@@ -229,11 +229,11 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "creds",
             [
                 _port_check(ctx.ports, 88, "Kerberos KDC"),
-                PrerequisiteCheck("user_list", "Usuarios válidos", ctx.has_enum, f"{len(ctx.humans)} humanos"),
-                PrerequisiteCheck("asrep_targets", "DONT_REQ_PREAUTH", bool(ctx.asrep_users), f"{len(ctx.asrep_users)} cuenta(s)"),
+                PrerequisiteCheck("user_list", "Valid users", ctx.has_enum, f"{len(ctx.humans)} humans"),
+                PrerequisiteCheck("asrep_targets", "DONT_REQ_PREAUTH", bool(ctx.asrep_users), f"{len(ctx.asrep_users)} account(s)"),
             ],
             targets=[{"username": u.username} for u in ctx.asrep_users[:10]],
-            note="Sin lockout — hash offline",
+            note="No lockout — offline hash",
         )
     )
     vectors.append(
@@ -243,8 +243,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "creds",
             [
                 _port_check(ctx.ports, 88, "Kerberos KDC"),
-                PrerequisiteCheck("spn_targets", "Cuentas con SPN", bool(ctx.krb_users), f"{len(ctx.krb_users)}"),
-                PrerequisiteCheck("valid_cred", "Credencial para pre-auth", ctx.has_creds, "cualquier bind válido"),
+                PrerequisiteCheck("spn_targets", "Accounts with SPN", bool(ctx.krb_users), f"{len(ctx.krb_users)}"),
+                PrerequisiteCheck("valid_cred", "Credential for pre-auth", ctx.has_creds, "any valid bind"),
                 _kerberos_clock(ws),
             ],
             targets=[{"username": u.username, "spns": len(u.spns)} for u in ctx.krb_users[:10]],
@@ -256,8 +256,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Timeroasting",
             "creds",
             [
-                PrerequisiteCheck("valid_cred", "LDAP autenticado", ctx.has_creds, ""),
-                PrerequisiteCheck("computers", "Inventario de equipos", bool(ctx.inv.get("computers")), "auth_inventory"),
+                PrerequisiteCheck("valid_cred", "Authenticated LDAP", ctx.has_creds, ""),
+                PrerequisiteCheck("computers", "Computer inventory", bool(ctx.inv.get("computers")), "auth_inventory"),
                 _port_check(ctx.ports, 389, "LDAP"),
             ],
             note="Crack offline machine AES keys",
@@ -265,10 +265,10 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     )
     spray_prereqs = [
         _lockout_loaded(ws, p),
-        PrerequisiteCheck("user_list", "Usuarios enumerados", ctx.has_enum, f"{len(ctx.humans)} humanos"),
-        PrerequisiteCheck("spray_eligible", "Bajo umbral lockout", bool(ctx.eligible_spray), f"{len(ctx.eligible_spray)} elegibles"),
+        PrerequisiteCheck("user_list", "Enumerated users", ctx.has_enum, f"{len(ctx.humans)} humans"),
+        PrerequisiteCheck("spray_eligible", "Below lockout threshold", bool(ctx.eligible_spray), f"{len(ctx.eligible_spray)} eligible"),
         _port_check(ctx.ports, 389, "LDAP spray"),
-        PrerequisiteCheck("operator_pwd", "Contraseña elegida por operador", False, "revisa reglas de pista"),
+        PrerequisiteCheck("operator_pwd", "Password chosen by operator", False, "review clue rules"),
     ]
     vectors.append(
         _vec(
@@ -278,7 +278,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             spray_prereqs,
             ready=all(x.met for x in spray_prereqs[:-1]),
             targets=[{"username": u} for u in ctx.eligible_spray[:15]],
-            note="Un password por ronda — respeta ventana GPO",
+            note="One password per round — respects GPO window",
         )
     )
     vectors.append(
@@ -288,18 +288,18 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "creds",
             [
                 _port_check(ctx.ports, 445, "SMB SYSVOL"),
-                PrerequisiteCheck("read_share", "Lectura SYSVOL o share", ctx.has_loot, "loot SMB o acceso manual"),
+                PrerequisiteCheck("read_share", "SYSVOL or share read access", ctx.has_loot, "SMB loot or manual access"),
             ],
-            note="Groups.xml con cpassword AES",
+            note="Groups.xml with AES cpassword",
         )
     )
     vectors.append(
         _vec(
             "blank_password",
-            "Cuentas sin contraseña / pwd not required",
+            "Accounts with blank password / pwd not required",
             "creds",
             [
-                PrerequisiteCheck("targets", "UAC PASSWD_NOTREQD", any(u.password_not_required for u in ctx.humans), "del inventario LDAP"),
+                PrerequisiteCheck("targets", "UAC PASSWD_NOTREQD", any(u.password_not_required for u in ctx.humans), "from LDAP inventory"),
                 _port_check(ctx.ports, 389, "LDAP bind"),
             ],
         )
@@ -319,20 +319,20 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
         vectors.append(
             _vec(
                 f"creds_verify:{user.lower()}",
-                f"Verificar credencial — {user}",
+                f"Verify credential — {user}",
                 "creds",
                 [
                     _lockout_loaded(ws, p),
-                    PrerequisiteCheck("target_exists", f"{user} en inventario", target_rec is not None, ""),
-                    PrerequisiteCheck("not_locked", "Cuenta no bloqueada", not locked, ""),
-                    PrerequisiteCheck("attempts", "Intentos restantes > 0", remaining is None or remaining > 0, f"restantes={remaining}"),
+                    PrerequisiteCheck("target_exists", f"{user} in inventory", target_rec is not None, ""),
+                    PrerequisiteCheck("not_locked", "Account not locked", not locked, ""),
+                    PrerequisiteCheck("attempts", "Remaining attempts > 0", remaining is None or remaining > 0, f"remaining={remaining}"),
                     _port_check(ctx.ports, 389, "LDAP verify"),
                     _kerberos_clock(ws),
-                    PrerequisiteCheck("operator_pwd", "Contraseña del operador", False, f"pista: «{clue.get('string', '')[:36]}»"),
+                    PrerequisiteCheck("operator_pwd", "Operator password", False, f"clue: «{clue.get('string', '')[:36]}»"),
                 ],
                 ready=target_rec is not None and not locked and (remaining is None or remaining > 0) and _load_json(ws / "lockout_policy.json") is not None,
                 targets=[{"username": user, "attempts_remaining": remaining}],
-                note="Lockout ANTES del bind — aplica reglas de pista",
+                note="Lockout BEFORE bind — applies clue rules",
             )
         )
 
@@ -340,14 +340,14 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "ldap_enum",
-            "Enumeración LDAP autenticada",
+            "Authenticated LDAP enumeration",
             "enum",
             [
-                PrerequisiteCheck("valid_cred", "Credencial válida", ctx.has_creds, ", ".join(sorted(ctx.valid))[:60]),
+                PrerequisiteCheck("valid_cred", "Valid credential", ctx.has_creds, ", ".join(sorted(ctx.valid))[:60]),
                 _port_check(ctx.ports, 389, "LDAP"),
             ],
             ready=ctx.has_creds and not ctx.has_enum,
-            note="Persiste auth_inventory + lockout_policy",
+            note="Persists auth_inventory + lockout_policy",
         )
     )
     vectors.append(
@@ -356,20 +356,20 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "BloodHound / SharpHound",
             "enum",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
-                PrerequisiteCheck("enum", "Inventario base", ctx.has_enum, "opcional pero recomendado"),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
+                PrerequisiteCheck("enum", "Base inventory", ctx.has_enum, "optional but recommended"),
             ],
-            note="ACL · delegación · paths a DA",
+            note="ACL · delegation · paths to DA",
         )
     )
     vectors.append(
         _vec(
             "trust_enum",
-            "Enumeración de trusts",
+            "Domain trust enumeration",
             "enum",
             [
-                PrerequisiteCheck("valid_cred", "Credencial de dominio", ctx.has_creds, ""),
-                PrerequisiteCheck("enum", "LDAP autenticado", ctx.has_enum, ""),
+                PrerequisiteCheck("valid_cred", "Domain credential", ctx.has_creds, ""),
+                PrerequisiteCheck("enum", "Authenticated LDAP", ctx.has_enum, ""),
             ],
         )
     )
@@ -378,10 +378,10 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "smb_loot",
-            "Loot SMB / shares",
+            "SMB loot / shares",
             "loot",
             [
-                PrerequisiteCheck("valid_cred", "Credencial SMB/LDAP", ctx.has_creds, ""),
+                PrerequisiteCheck("valid_cred", "SMB/LDAP credential", ctx.has_creds, ""),
                 _port_check(ctx.ports, 445, "SMB"),
             ],
             targets=[{"files": ctx.loot.get("file_count", 0)}] if ctx.has_loot else [],
@@ -392,23 +392,23 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "unconstrained_delegation",
-            "Delegación sin restricciones",
+            "Unconstrained delegation",
             "kerberos",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
-                PrerequisiteCheck("deleg_hosts", "Equipos TRUSTED_FOR_DELEGATION", _has_delegation(ctx, "unconstrained"), "kerberos_ops o inventario"),
-                PrerequisiteCheck("coerce", "Coerción de auth al listener", False, "PetitPotam / printerbug"),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
+                PrerequisiteCheck("deleg_hosts", "TRUSTED_FOR_DELEGATION computers", _has_delegation(ctx, "unconstrained"), "kerberos_ops or inventory"),
+                PrerequisiteCheck("coerce", "Auth coercion to listener", False, "PetitPotam / printerbug"),
             ],
-            note="Captura TGT en equipo delegado",
+            note="Capture TGT on delegated computer",
         )
     )
     vectors.append(
         _vec(
             "constrained_delegation",
-            "Delegación restringida (S4U)",
+            "Constrained delegation (S4U)",
             "kerberos",
             [
-                PrerequisiteCheck("valid_cred", "Cred de cuenta delegada", ctx.has_creds, ""),
+                PrerequisiteCheck("valid_cred", "Delegated account credential", ctx.has_creds, ""),
                 PrerequisiteCheck("s4u", "msDS-AllowedToDelegateTo", _has_delegation(ctx, "constrained"), ""),
                 _kerberos_clock(ws),
             ],
@@ -420,8 +420,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "RBCD (Resource-Based)",
             "kerberos",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
-                PrerequisiteCheck("genericwrite", "GenericWrite sobre equipo O MAQ>0", bool(_acl_right_present(ctx, "genericwrite")) or bool(ctx.inv.get("machine_account_quota")), "ACL o MAQ"),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
+                PrerequisiteCheck("genericwrite", "GenericWrite on computer OR MAQ>0", bool(_acl_right_present(ctx, "genericwrite")) or bool(ctx.inv.get("machine_account_quota")), "ACL or MAQ"),
                 _kerberos_clock(ws),
             ],
             note="getST impersonation",
@@ -433,8 +433,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Shadow Credentials",
             "kerberos",
             [
-                PrerequisiteCheck("acl", "GenericAll/GenericWrite sobre usuario", bool(_acl_right_present(ctx, "genericall") or _acl_right_present(ctx, "genericwrite")), "acl_findings"),
-                PrerequisiteCheck("valid_cred", "Cred del principal con derecho", bool(ctx.owned & ctx.valid), ""),
+                PrerequisiteCheck("acl", "GenericAll/GenericWrite on user", bool(_acl_right_present(ctx, "genericall") or _acl_right_present(ctx, "genericwrite")), "acl_findings"),
+                PrerequisiteCheck("valid_cred", "Credential of principal with right", bool(ctx.owned & ctx.valid), ""),
             ],
             note="msDS-KeyCredentialLink — pywhisker",
         )
@@ -442,16 +442,16 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
 
     # ── ACL ABUSE (generic per right) ──
     acl_rights = [
-        ("genericall_abuse", "GenericAll", "genericall", "Control total — reset/shadow/addmember"),
-        ("writedacl_abuse", "WriteDACL", "writedacl", "ACE injection → GenericAll o DCSync"),
+        ("genericall_abuse", "GenericAll", "genericall", "Full control — reset/shadow/addmember"),
+        ("writedacl_abuse", "WriteDACL", "writedacl", "ACE injection → GenericAll or DCSync"),
         ("writeowner_abuse", "WriteOwner", "writeowner", "Ownership → WriteDACL"),
-        ("genericwrite_abuse", "GenericWrite", "genericwrite", "Atributos — RBCD, gMSA, SPN"),
-        ("forcechangepassword", "ForceChangePassword", "forcechangepassword", "Reset sin pwd actual"),
-        ("addmember_abuse", "AddMember / Self", "addmember", "Unirse a grupo privilegiado"),
-        ("readgmsapassword", "ReadGMSAPassword", "readgmsapassword", "Credencial gMSA"),
+        ("genericwrite_abuse", "GenericWrite", "genericwrite", "Attributes — RBCD, gMSA, SPN"),
+        ("forcechangepassword", "ForceChangePassword", "forcechangepassword", "Reset without current pwd"),
+        ("addmember_abuse", "AddMember / Self", "addmember", "Join privileged group"),
+        ("readgmsapassword", "ReadGMSAPassword", "readgmsapassword", "gMSA credential"),
         ("readlapspassword", "ReadLAPSPassword", "readlapspassword", "LAPS password"),
-        ("writespn_abuse", "WriteSPN", "writespn", "Kerberoast forzado"),
-        ("dcsync_abuse", "DCSync", "dcsync", "Replicación de secretos AD"),
+        ("writespn_abuse", "WriteSPN", "writespn", "Forced Kerberoast"),
+        ("dcsync_abuse", "DCSync", "dcsync", "Replication of AD secrets"),
     ]
     for aid, title, right, desc in acl_rights:
         hits = _acl_right_present(ctx, right)
@@ -462,8 +462,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
                 f"ACL — {title}",
                 "escalate",
                 [
-                    PrerequisiteCheck("acl_enum", "ACL enumerada", ctx.has_acls, f"{len(hits)} ACE(s) {right}"),
-                    PrerequisiteCheck("pivot_cred", "Principal owned + cred válida", pivot_ok, "compromete al trustee"),
+                    PrerequisiteCheck("acl_enum", "ACL enumerated", ctx.has_acls, f"{len(hits)} ACE(s) {right}"),
+                    PrerequisiteCheck("pivot_cred", "Owned principal + valid credential", pivot_ok, "compromises the trustee"),
                     _port_check(ctx.ports, 389, "LDAP modify"),
                 ],
                 ready=bool(hits) and pivot_ok,
@@ -475,12 +475,12 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "acl_enum",
-            "Enumerar ACLs (owned)",
+            "Enumerate ACLs (owned)",
             "escalate",
             [
-                PrerequisiteCheck("owned_cred", "Owned + cred válida", bool(ctx.owned & ctx.valid), ""),
+                PrerequisiteCheck("owned_cred", "Owned + valid credential", bool(ctx.owned & ctx.valid), ""),
                 _port_check(ctx.ports, 389, "LDAP"),
-                PrerequisiteCheck("enum", "Inventario AD", ctx.has_enum, ""),
+                PrerequisiteCheck("enum", "AD inventory", ctx.has_enum, ""),
             ],
         )
     )
@@ -489,11 +489,11 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "adcs_enum",
-            "Enumeración AD CS",
+            "AD CS enumeration",
             "escalate",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
-                PrerequisiteCheck("adcs", "CA / templates en LDAP", _adcs_present(ctx), "adcs find"),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
+                PrerequisiteCheck("adcs", "CA / templates in LDAP", _adcs_present(ctx), "adcs find"),
                 _port_check(ctx.ports, 389, "LDAP"),
             ],
         )
@@ -504,10 +504,10 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "AD CS ESC — enrollment",
             "escalate",
             [
-                PrerequisiteCheck("adcs", "Template vulnerable", _adcs_present(ctx), ""),
-                PrerequisiteCheck("enroll", "Derecho de enrollment", False, "certipy find -vulnerable"),
+                PrerequisiteCheck("adcs", "Vulnerable template", _adcs_present(ctx), ""),
+                PrerequisiteCheck("enroll", "Enrollment right", False, "certipy find -vulnerable"),
             ],
-            note="ESC1–ESC16 según misconfig",
+            note="ESC1–ESC16 depending on misconfig",
         )
     )
 
@@ -518,7 +518,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Pass-the-Hash",
             "lateral",
             [
-                PrerequisiteCheck("hash", "Hash NT recuperado", bool((_load_json(ws / "credentials.json") or {}).get("hashes")), "roast/dcsync/lsa"),
+                PrerequisiteCheck("hash", "NT hash recovered", bool((_load_json(ws / "credentials.json") or {}).get("hashes")), "roast/dcsync/lsa"),
                 _port_check(ctx.ports, 445, "SMB"),
             ],
         )
@@ -529,7 +529,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Pass-the-Ticket",
             "lateral",
             [
-                PrerequisiteCheck("ticket", "TGT/TGS exportado", False, "Rubeus / mimikatz"),
+                PrerequisiteCheck("ticket", "TGT/TGS exported", False, "Rubeus / mimikatz"),
                 _port_check(ctx.ports, 88, "Kerberos"),
             ],
         )
@@ -540,10 +540,10 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "WinRM lateral",
             "lateral",
             [
-                PrerequisiteCheck("valid_cred", "Credencial admin/local", ctx.has_creds, ""),
+                PrerequisiteCheck("valid_cred", "Local admin credential", ctx.has_creds, ""),
                 _port_check(ctx.ports, 5985, "WinRM HTTP"),
             ],
-            note="5986 si HTTPS",
+            note="5986 if HTTPS",
         )
     )
     vectors.append(
@@ -552,7 +552,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "RDP lateral",
             "lateral",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
                 _port_check(ctx.ports, 3389, "RDP"),
             ],
         )
@@ -563,8 +563,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "MSSQL impersonate / linked",
             "lateral",
             [
-                PrerequisiteCheck("mssql", "Instancia MSSQL", _mssql_present(ctx), "1433 o postex"),
-                PrerequisiteCheck("valid_cred", "Credencial SQL o Windows", ctx.has_creds, ""),
+                PrerequisiteCheck("mssql", "MSSQL instance", _mssql_present(ctx), "1433 or postex"),
+                PrerequisiteCheck("valid_cred", "SQL or Windows credential", ctx.has_creds, ""),
             ],
         )
     )
@@ -573,13 +573,13 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
     vectors.append(
         _vec(
             "petitpotam_coerce",
-            "Coerción (PetitPotam / PrinterBug)",
+            "Coercion (PetitPotam / PrinterBug)",
             "coerce",
             [
-                PrerequisiteCheck("listener", "NTLM relay / listener", False, "ntlmrelayx configurado"),
-                PrerequisiteCheck("target", "DC o spooler alcanzable", ctx.has_scan, ""),
+                PrerequisiteCheck("listener", "NTLM relay / listener", False, "ntlmrelayx configured"),
+                PrerequisiteCheck("target", "DC or spooler reachable", ctx.has_scan, ""),
             ],
-            note="Relay → LDAP RBCD o AD CS ESC8",
+            note="Relay → LDAP RBCD or AD CS ESC8",
         )
     )
     vectors.append(
@@ -588,8 +588,8 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "NTLM relay",
             "coerce",
             [
-                PrerequisiteCheck("coerce", "Auth coaccionada hacia atacante", False, ""),
-                PrerequisiteCheck("signing", "LDAP/SMB signing no obligatorio", False, "verificar manualmente"),
+                PrerequisiteCheck("coerce", "Auth coerced towards attacker", False, ""),
+                PrerequisiteCheck("signing", "LDAP/SMB signing not required", False, "verify manually"),
             ],
         )
     )
@@ -601,7 +601,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Dump LSA / SAM (host)",
             "postex",
             [
-                PrerequisiteCheck("admin", "Admin local / SYSTEM en host", bool(ctx.owned), "postex scan"),
+                PrerequisiteCheck("admin", "Local admin / SYSTEM on host", bool(ctx.owned), "postex scan"),
             ],
         )
     )
@@ -611,7 +611,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "Golden Ticket",
             "postex",
             [
-                PrerequisiteCheck("krbtgt", "Hash krbtgt", False, "requiere DCSync o DC compromise"),
+                PrerequisiteCheck("krbtgt", "krbtgt hash", False, "requires DCSync or DC compromise"),
             ],
         )
     )
@@ -623,7 +623,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
             "noPac (CVE-2021-42278)",
             "escalate",
             [
-                PrerequisiteCheck("valid_cred", "Credencial", ctx.has_creds, ""),
+                PrerequisiteCheck("valid_cred", "Credential", ctx.has_creds, ""),
                 PrerequisiteCheck("maq", "MAQ > 0", bool(ctx.inv.get("machine_account_quota")), "LDAP domain policy"),
             ],
         )
@@ -643,7 +643,7 @@ def build_all_attack_vectors(ctx: WorkspaceContext) -> list[AttackVector]:
                 ready=bool(op.get("prerequisites_met")),
                 prerequisites=prereqs,
                 targets=[],
-                note="Módulo WSUS",
+                note="WSUS module",
             )
         )
 

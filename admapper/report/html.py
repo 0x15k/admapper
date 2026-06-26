@@ -28,8 +28,8 @@ def build_engagement_html(
 ) -> str:
     """Minimal HTML engagement report from scenario data + findings table."""
     owned = list(owned_users or [])
-    pivot = pivot_user or (owned[-1] if owned else "(ninguno)")
-    domain_s = domain or "(sin dominio)"
+    pivot = pivot_user or (owned[-1] if owned else "(none)")
+    domain_s = domain or "(no domain)"
     phase = infer_kill_chain_phase(ws_path, owned)
     roast = roast_candidates_line(ws_path)
     top_actions = resolve_top_actions(

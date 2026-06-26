@@ -424,7 +424,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
                 "could not derive drop paths — need loot with zip/dll hints or COM task paths"
             )
             print_warn(
-                "sin rutas DLL-hijack — necesitas loot con zip/dll o argumentos de tarea más claros",
+                "no DLL-hijack routes found — need loot with zip/dll or clearer task arguments",
                 source=Tool.ADMAPPER,
                 manual="admapper postex scan -w <workspace>",
             )
