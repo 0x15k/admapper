@@ -242,6 +242,77 @@ def uninstall(root: Path) -> None:
     ok("Uninstall complete")
 
 
+def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None:
+    print()
+    info("Installing companion tools...")
+
+    # 1. Install pipx tools
+    pipx = shutil.which("pipx")
+    if not pipx:
+        pipx = ensure_pipx(python_exe, system, is_kali)
+
+    pipx_tools = {
+        "certipy": "certipy-ad",
+        "pywhisker": "pywhisker",
+        "nxc": "netexec",
+    }
+
+    for bin_name, package in pipx_tools.items():
+        if shutil.which(bin_name):
+            ok(f"Companion (Python): {package} is already installed ({shutil.which(bin_name)})")
+        else:
+            info(f"Installing {package} via pipx...")
+            try:
+                run(pipx, "install", package)
+                ok(f"Installed {package}")
+            except Exception as exc:
+                warn(f"Failed to install {package}: {exc}")
+
+    # 2. Install system tools
+    if system == "darwin":
+        brew = shutil.which("brew")
+        if not brew:
+            warn("brew not found — cannot install native companion tools (hashcat, john, libfaketime)")
+            return
+
+        brew_tools = {
+            "hashcat": "hashcat",
+            "john": "john-jumbo",
+            "faketime": "libfaketime",
+        }
+        for bin_name, formula in brew_tools.items():
+            if shutil.which(bin_name):
+                ok(f"Companion (System): {formula} is already installed ({shutil.which(bin_name)})")
+            else:
+                info(f"Installing {formula} via Homebrew...")
+                try:
+                    run(brew, "install", formula)
+                    ok(f"Installed {formula}")
+                except Exception as exc:
+                    warn(f"Failed to install {formula}: {exc}")
+
+    elif system == "linux":
+        apt = shutil.which("apt-get")
+        if not apt:
+            warn("apt-get not found — cannot install native companion tools (hashcat, john)")
+            return
+
+        apt_tools = {
+            "hashcat": "hashcat",
+            "john": "john",
+        }
+        for bin_name, package in apt_tools.items():
+            if shutil.which(bin_name):
+                ok(f"Companion (System): {package} is already installed ({shutil.which(bin_name)})")
+            else:
+                info(f"Installing {package} via apt-get...")
+                try:
+                    run("sudo", "apt-get", "install", "-y", package)
+                    ok(f"Installed {package}")
+                except Exception as exc:
+                    warn(f"Failed to install {package}: {exc}")
+
+
 def post_install(system: str) -> None:
     print()
     print("Recommended companion tools (install separately):")
@@ -268,6 +339,7 @@ def main() -> None:
     parser.add_argument("--dev", action="store_true", help="Local .venv + dev extras")
     parser.add_argument("--force", action="store_true", help="Force reinstall")
     parser.add_argument("--uninstall", action="store_true", help="Remove admapper")
+    parser.add_argument("--companion", "-c", action="store_true", help="Install companion tools (certipy, netexec, hashcat, john, libfaketime)")
     args = parser.parse_args()
 
     extra = "full" if not args.dev else "dev"
@@ -298,6 +370,9 @@ def main() -> None:
             ensure_system_packages(system, is_kali)
         pipx = ensure_pipx(python, system, is_kali)
         install_pipx(root, pipx, extra, args.force)
+
+    if args.companion:
+        install_companion_tools(system, is_kali, python)
 
     post_install(system)
 
