@@ -315,7 +315,7 @@ def install_companion_tools(system: str, is_kali: bool, python_exe: str) -> None
 
 def post_install(system: str) -> None:
     print()
-    print("Recommended companion tools (install separately):")
+    print("Recommended companion tools (or run this installer with '--companion' to auto-install):")
     print("  pipx install certipy-ad       # AD CS exploitation (ESC1-14)")
     print("  pipx install pywhisker        # Shadow Credentials")
     print("  pipx install netexec          # nxc (SMB/WinRM/LDAP)")
