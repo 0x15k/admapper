@@ -6,15 +6,15 @@ from admapper.models.adcs import CertificateTemplateRecord
 
 def test_sanitize_owned_removes_aes_artifact() -> None:
     clean, removed = sanitize_owned_users(
-        ["wallace.doe", "msa_health$", "aes128-cts-hmac-sha1-96:$", "jaylee.doe"]
+        ["target.user", "msa_target$", "aes128-cts-hmac-sha1-96:$", "jaylee.doe"]
     )
     assert "aes128-cts-hmac-sha1-96:$" in removed
-    assert clean == ["wallace.doe", "msa_health$", "jaylee.doe"]
+    assert clean == ["target.user", "msa_target$", "jaylee.doe"]
 
 
 def test_is_valid_owned_username() -> None:
     assert is_valid_owned_username("jaylee.doe")
-    assert is_valid_owned_username("msa_health$")
+    assert is_valid_owned_username("msa_target$")
     assert not is_valid_owned_username("aes128-cts-hmac-sha1-96:$")
 
 
@@ -35,7 +35,7 @@ def test_group_enroll_hints_only_confirmed_aces() -> None:
     principals = [
         PrincipalContext(
             username="jaylee.doe",
-            user_dn="CN=jaylee,DC=corp,DC=local",
+            user_dn="CN=jaylee,DC=target,DC=example",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
             sid_to_name={it_sid: "IT"},

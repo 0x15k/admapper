@@ -18,7 +18,7 @@ def _session_with_dc(tmp_path: Path) -> Session:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     hosts_store = HostsStore(manager, "lab")
     hosts_store.merge(
         [
@@ -43,7 +43,7 @@ def test_run_user_enumeration_merges_ldap_users(tmp_path: Path) -> None:
             )
         )
     ]
-    ldap_result = LdapUserEnumResult(host="10.0.0.1", base_dn="DC=corp,DC=local", users=ldap_users)
+    ldap_result = LdapUserEnumResult(host="10.0.0.1", base_dn="DC=target,DC=example", users=ldap_users)
 
     with (
         patch("admapper.enumeration.scan.enumerate_users_ldap", return_value=ldap_result),

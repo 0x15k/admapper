@@ -46,7 +46,7 @@ def test_cli_web_with_host_runs_unauth_discovery(tmp_path: Path) -> None:
     with (
         patch("admapper.recon.ports.scan_host", return_value=[389]) as mock_scan,
         patch("admapper.recon.unauth.run_unauth_scan") as mock_unauth,
-        patch("admapper.core.discovery.ensure_domain", return_value="corp.local") as mock_ensure,
+        patch("admapper.core.discovery.ensure_domain", return_value="target.example") as mock_ensure,
         patch("admapper.cli.scan.sync_hosts_from_session") as mock_sync,
         patch("admapper.graph.dashboard_server.run_dashboard_server") as mock_run_server,
     ):
@@ -71,7 +71,7 @@ def test_cli_dashboard_with_host_runs_unauth_discovery(tmp_path: Path) -> None:
     with (
         patch("admapper.recon.ports.scan_host", return_value=[389]) as mock_scan,
         patch("admapper.recon.unauth.run_unauth_scan") as mock_unauth,
-        patch("admapper.core.discovery.ensure_domain", return_value="corp.local") as mock_ensure,
+        patch("admapper.core.discovery.ensure_domain", return_value="target.example") as mock_ensure,
         patch("admapper.cli.scan.sync_hosts_from_session") as mock_sync,
         patch("admapper.graph.dashboard_server.run_dashboard_server") as mock_run_server,
         patch("admapper.graph.ops_ui.write_ops_html") as mock_write_html,

@@ -47,7 +47,7 @@ def _base_ws(tmp_path: Path) -> Path:
         json.dumps(
             {
                 "credentials": [
-                    {"username": "wallace", "status": "valid", "password": "x"},
+                    {"username": "target", "status": "valid", "password": "x"},
                 ]
             }
         )
@@ -92,7 +92,7 @@ def test_attack_readiness_includes_lockout_before_verify(tmp_path: Path) -> None
         else u
         for u in users
     ]
-    vectors = build_attack_readiness(ws, users=users, policy=policy, owned_users=["wallace"])
+    vectors = build_attack_readiness(ws, users=users, policy=policy, owned_users=["target"])
 
     verify = next(v for v in vectors if v["attack_id"].startswith("creds_verify:"))
     keys = [p["key"] for p in verify["prerequisites"]]

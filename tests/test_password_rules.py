@@ -10,7 +10,7 @@ from admapper.report.engagement_map import loot_clue_rows
 def test_year_suffix_detection() -> None:
     clues = [
         {
-            "user": "svc_sql",
+            "user": "svc_user",
             "string": "Welcome2026",
             "source": "Logs/trace.log",
             "confidence": "medium",
@@ -27,7 +27,7 @@ def test_year_suffix_detection() -> None:
 def test_filename_year_mismatch_inference() -> None:
     clues = [
         {
-            "user": "svc_sql",
+            "user": "svc_user",
             "string": "Welcome2025",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
@@ -48,7 +48,7 @@ def test_filename_year_mismatch_inference() -> None:
 def test_no_raw_password_list_in_output() -> None:
     clues = [
         {
-            "user": "svc_sql",
+            "user": "svc_user",
             "string": "Welcome2026",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
@@ -73,7 +73,7 @@ def test_loot_clue_rows_feed_rules(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "password": "Welcome2026",
                         "source_file": "Logs/IdentitySync_Trace_20260219.log",
                         "confidence": "medium",

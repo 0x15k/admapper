@@ -21,11 +21,11 @@ def test_topology_after_scan(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "corp.local",
+                "domain": "target.example",
                 "hosts": [
                     {
                         "address": "192.168.10.1",
-                        "hostname": "dc01.corp.local",
+                        "hostname": "dc01.target.example",
                         "is_domain_controller": True,
                         "open_ports": [88, 389, 445],
                     }
@@ -33,7 +33,7 @@ def test_topology_after_scan(tmp_path: Path) -> None:
             }
         )
     )
-    topo = build_network_topology(ws, domain="corp.local", owned_users=[])
+    topo = build_network_topology(ws, domain="target.example", owned_users=[])
     assert topo["has_scan"] is True
     assert topo["domain_known"] is True
     assert any(n["id"] == "host:192.168.10.1" for n in topo["nodes"])

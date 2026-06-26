@@ -717,7 +717,7 @@ def build_ops_html(
       interactables: [
         {{ id: 'laptop', tx: 3.5, ty: 6.2, r: 1.65, label: 'Laptop AD OPS', face: 'up' }},
         {{ id: 'bed', tx: 16.2, ty: 10.5, r: 1.5, label: 'Bed', flavor: "Better not sleep — the engagement won't pentest itself." }},
-        {{ id: 'shelf', tx: 12.5, ty: 5.4, r: 1.25, label: 'Bookshelf', flavor: 'CRTP, CRTE, OSCP… The laptop is faster.' }},
+        {{ id: 'shelf', tx: 12.5, ty: 5.4, r: 1.25, label: 'Bookshelf', flavor: 'AD methodology books. The laptop is faster.' }},
         {{ id: 'tv', tx: 16.2, ty: 5.6, r: 1.15, label: 'TV', flavor: 'Just static. The real map is in AD OPS.' }},
       ],
     }};
@@ -1638,7 +1638,7 @@ def build_ops_html(
 
       html += `<div class="cred-form">
         <label>Authenticate (human user + password)</label>
-        <input id="cred-user" placeholder="user (e.g. svc_sql)" autocomplete="off"/>
+        <input id="cred-user" placeholder="user (e.g. svc_user)" autocomplete="off"/>
         <input id="cred-pass" type="password" placeholder="password" autocomplete="off"/>
         <button type="button" class="action-btn" id="cred-submit" style="margin-top:0.5rem">▶ AUTHENTICATE</button>
       </div>
@@ -2125,14 +2125,14 @@ def build_ops_html(
           + `<td>${{r.crto !== '—' ? r.crto : ''}}</td>`
           + `<td>${{(r.mitre || []).join(', ')}}</td></tr>`;
       }});
-      return `<table class="study-map"><thead><tr><th>#</th><th>Phase</th><th>CRTP</th><th>CRTE</th><th>CRTO</th><th>MITRE</th></tr></thead>`
+      return `<table class="study-map"><thead><tr><th>#</th><th>Phase</th><th>Skill 1</th><th>Skill 2</th><th>Skill 3</th><th>MITRE</th></tr></thead>`
         + `<tbody>${{body}}</tbody></table>`;
     }}
 
     function renderReferenceDetails(intel) {{
       const prog = opsProgress();
       let html = '<div class="note-section"><div class="note-block-label">Reference</div>';
-      html += '<details><summary>Study map (CRTP · CRTE · CRTO)</summary>';
+      html += '<details><summary>Study map (Skill 1 · Skill 2 · Skill 3)</summary>';
       html += renderStudyMapReference();
       html += '</details>';
       html += '<details><summary>Attack prerequisites (full matrix)</summary>';

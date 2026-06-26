@@ -91,7 +91,7 @@ def test_collect_workspace_report_aggregates_sources(tmp_path: Path) -> None:
 def test_build_navigator_layer_scores_techniques(tmp_path: Path) -> None:
     ws_path = _seed_workspace(tmp_path)
     collected = collect_workspace_report(ws_path)
-    layer = build_navigator_layer(collected.items, workspace="lab", domain="corp.local")
+    layer = build_navigator_layer(collected.items, workspace="lab", domain="target.example")
 
     technique_ids = {t["techniqueID"] for t in layer["techniques"]}
     assert "T1087.002" in technique_ids
@@ -104,7 +104,7 @@ def test_run_export_writes_all_artifacts(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
 
     result = run_export(session)
 

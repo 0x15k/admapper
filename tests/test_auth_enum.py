@@ -23,26 +23,26 @@ def test_run_auth_enumeration_saves_inventory(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
     store.mark_status(cred.id, CredentialStatus.VALID)
 
     ldap_result = LdapAuthEnumResult(
         users=[UserRecord(username="jsmith", sources=["ldap_auth"])],
-        groups=[GroupRecord(name="Domain Users", dn="CN=Domain Users,DC=corp,DC=local")],
+        groups=[GroupRecord(name="Domain Users", dn="CN=Domain Users,DC=target,DC=example")],
     )
     smb_result = SmbAuthEnumResult(shares=["SYSVOL", "NETLOGON"])
 
     mock_conn = MagicMock()
-    mock_session = LdapSession(host="10.0.0.1", base_dn="DC=corp,DC=local", conn=mock_conn)
+    mock_session = LdapSession(host="10.0.0.1", base_dn="DC=target,DC=example", conn=mock_conn)
 
     lockout_ctx = PolicyFetchResult(
         host="10.0.0.1",
-        base_dn="DC=corp,DC=local",
+        base_dn="DC=target,DC=example",
         policy=DomainLockoutPolicy(lockout_threshold=5, source_host="10.0.0.1"),
         user_states=[LockoutUserState(username="jsmith", bad_pwd_count=1)],
     )
@@ -55,7 +55,7 @@ def test_run_auth_enumeration_saves_inventory(tmp_path: Path) -> None:
         patch("admapper.auth.auth_enum.print_manual_guide"),
         patch("admapper.auth.posture.check_security_posture"),
     ):
-        result = run_auth_enumeration(session, cred, "10.0.0.1", "corp.local")
+        result = run_auth_enumeration(session, cred, "10.0.0.1", "target.example")
 
     assert result.inventory_path is not None
     ws_lab = tmp_path / "ws" / "lab"

@@ -22,7 +22,7 @@ MSSQL_TECHNIQUES: dict[str, MssqlTechnique] = {
         mitre_id="T1021",
         summary="Connect to MSSQL with owned domain credentials.",
         manual_commands=(
-            "mssqlclient.py corp.local/user:pass@<host> -windows-auth",
+            "mssqlclient.py <DOMAIN>/user:pass@<host> -windows-auth",
             "nxc mssql <host> -u user -p pass",
         ),
     ),
@@ -33,7 +33,7 @@ MSSQL_TECHNIQUES: dict[str, MssqlTechnique] = {
         mitre_id="T1021",
         summary="Owned principal has sysadmin on MSSQL instance.",
         manual_commands=(
-            "mssqlclient.py corp.local/user:pass@<host> -windows-auth",
+            "mssqlclient.py <DOMAIN>/user:pass@<host> -windows-auth",
             "SELECT IS_SRVROLEMEMBER('sysadmin');",
         ),
     ),

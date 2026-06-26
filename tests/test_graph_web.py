@@ -12,21 +12,21 @@ def test_attack_graph_html(tmp_path: Path) -> None:
             {
                 "nodes": [
                     {
-                        "id": "user:svc_sql@corp.local",
+                        "id": "user:svc_user@target.example",
                         "type": "user",
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "owned": True,
                     },
                     {
-                        "id": "group:protected users@corp.local",
+                        "id": "group:protected users@target.example",
                         "type": "group",
                         "name": "Protected Users",
                     },
                 ],
                 "edges": [
                     {
-                        "source": "user:svc_sql@corp.local",
-                        "target": "group:protected users@corp.local",
+                        "source": "user:svc_user@target.example",
+                        "target": "group:protected users@target.example",
                         "type": "member_of",
                     }
                 ],
@@ -39,7 +39,7 @@ def test_attack_graph_html(tmp_path: Path) -> None:
             {
                 "users": [
                     {
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "sources": ["ldap_auth", "share_loot"],
                         "in_domain": True,
                         "cred_status": "valid",
@@ -52,12 +52,12 @@ def test_attack_graph_html(tmp_path: Path) -> None:
     html = build_attack_graph_html(
         ws,
         workspace="ws",
-        domain="corp.local",
-        owned_users=["svc_sql"],
-        pivot_user="svc_sql",
+        domain="target.example",
+        owned_users=["svc_user"],
+        pivot_user="svc_user",
     )
     assert "vis-network" in html
-    assert "svc_sql" in html
+    assert "svc_user" in html
     assert "ldap_auth" in html
     assert "You are here" in html
     assert "Next step" in html or "Hash obtained" in html
@@ -72,7 +72,7 @@ def test_attack_graph_html_shows_hash_and_krb5_blocker(tmp_path: Path) -> None:
             {
                 "new_hashes": [
                     {
-                        "account": "msa_health$",
+                        "account": "msa_target$",
                         "nthash": "0123456789abcdef0123456789abcdef",
                     }
                 ],
@@ -90,21 +90,21 @@ def test_attack_graph_html_shows_hash_and_krb5_blocker(tmp_path: Path) -> None:
     html = build_attack_graph_html(
         ws,
         workspace="ws",
-        domain="corp.local",
-        owned_users=["msa_health$"],
-        pivot_user="msa_health$",
+        domain="target.example",
+        owned_users=["msa_target$"],
+        pivot_user="msa_target$",
     )
     assert "Hash obtained" in html
     assert "0123456789abcdef0123456789abcdef" in html
-    assert "dc01.corp.local" in html
+    assert "dc01.target.example" in html
     assert "Blocker" in html
     assert "WinRM" in html
 
     path = write_attack_graph_html(
         ws,
         workspace="ws",
-        domain="corp.local",
-        owned_users=["svc_sql"],
-        pivot_user="svc_sql",
+        domain="target.example",
+        owned_users=["svc_user"],
+        pivot_user="svc_user",
     )
     assert path.name == "attack_graph.html"

@@ -17,7 +17,7 @@ def test_build_engagement_html_includes_findings(tmp_path: Path) -> None:
                         "severity": "high",
                         "principal": "user1",
                         "right": "GenericAll",
-                        "target_name": "svc_sql",
+                        "target_name": "svc_user",
                         "summary": "ACL abuse",
                     }
                 ]
@@ -33,13 +33,13 @@ def test_build_engagement_html_includes_findings(tmp_path: Path) -> None:
     html = build_engagement_html(
         ws,
         workspace="lab",
-        domain="corp.local",
+        domain="target.example",
         owned_users=["user1"],
         pivot_user="user1",
     )
 
     assert "<!DOCTYPE html>" in html
-    assert "corp.local" in html
+    assert "target.example" in html
     assert "GenericAll" in html
     assert "RECOMENDADO" in html or "Recommended actions" in html
 

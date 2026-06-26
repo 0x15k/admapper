@@ -17,7 +17,7 @@ def test_detect_template_enrollment_for_owned_group() -> None:
     principals = [
         PrincipalContext(
             username="jaylee.doe",
-            user_dn="CN=jaylee,DC=corp,DC=local",
+            user_dn="CN=jaylee,DC=target,DC=example",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
             sid_to_name={it_sid: "IT", "S-1-5-21-1-2-3-2100": "jaylee.doe"},
@@ -27,7 +27,7 @@ def test_detect_template_enrollment_for_owned_group() -> None:
         templates=templates,
         enrollment_services=[EnrollmentServiceRecord(name="corp-CA")],
         principals=principals,
-        domain="corp.local",
+        domain="target.example",
         dc_ip="10.0.0.1",
     )
     escs = {f.esc for f in findings}
@@ -46,7 +46,7 @@ def test_detect_esc4_template_write() -> None:
     principals = [
         PrincipalContext(
             username="operator",
-            user_dn="CN=op,DC=corp,DC=local",
+            user_dn="CN=op,DC=target,DC=example",
             user_sid=user_sid,
             sid_to_name={user_sid: "operator"},
         )

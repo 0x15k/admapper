@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Progressive network topology (TryHackMe Networks / Grey Hack style).
+"""Progressive network topology.
 
 Nodes and edges appear only from discovered workspace facts — blackbox safe.
 """
@@ -92,7 +92,7 @@ def build_network_topology(
     reveal_scan: bool = True,
     reveal_enum: bool = True,
 ) -> dict[str, Any]:
-    """Build THM-style infra map from scan → enum → owned discoveries."""
+    """Build infra map from scan → enum → owned discoveries."""
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
     n_seen: set[str] = set()

@@ -12,7 +12,7 @@ def test_user_match_loot_with_ldap(tmp_path: Path) -> None:
             {
                 "users": [
                     {
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "sources": ["ldap_auth"],
                         "enabled": True,
                     }
@@ -26,8 +26,8 @@ def test_user_match_loot_with_ldap(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "password": "KnownPassword123!",
                         "source_file": "Logs/trace.log",
                     }
                 ]
@@ -40,7 +40,7 @@ def test_user_match_loot_with_ldap(tmp_path: Path) -> None:
             {
                 "credentials": [
                     {
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "status": "valid",
                         "secret": "x",
                     }
@@ -56,4 +56,4 @@ def test_user_match_loot_with_ldap(tmp_path: Path) -> None:
     assert "share_loot" in user["sources"]
     assert user["in_domain"] is True
     assert user["cred_status"] == "valid"
-    assert user["loot_password"] == "WelcomePassword123!"
+    assert user["loot_password"] == "KnownPassword123!"

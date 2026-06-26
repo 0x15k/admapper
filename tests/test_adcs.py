@@ -40,7 +40,7 @@ def test_detect_esc1_and_esc8() -> None:
     services = [
         EnrollmentServiceRecord(
             name="corp-DC01-CA",
-            dns_host="dc01.corp.local",
+            dns_host="dc01.target.example",
             web_enrollment=True,
             templates=["VulnUser", "AnyPurpose"],
         )
@@ -83,17 +83,17 @@ def test_run_adcs_analysis_writes_artifacts(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[389], is_domain_controller=True)]
     )
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
     store.mark_status(cred.id, CredentialStatus.VALID)
 
     enum_result = AdcsEnumResult(
         enrollment_services=[
-            EnrollmentServiceRecord(name="corp-CA", dns_host="dc01.corp.local", web_enrollment=True)
+            EnrollmentServiceRecord(name="corp-CA", dns_host="dc01.target.example", web_enrollment=True)
         ],
         templates=[
             CertificateTemplateRecord(
@@ -129,21 +129,21 @@ def test_golden_cert_with_ca_admin_rights(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[389], is_domain_controller=True)]
     )
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
     store.mark_status(cred.id, CredentialStatus.VALID)
 
     # Enrollment service with manage_ca rights for jsmith
     services = [
         EnrollmentServiceRecord(
             name="corp-CA",
-            dns_host="dc01.corp.local",
+            dns_host="dc01.target.example",
             security_aces=[
                 {
                     "trustee_sid": "S-1-5-21-1111-2222-3333-1001",

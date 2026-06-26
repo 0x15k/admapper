@@ -9,7 +9,7 @@ from admapper.recon.dns import dn_to_domain
 
 
 def test_dn_to_domain() -> None:
-    assert dn_to_domain("DC=corp,DC=local") == "corp.local"
+    assert dn_to_domain("DC=target,DC=example") == "target.example"
 
 
 def test_default_workspace_name_from_ip() -> None:
@@ -29,7 +29,7 @@ def test_resolve_domain_from_findings(tmp_path: Path) -> None:
                 "findings": [
                     {
                         "key": "ldap_anonymous_10.0.0.1",
-                        "detail": "DC=corp,DC=local",
+                        "detail": "DC=target,DC=example",
                     }
                 ]
             }
@@ -37,7 +37,7 @@ def test_resolve_domain_from_findings(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert resolve_domain(session) == "corp.local"
+    assert resolve_domain(session) == "target.example"
 
 
 def test_ensure_domain_persists_on_session(tmp_path: Path) -> None:
@@ -48,10 +48,10 @@ def test_ensure_domain_persists_on_session(tmp_path: Path) -> None:
     ws_path = tmp_path / "ws" / "lab"
     ws_path.mkdir(parents=True, exist_ok=True)
     (ws_path / "unauth_scan.json").write_text(
-        json.dumps({"domain": "corp.local"}),
+        json.dumps({"domain": "target.example"}),
         encoding="utf-8",
     )
 
     domain = ensure_domain(session, announce=False)
-    assert domain == "corp.local"
-    assert session.workspace.domain == "corp.local"
+    assert domain == "target.example"
+    assert session.workspace.domain == "target.example"

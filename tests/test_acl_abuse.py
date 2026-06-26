@@ -109,7 +109,7 @@ def test_run_acl_analysis_writes_findings(tmp_path: Path, trustee_sid: str) -> N
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
 
@@ -121,7 +121,7 @@ def test_run_acl_analysis_writes_findings(tmp_path: Path, trustee_sid: str) -> N
         [HostRecord(address="10.0.0.1", open_ports=[389], is_domain_controller=True)]
     )
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
     store.mark_status(cred.id, CredentialStatus.VALID)
 
     import json
@@ -130,13 +130,13 @@ def test_run_acl_analysis_writes_findings(tmp_path: Path, trustee_sid: str) -> N
         "users": [
             {
                 "username": "admin",
-                "dn": "CN=Administrator,CN=Users,DC=corp,DC=local",
+                "dn": "CN=Administrator,CN=Users,DC=target,DC=example",
             }
         ],
         "groups": [
             {
                 "name": "Domain Admins",
-                "dn": "CN=Domain Admins,CN=Users,DC=corp,DC=local",
+                "dn": "CN=Domain Admins,CN=Users,DC=target,DC=example",
             }
         ],
         "computers": [],
@@ -148,13 +148,13 @@ def test_run_acl_analysis_writes_findings(tmp_path: Path, trustee_sid: str) -> N
 
     principal = PrincipalContext(
         username="jsmith",
-        user_dn="CN=John Smith,CN=Users,DC=corp,DC=local",
+        user_dn="CN=John Smith,CN=Users,DC=target,DC=example",
         user_sid=trustee_sid,
         sid_to_name={trustee_sid: "jsmith"},
     )
     targets = [
         AclTarget(
-            dn="CN=Domain Admins,CN=Users,DC=corp,DC=local",
+            dn="CN=Domain Admins,CN=Users,DC=target,DC=example",
             name="Domain Admins",
             object_type="group",
             object_classes=["top", "group"],

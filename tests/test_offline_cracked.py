@@ -15,10 +15,10 @@ def test_sync_offline_cracked_hashes(tmp_path: Path) -> None:
         "credentials": [
             {
                 "id": "c1",
-                "username": "svc_sql",
+                "username": "svc_user",
                 "secret": "original_hash",
                 "type": "ntlm",
-                "domain": "corp.local",
+                "domain": "target.example",
                 "status": "unverified",
                 "source": "spray"
             }
@@ -30,13 +30,13 @@ def test_sync_offline_cracked_hashes(tmp_path: Path) -> None:
     loot_dir.mkdir()
     
     cracked_file = loot_dir / "cracked.txt"
-    cracked_file.write_text("svc_sql:Password123!\n")
+    cracked_file.write_text("svc_user:CrackedPassword123!\n")
     
     # 3. Setup context
     ctx = DashboardContext(
         ws_path=ws_path,
         workspace="workspace",
-        domain="corp.local",
+        domain="target.example",
         owned_users=[],
         pivot_user=None,
         host="192.168.10.130"
@@ -49,12 +49,12 @@ def test_sync_offline_cracked_hashes(tmp_path: Path) -> None:
     data = json.loads(creds_path.read_text(encoding="utf-8"))
     creds = data["credentials"]
     assert len(creds) == 1
-    assert creds[0]["username"] == "svc_sql"
-    assert creds[0]["secret"] == "Password123!"
+    assert creds[0]["username"] == "svc_user"
+    assert creds[0]["secret"] == "CrackedPassword123!"
     assert creds[0]["status"] == "valid"
     assert creds[0]["type"] == "password"
     
     # 5. Verify progress got updated
-    assert "svc_sql" in ctx.progress.owned_users
-    assert "svc_sql" in ctx.progress.verified_users
-    assert ctx.progress.owned_methods.get("svc_sql") == "password"
+    assert "svc_user" in ctx.progress.owned_users
+    assert "svc_user" in ctx.progress.verified_users
+    assert ctx.progress.owned_methods.get("svc_user") == "password"

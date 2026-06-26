@@ -23,21 +23,21 @@ def _session(tmp_path: Path, *, owned: list[str] | None = None) -> Session:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     if owned:
         session.workspace.owned_users = list(owned)
     session.persist_workspace()
     return session
 
 
-def test_sync_owned_marks_msa_health_from_exploit_log(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.doe"])
+def test_sync_owned_marks_msa_target_from_exploit_log(tmp_path: Path) -> None:
+    session = _session(tmp_path, owned=["target.user"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
             {
                 "new_hashes": [
-                    {"account": "msa_health$", "nthash": "a" * 32},
+                    {"account": "msa_target$", "nthash": "a" * 32},
                 ],
                 "new_users": ["jaylee.doe"],
             }
@@ -47,20 +47,20 @@ def test_sync_owned_marks_msa_health_from_exploit_log(tmp_path: Path) -> None:
 
     marked = sync_owned_from_intel(session)
 
-    assert "msa_health$" in marked
+    assert "msa_target$" in marked
     assert "jaylee.doe" in marked
-    assert "msa_health$" in session.workspace.owned_users
+    assert "msa_target$" in session.workspace.owned_users
     assert "jaylee.doe" in session.workspace.owned_users
 
 
 def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.doe", "msa_health$"])
+    session = _session(tmp_path, owned=["target.user", "msa_target$"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
             {
                 "new_hashes": [
-                    {"account": "msa_health$", "nthash": "b" * 32},
+                    {"account": "msa_target$", "nthash": "b" * 32},
                 ],
             }
         ),
@@ -69,21 +69,21 @@ def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
 
     pivot = auto_set_pivot(session)
 
-    assert pivot == "msa_health$"
-    assert session.workspace.pivot_user == "msa_health$"
+    assert pivot == "msa_target$"
+    assert session.workspace.pivot_user == "msa_target$"
 
 
 def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
     session = _session(
         tmp_path,
-        owned=["wallace.doe", "svc_sql", "msa_health$", "jaylee.doe"],
+        owned=["target.user", "svc_user", "msa_target$", "jaylee.doe"],
     )
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
             {
                 "new_hashes": [
-                    {"account": "msa_health$", "nthash": "b" * 32},
+                    {"account": "msa_target$", "nthash": "b" * 32},
                 ],
             }
         ),
@@ -97,7 +97,7 @@ def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
 
 
 def test_prepare_finalize_minimal_workspace(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.doe"])
+    session = _session(tmp_path, owned=["target.user"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "auth_inventory.json").write_text(
         json.dumps({"users": [], "computers": []}),
@@ -118,13 +118,13 @@ def test_prepare_finalize_minimal_workspace(tmp_path: Path) -> None:
 
 
 def test_run_auto_postex_scan_calls_analysis_once(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["msa_health$"])
+    session = _session(tmp_path, owned=["msa_target$"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
             {
                 "new_hashes": [
-                    {"account": "msa_health$", "nthash": "7fdad697aa96c287e6d33381c3755b17"},
+                    {"account": "msa_target$", "nthash": "7fdad697aa96c287e6d33381c3755b17"},
                 ],
             }
         ),
@@ -148,7 +148,7 @@ def test_run_auto_postex_scan_calls_analysis_once(tmp_path: Path) -> None:
 
 
 def test_finalize_auto_skips_postex_rescan(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.doe"])
+    session = _session(tmp_path, owned=["target.user"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "auth_inventory.json").write_text(
         json.dumps({"users": [], "computers": []}),
@@ -175,8 +175,8 @@ def test_resolve_pivot_upgrades_stale_machine_pivot(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.workspace.owned_users = ["msa_health$", "jaylee.doe"]
-    session.workspace.pivot_user = "msa_health$"
+    session.workspace.owned_users = ["msa_target$", "jaylee.doe"]
+    session.workspace.pivot_user = "msa_target$"
     session.persist_workspace()
 
     assert resolve_pivot_user(session) == "jaylee.doe"
@@ -188,7 +188,7 @@ def test_pick_wired_next_skips_acl_prefers_postex() -> None:
             {
                 "module": "acls",
                 "technique": "genericwrite",
-                "target": "msa_health",
+                "target": "msa_target",
                 "ready": True,
                 "target_owned": False,
             },
@@ -210,12 +210,12 @@ def test_pick_wired_next_skips_acl_prefers_postex() -> None:
 def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> None:
     from admapper.core.connectivity import TargetUnreachableError
 
-    session = _session(tmp_path, owned=["msa_health$"])
+    session = _session(tmp_path, owned=["msa_target$"])
     ws_path = tmp_path / "ws" / "lab"
     session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
     (ws_path / "exploit_log.json").write_text(
-        json.dumps({"new_hashes": [{"account": "msa_health$", "nthash": "a" * 32}]}),
+        json.dumps({"new_hashes": [{"account": "msa_target$", "nthash": "a" * 32}]}),
         encoding="utf-8",
     )
 
@@ -275,7 +275,7 @@ def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> 
 def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
     from admapper.core.connectivity import TargetUnreachableError
 
-    session = _session(tmp_path, owned=["wallace.doe"])
+    session = _session(tmp_path, owned=["target.user"])
     ws_path = tmp_path / "ws" / "lab"
     session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
@@ -304,7 +304,7 @@ def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
 def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
     from admapper.core.connectivity import TargetUnreachableError
 
-    session = _session(tmp_path, owned=["msa_health$"])
+    session = _session(tmp_path, owned=["msa_target$"])
     session.workspace.mode = OperationMode.AUTO
     session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
@@ -313,7 +313,7 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
         json.dumps(
             {
                 "dc_ip": "192.168.10.182",
-                "shell_user": "msa_health$",
+                "shell_user": "msa_target$",
                 "findings": [
                     {
                         "drop_path": r"C:\ProgramData\UpdateMonitor",

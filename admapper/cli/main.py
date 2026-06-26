@@ -270,7 +270,7 @@ def escalate_show(
 
 @escalate_app.command("mark")
 def escalate_mark(
-    user: Annotated[str, typer.Argument(help="User or machine account (e.g. msa_health$)")],
+    user: Annotated[str, typer.Argument(help="User or machine account (e.g. msa_target$)")],
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
@@ -1157,8 +1157,8 @@ def brief(
 
 @app.command()
 def winrm(
-    host: Annotated[str, typer.Option("--host", "-H", help="DC IP or FQDN (e.g. dc01.corp.local)")],
-    domain: Annotated[str, typer.Option("--domain", "-d", help="AD domain (e.g. corp.local)")],
+    host: Annotated[str, typer.Option("--host", "-H", help="DC IP or FQDN (e.g. dc01.<DOMAIN>)")],
+    domain: Annotated[str, typer.Option("--domain", "-d", help="AD domain (e.g. <DOMAIN>)")],
     user: Annotated[str, typer.Option("--user", "-u", help="Username")],
     password: Annotated[
         str | None,

@@ -23,7 +23,7 @@ def test_build_password_candidates_file(tmp_path: Path) -> None:
         """{
   "parsed_credentials": [
     {
-      "username": "svc_sql",
+      "username": "svc_user",
       "password": "Password2026",
       "confidence": "medium",
       "source_file": "Logs/trace.log"
@@ -36,7 +36,7 @@ def test_build_password_candidates_file(tmp_path: Path) -> None:
         """{
   "credentials": [
     {
-      "username": "svc_sql",
+      "username": "svc_user",
       "secret": "Password2026",
       "status": "valid"
     }

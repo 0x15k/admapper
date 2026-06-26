@@ -10,7 +10,7 @@ def _session(tmp_path) -> Session:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.set_hosts("192.168.10.182")
     return session
 
@@ -24,8 +24,8 @@ def test_check_winrm_password_access_denied(tmp_path) -> None:
     ):
         check = check_winrm_password_access(
             session,
-            username="wallace.doe",
-            password="WelcomePassword123!",
+            username="target.user",
+            password="KnownPassword123!",
             host="192.168.10.182",
         )
     assert check is not None
@@ -34,7 +34,7 @@ def test_check_winrm_password_access_denied(tmp_path) -> None:
 
 def test_check_winrm_password_access_confirmed(tmp_path) -> None:
     session = _session(tmp_path)
-    proc = MagicMock(returncode=0, stdout="(Pwn3d!) corp.local\\admin", stderr="")
+    proc = MagicMock(returncode=0, stdout="(Pwn3d!) target.example\\admin", stderr="")
     with (
         patch("admapper.exploit.lateral.resolve_nxc", return_value="/usr/bin/nxc"),
         patch("admapper.exploit.lateral.run_command", return_value=proc),

@@ -34,14 +34,14 @@ def test_detect_cve_findings_covers_phase16() -> None:
 
     targets = [
         CveTarget(
-            host="dc01.corp.local",
+            host="dc01.target.example",
             computer_name="DC01",
             operating_system="Windows Server 2019 Standard",
             is_domain_controller=True,
             open_ports=[445],
         ),
         CveTarget(
-            host="ws2008.corp.local",
+            host="ws2008.target.example",
             computer_name="WS2008",
             operating_system="Windows Server 2008 R2 Standard",
             is_domain_controller=False,
@@ -61,13 +61,13 @@ def test_discover_cve_targets_from_inventory_and_hosts(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
 
     HostsStore(manager, "lab").merge(
         [
             HostRecord(
                 address="10.0.0.1",
-                hostname="dc01.corp.local",
+                hostname="dc01.target.example",
                 open_ports=[445],
                 is_domain_controller=True,
             )
@@ -77,7 +77,7 @@ def test_discover_cve_targets_from_inventory_and_hosts(tmp_path: Path) -> None:
         "computers": [
             {
                 "name": "WS01",
-                "dns_host": "ws01.corp.local",
+                "dns_host": "ws01.target.example",
                 "operating_system": "Windows 10 Pro",
             }
         ]
@@ -85,15 +85,15 @@ def test_discover_cve_targets_from_inventory_and_hosts(tmp_path: Path) -> None:
 
     targets = discover_cve_targets(session, inventory)
     hosts = {t.host for t in targets}
-    assert "ws01.corp.local" in hosts
-    assert "10.0.0.1" in hosts or "dc01.corp.local" in hosts
+    assert "ws01.target.example" in hosts
+    assert "10.0.0.1" in hosts or "dc01.target.example" in hosts
 
 
 def test_run_cve_analysis_writes_artifacts(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
 
@@ -101,7 +101,7 @@ def test_run_cve_analysis_writes_artifacts(tmp_path: Path) -> None:
         [
             HostRecord(
                 address="10.0.0.1",
-                hostname="dc01.corp.local",
+                hostname="dc01.target.example",
                 open_ports=[445],
                 is_domain_controller=True,
             )
@@ -111,7 +111,7 @@ def test_run_cve_analysis_writes_artifacts(tmp_path: Path) -> None:
         "computers": [
             {
                 "name": "DC01",
-                "dns_host": "dc01.corp.local",
+                "dns_host": "dc01.target.example",
                 "operating_system": "Windows Server 2019 Standard",
             }
         ]
@@ -120,10 +120,10 @@ def test_run_cve_analysis_writes_artifacts(tmp_path: Path) -> None:
         json.dumps(inventory),
         encoding="utf-8",
     )
-    cred = session.credentials.add("jsmith", "Secret123!", domain="corp.local")
+    cred = session.credentials.add("jsmith", "Secret123!", domain="target.example")
     session.credentials.mark_status(cred.id, CredentialStatus.VALID)
 
-    domain_ctx = DomainCveContext(machine_account_quota=10, domain_controllers=["dc01.corp.local"])
+    domain_ctx = DomainCveContext(machine_account_quota=10, domain_controllers=["dc01.target.example"])
 
     with (
         patch("admapper.cves.analyze.enumerate_domain_cve_context", return_value=domain_ctx),
@@ -140,7 +140,7 @@ def test_run_zerologon_exploit_requires_confirm(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
 
     with (
         patch("admapper.cves.exploit.confirm", return_value=False),
@@ -148,7 +148,7 @@ def test_run_zerologon_exploit_requires_confirm(tmp_path: Path) -> None:
     ):
         from admapper.cves.exploit import run_zerologon_exploit
 
-        ok = run_zerologon_exploit(session, "dc01.corp.local")
+        ok = run_zerologon_exploit(session, "dc01.target.example")
 
     assert ok is False
     mock_probe.assert_not_called()

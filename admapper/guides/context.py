@@ -97,13 +97,13 @@ def contextualize_text(text: str, ctx: GuideContext) -> str:
 
     out = text
     replacements: list[tuple[str, str]] = [
-        ("corp.local/user:pass@", f"{domain}/{user}:{password}@"),
-        ("corp.local/user:pass", f"{domain}/{user}:{password}"),
-        ("corp.local/", f"{domain}/"),
-        ("user@corp.local", f"{user}@{domain}"),
+        ("<DOMAIN>/user:pass@", f"{domain}/{user}:{password}@"),
+        ("<DOMAIN>/user:pass", f"{domain}/{user}:{password}"),
+        ("<DOMAIN>/", f"{domain}/"),
+        ("user@<DOMAIN>", f"{user}@{domain}"),
         ("user@domain", f"{user}@{domain}"),
-        ("DC=corp,DC=local", base_dn),
-        ("corp.local", domain),
+        ("<BASE_DN>", base_dn),
+        ("<DOMAIN>", domain),
         ("<BASE_DN>", base_dn),
         ("<DC_IP>", dc_ip),
         ("<DC>", dc_host),

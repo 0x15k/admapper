@@ -14,7 +14,7 @@ def test_build_coerce_opportunities_with_dc_and_esc8(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88], is_domain_controller=True)]
     )
@@ -35,7 +35,7 @@ def test_build_coerce_opportunities_with_dc_and_esc8(tmp_path: Path) -> None:
     adcs_data = {
         "findings": [{"esc": "esc8", "ca_name": "corp-CA"}],
         "enrollment_services": [
-            {"name": "corp-CA", "dns_host": "ca01.corp.local", "web_enrollment": True}
+            {"name": "corp-CA", "dns_host": "ca01.target.example", "web_enrollment": True}
         ],
     }
 
@@ -60,7 +60,7 @@ def test_run_coerce_analysis_writes_playbook(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88], is_domain_controller=True)]
     )

@@ -19,12 +19,12 @@ def test_run_start_auth_marks_owned_and_graph(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
     store.mark_status(cred.id, CredentialStatus.VALID)
 
     with (
@@ -33,8 +33,8 @@ def test_run_start_auth_marks_owned_and_graph(tmp_path: Path) -> None:
             "admapper.auth.start_auth.fetch_authenticated_user_context",
             return_value=AuthenticatedUserContext(
                 username="jsmith",
-                domain="corp.local",
-                member_of=["CN=Staff,DC=corp,DC=local"],
+                domain="target.example",
+                member_of=["CN=Staff,DC=target,DC=example"],
             ),
         ),
         patch(
@@ -61,11 +61,11 @@ def test_run_start_auth_verifies_unverified_cred(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
-    cred = session.credentials.add("jsmith", "Secret123!", domain="corp.local")
+    cred = session.credentials.add("jsmith", "Secret123!", domain="target.example")
     valid_cred = session.credentials.mark_status(cred.id, CredentialStatus.VALID)
     assert valid_cred is not None
 
@@ -81,7 +81,7 @@ def test_run_start_auth_verifies_unverified_cred(tmp_path: Path) -> None:
         ),
         patch(
             "admapper.auth.start_auth.fetch_authenticated_user_context",
-            return_value=AuthenticatedUserContext(username="jsmith", domain="corp.local"),
+            return_value=AuthenticatedUserContext(username="jsmith", domain="target.example"),
         ),
         patch(
             "admapper.auth.start_auth.run_auth_enumeration",

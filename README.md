@@ -1,6 +1,6 @@
 # ADMapper
 
-**All-in-one Active Directory pentesting toolkit.** Enumerate, attack, and own AD environments from a single CLI. Built for OSCP, HTB, and real engagements.
+**All-in-one Active Directory pentesting toolkit.** Enumerate, attack, and own AD environments from a single CLI. Built for CTFs, cert labs, and real engagements.
 
 > Python 3.11+ | macOS, Linux, Windows | No GUI required
 
@@ -17,7 +17,7 @@
 - **OPSEC profiles** — `stealth / normal / lab` — controls delays, confirmations, and feature gates
 - **Automated pipeline** — `admapper run` chains recon + attack + escalation in one command
 - **Guided exploitation** — each finding includes step-by-step exploitation guides (BloodHound-style)
-- **OSCP-ready** — works offline, exports to JSON/Navigator/HTML
+- **Cert-ready** — works offline, exports to JSON/Navigator/HTML
 - **Interactive Web Dashboard** — vis.js topology graph, auto-pivoting on node/identity selection, compromise tracking (🔑 password, #️⃣ NTLM hash, 💨 spray, 🎫 roast, etc.)
 
 ## Quick Start
@@ -38,9 +38,9 @@ After install, `admapper` is available globally (via pipx):
 
 ```bash
 # Full automated engagement — just IP + creds
-admapper run -H 10.10.10.100 -u john -p 'Password1!'
+admapper run -H <DC_IP> -u <user> -p '<pass>'
 # Or via the short alias 'r':
-admapper r -H 10.10.10.100 -u john -p 'Password1!'
+admapper r -H <DC_IP> -u <user> -p '<pass>'
 
 # Check installation health
 admapper doctor
@@ -57,7 +57,7 @@ admapper run -H <DC_IP> -u <user> -p '<pass>'
 admapper r -H <DC_IP> -u <user> -p '<pass>'
 
 # Specify domain explicitly (optional — auto-detected)
-admapper r -H 10.10.10.100 -u admin -p 'P@ss' -d corp.local
+admapper r -H <DC_IP> -u <user> -p '<pass>' -d <DOMAIN>
 ```
 
 ### Playbook & Escalation Analysis
@@ -78,9 +78,9 @@ ADMapper supports built-in playbook and escalation sub-typers with clean command
 - **Scriptability (`--json` output)**:
   For automated scripting and tools integration, pass the `--json` option to the main or show commands under postex/escalate. This silences terminal logging and returns clean structured JSON to stdout:
   ```bash
-  admapper px -w target-10-129-245-130 --json
+  admapper px -w <workspace> --json
   admapper px show postex-001 --json
-  admapper esc -w target-10-129-245-130 --json
+  admapper esc -w <workspace> --json
   admapper esc show --json
   ```
 
@@ -89,24 +89,24 @@ ADMapper supports built-in playbook and escalation sub-typers with clean command
 ```
 admapper
 (admapper)> set workspace lab
-(admapper:lab)> set domain corp.local
-(admapper:lab:corp.local)> set hosts 10.10.10.100
+(admapper:lab)> set domain <DOMAIN>
+(admapper:lab:<DOMAIN>)> set hosts <IP_RANGE>
 
-(admapper:lab:corp.local)> creds add john Password1!
-(admapper:lab:corp.local)> start_unauth         # DNS, null LDAP, AS-REP
-(admapper:lab:corp.local)> enum users            # LDAP user enumeration + roastable detection
-(admapper:lab:corp.local)> kerberoast            # Kerberoasting
-(admapper:lab:corp.local)> asreproast            # AS-REP roast
-(admapper:lab:corp.local)> spray 'Winter2026!'   # password spray
+(admapper:lab:<DOMAIN>)> creds add <user> <pass>
+(admapper:lab:<DOMAIN>)> start_unauth         # DNS, null LDAP, AS-REP
+(admapper:lab:<DOMAIN>)> enum users            # LDAP user enumeration + roastable detection
+(admapper:lab:<DOMAIN>)> kerberoast            # Kerberoasting
+(admapper:lab:<DOMAIN>)> asreproast            # AS-REP roast
+(admapper:lab:<DOMAIN>)> spray '<PASSWORD>'   # password spray
 
-(admapper:lab:corp.local)> start_auth            # authenticated enumeration + security posture
-(admapper:lab:corp.local)> enum auth             # full LDAP dump
-(admapper:lab:corp.local)> acls                  # dangerous ACLs
-(admapper:lab:corp.local)> paths                 # attack paths to DA
-(admapper:lab:corp.local)> adcs                  # AD CS vulnerabilities
-(admapper:lab:corp.local)> coerce                # NTLM coercion playbook
-(admapper:lab:corp.local)> postex                # post-exploitation
-(admapper:lab:corp.local)> export                # export all findings
+(admapper:lab:<DOMAIN>)> start_auth            # authenticated enumeration + security posture
+(admapper:lab:<DOMAIN>)> enum auth             # full LDAP dump
+(admapper:lab:<DOMAIN>)> acls                  # dangerous ACLs
+(admapper:lab:<DOMAIN>)> paths                 # attack paths to DA
+(admapper:lab:<DOMAIN>)> adcs                  # AD CS vulnerabilities
+(admapper:lab:<DOMAIN>)> coerce                # NTLM coercion playbook
+(admapper:lab:<DOMAIN>)> postex                # post-exploitation
+(admapper:lab:<DOMAIN>)> export                # export all findings
 ```
 
 ### OPSEC Profiles
@@ -116,7 +116,7 @@ Control the noise level of every operation:
 ```bash
 admapper opsec set stealth   # delays 3-10s, no spray, no coerce, confirms required
 admapper opsec set normal    # balanced defaults
-admapper opsec set lab       # no delays, no confirmations (HTB/lab use)
+admapper opsec set lab       # no delays, no confirmations (lab/CTF use)
 admapper opsec               # show current profile
 ```
 

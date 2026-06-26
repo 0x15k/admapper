@@ -106,7 +106,7 @@ def test_detect_roastable_targets_kerberoast(tmp_path: Path) -> None:
     inv = {
         "users": [
             {
-                "username": "svc_sql",
+                "username": "svc_user",
                 "kerberoastable": True,
                 "spns": ["MSSQLSvc/db01:1433"],
                 "enabled": True,
@@ -120,7 +120,7 @@ def test_detect_roastable_targets_kerberoast(tmp_path: Path) -> None:
         report = detect_roastable_targets(session)
 
     assert len(report.kerberoast_targets) == 1
-    assert report.kerberoast_targets[0].username == "svc_sql"
+    assert report.kerberoast_targets[0].username == "svc_user"
 
 
 def test_detect_roastable_targets_passwd_notreqd(tmp_path: Path) -> None:

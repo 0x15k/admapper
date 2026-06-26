@@ -14,18 +14,18 @@ def test_find_attack_paths_owned_to_domain_admins() -> None:
     graph = {
         "nodes": [
             {
-                "id": "user:jsmith@corp.local",
+                "id": "user:jsmith@target.example",
                 "type": "user",
                 "username": "jsmith",
                 "owned": True,
             },
             {
-                "id": "group:it admins@corp.local",
+                "id": "group:it admins@target.example",
                 "type": "group",
                 "name": "IT Admins",
             },
             {
-                "id": "group:domain admins@corp.local",
+                "id": "group:domain admins@target.example",
                 "type": "group",
                 "name": "Domain Admins",
                 "high_value": True,
@@ -34,21 +34,21 @@ def test_find_attack_paths_owned_to_domain_admins() -> None:
         "edges": [
             {
                 "id": "u->g1",
-                "source": "user:jsmith@corp.local",
-                "target": "group:it admins@corp.local",
+                "source": "user:jsmith@target.example",
+                "target": "group:it admins@target.example",
                 "type": "member_of",
             },
             {
                 "id": "g1->g2",
-                "source": "group:it admins@corp.local",
-                "target": "group:domain admins@corp.local",
+                "source": "group:it admins@target.example",
+                "target": "group:domain admins@target.example",
                 "type": "member_of",
             },
         ],
     }
     paths = find_attack_paths(graph)
     assert paths
-    assert paths[0].target == "group:domain admins@corp.local"
+    assert paths[0].target == "group:domain admins@target.example"
     assert paths[0].length == 2
 
 
@@ -58,14 +58,14 @@ def test_enrich_graph_adds_member_edges() -> None:
         "users": [
             {
                 "username": "jsmith",
-                "dn": "CN=John Smith,OU=Users,DC=corp,DC=local",
+                "dn": "CN=John Smith,OU=Users,DC=target,DC=example",
             }
         ],
         "groups": [
             {
                 "name": "Domain Admins",
-                "dn": "CN=Domain Admins,CN=Users,DC=corp,DC=local",
-                "members": ["CN=John Smith,OU=Users,DC=corp,DC=local"],
+                "dn": "CN=Domain Admins,CN=Users,DC=target,DC=example",
+                "members": ["CN=John Smith,OU=Users,DC=target,DC=example"],
             }
         ],
         "delegations": [],
@@ -73,7 +73,7 @@ def test_enrich_graph_adds_member_edges() -> None:
     enriched = enrich_graph_from_inventory(
         graph,
         inventory,
-        domain="corp.local",
+        domain="target.example",
         owned_users=["jsmith"],
     )
     edges = enriched["edges"]
@@ -86,25 +86,25 @@ def test_run_graph_analysis_writes_paths_json(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
 
     store = GraphStore(manager, "lab")
-    store.mark_user_owned("corp.local", "jsmith")
+    store.mark_user_owned("target.example", "jsmith")
 
     inv = {
         "users": [
             {
                 "username": "jsmith",
-                "dn": "CN=John Smith,OU=Users,DC=corp,DC=local",
+                "dn": "CN=John Smith,OU=Users,DC=target,DC=example",
             }
         ],
         "groups": [
             {
                 "name": "Domain Admins",
-                "dn": "CN=Domain Admins,CN=Users,DC=corp,DC=local",
-                "members": ["CN=John Smith,OU=Users,DC=corp,DC=local"],
+                "dn": "CN=Domain Admins,CN=Users,DC=target,DC=example",
+                "members": ["CN=John Smith,OU=Users,DC=target,DC=example"],
             }
         ],
         "delegations": [],

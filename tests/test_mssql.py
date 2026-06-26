@@ -20,7 +20,7 @@ def test_discover_mssql_instances_from_hosts_and_spns(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
 
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.5", open_ports=[1433])]
@@ -29,7 +29,7 @@ def test_discover_mssql_instances_from_hosts_and_spns(tmp_path: Path) -> None:
         [
             UserRecord(
                 username="sqlsvc",
-                spns=["MSSQLSvc/sql01.corp.local:1433"],
+                spns=["MSSQLSvc/sql01.target.example:1433"],
             )
         ]
     )
@@ -37,30 +37,30 @@ def test_discover_mssql_instances_from_hosts_and_spns(tmp_path: Path) -> None:
     instances = discover_mssql_instances(session)
     hosts = {i.host for i in instances}
     assert "10.0.0.5" in hosts
-    assert "sql01.corp.local" in hosts
+    assert "sql01.target.example" in hosts
 
 
 def test_build_mssql_opportunities_covers_phase15() -> None:
     instances = [
-        MssqlInstance(host="sql01.corp.local"),
-        MssqlInstance(host="sql02.corp.local"),
+        MssqlInstance(host="sql01.target.example"),
+        MssqlInstance(host="sql02.target.example"),
     ]
     enum_results = [
         MssqlEnumResult(
-            host="sql01.corp.local",
+            host="sql01.target.example",
             login_ok=True,
             is_sysadmin=True,
             linked_servers=["REMOTE01"],
             trustworthy_databases=["appdb"],
             xp_cmdshell_enabled=True,
         ),
-        MssqlEnumResult(host="sql02.corp.local", login_ok=False, error="login failed"),
+        MssqlEnumResult(host="sql02.target.example", login_ok=False, error="login failed"),
     ]
 
     ops = build_mssql_opportunities(
         instances,
         enum_results,
-        context="corp.local\\jsmith",
+        context="target.example\\jsmith",
     )
     techniques = {o.technique for o in ops}
     assert "sql_access" in techniques
@@ -75,18 +75,18 @@ def test_run_mssql_analysis_writes_artifacts(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
 
     HostsStore(manager, "lab").merge(
-        [HostRecord(address="sql01.corp.local", open_ports=[1433])]
+        [HostRecord(address="sql01.target.example", open_ports=[1433])]
     )
-    cred = session.credentials.add("jsmith", "Secret123!", domain="corp.local")
+    cred = session.credentials.add("jsmith", "Secret123!", domain="target.example")
     session.credentials.mark_status(cred.id, CredentialStatus.VALID)
 
     mock_enum = MssqlEnumResult(
-        host="sql01.corp.local",
+        host="sql01.target.example",
         login_ok=True,
         is_sysadmin=False,
         linked_servers=["LINKED01"],

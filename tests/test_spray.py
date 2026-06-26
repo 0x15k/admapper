@@ -40,8 +40,8 @@ def test_filter_spray_targets_lockout_buffer() -> None:
 
 
 def test_generate_spray_variations_includes_company_year() -> None:
-    variations = generate_spray_variations("corp.local", year=2026)
-    assert "Corp2026!" in variations
+    variations = generate_spray_variations("target.example", year=2026)
+    assert "Target2026!" in variations
     assert "Winter2026!" in variations
 
 
@@ -58,7 +58,7 @@ def test_run_spray_stores_hits(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
@@ -81,7 +81,7 @@ def test_run_spray_stores_hits(tmp_path: Path) -> None:
             "admapper.creds.spray.fetch_lockout_context",
             return_value=PolicyFetchResult(
                 host="10.0.0.1",
-                base_dn="DC=corp,DC=local",
+                base_dn="DC=target,DC=example",
                 policy=policy,
                 user_states=states,
             ),

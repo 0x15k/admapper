@@ -16,7 +16,7 @@ def test_run_kerberos_analysis_delegations_and_backup_ops(tmp_path: Path) -> Non
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["backupuser"]
     session.persist_workspace()
 
@@ -26,28 +26,28 @@ def test_run_kerberos_analysis_delegations_and_backup_ops(tmp_path: Path) -> Non
                 "object_name": "DC01",
                 "object_type": "computer",
                 "delegation_type": "unconstrained",
-                "dn": "CN=DC01,OU=Computers,DC=corp,DC=local",
+                "dn": "CN=DC01,OU=Computers,DC=target,DC=example",
             },
             {
                 "object_name": "WEB01$",
                 "object_type": "computer",
                 "delegation_type": "constrained_pt",
-                "targets": ["cifs/dc01.corp.local"],
-                "dn": "CN=WEB01,OU=Computers,DC=corp,DC=local",
+                "targets": ["cifs/dc01.target.example"],
+                "dn": "CN=WEB01,OU=Computers,DC=target,DC=example",
             },
         ],
         "groups": [
             {
                 "name": "Backup Operators",
-                "dn": "CN=Backup Operators,CN=Builtin,DC=corp,DC=local",
-                "members": ["CN=backupuser,CN=Users,DC=corp,DC=local"],
+                "dn": "CN=Backup Operators,CN=Builtin,DC=target,DC=example",
+                "members": ["CN=backupuser,CN=Users,DC=target,DC=example"],
             }
         ],
         "computers": [
             {
                 "name": "WS01",
-                "dn": "CN=WS01,OU=Computers,DC=corp,DC=local",
-                "dns_host": "ws01.corp.local",
+                "dn": "CN=WS01,OU=Computers,DC=target,DC=example",
+                "dns_host": "ws01.target.example",
             }
         ],
     }
@@ -96,9 +96,9 @@ def test_constrained_pt_delegation_type_in_ldap_enum() -> None:
 
     entry = MagicMock()
     entry.userAccountControl.value = UAC_TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION
-    entry.distinguishedName.value = "CN=WEB01,DC=corp,DC=local"
+    entry.distinguishedName.value = "CN=WEB01,DC=target,DC=example"
     allowed = MagicMock()
-    allowed.values = ["cifs/dc.corp.local"]
+    allowed.values = ["cifs/dc.target.example"]
     setattr(entry, "msDS-AllowedToDelegateTo", allowed)
     entry.msDS_AllowedToActOnBehalfOfOtherIdentity = None
 

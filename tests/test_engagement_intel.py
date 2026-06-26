@@ -82,7 +82,7 @@ def test_build_engagement_intel_domain_users(tmp_path: Path) -> None:
             }
         )
     )
-    intel = build_engagement_intel(ws, workspace="ws", domain="lab.local", owned_users=["alice"])
+    intel = build_engagement_intel(ws, workspace="ws", domain="target.example", owned_users=["alice"])
 
     users = intel["domain_users"]
     assert len(users) == 2
@@ -114,7 +114,7 @@ def test_lockout_policy_cached(tmp_path: Path) -> None:
         )
     )
     with patch("admapper.analysis.engagement_intel.fetch_lockout_context") as mock_fetch:
-        intel = build_engagement_intel(ws, domain="lab.local")
+        intel = build_engagement_intel(ws, domain="target.example")
         mock_fetch.assert_not_called()
 
     alice = next(u for u in intel["domain_users"] if u["username"] == "alice")

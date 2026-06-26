@@ -57,7 +57,7 @@ def _ws(tmp_path: Path) -> Path:
 
 def test_selectable_identities_any_lab(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    rows = build_selectable_identities(ws, domain="lab.local", owned_users=["alice"])
+    rows = build_selectable_identities(ws, domain="target.example", owned_users=["alice"])
     users = {r["username"] for r in rows}
     assert "alice" in users
     assert "bob" in users
@@ -71,7 +71,7 @@ def test_identity_lens_profiles_pivot(tmp_path: Path) -> None:
     lens = build_identity_lens(
         ws,
         workspace="ws",
-        domain="lab.local",
+        domain="target.example",
         pivot_user="alice",
         owned_users=["alice"],
     )
@@ -85,7 +85,7 @@ def test_identity_lens_enum_target_read_only(tmp_path: Path) -> None:
     lens = build_identity_lens(
         ws,
         workspace="ws",
-        domain="lab.local",
+        domain="target.example",
         pivot_user="carol",
         owned_users=["alice"],
     )

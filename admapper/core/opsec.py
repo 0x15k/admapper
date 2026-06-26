@@ -5,7 +5,7 @@ of every ADMapper operation:
 
   STEALTH  — minimum footprint: delays, no spray, read-only, explicit confirms
   NORMAL   — balanced defaults (current behaviour)
-  LAB      — no delays, no confirmations, maximum aggression (HTB/lab use)
+  LAB      — no delays, no confirmations, maximum aggression (assessment/lab use)
 
 Usage in CLI:
   admapper opsec stealth   # set profile

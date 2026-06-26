@@ -42,8 +42,8 @@ def test_check_kerberos_with_skew_uses_workspace_cache(tmp_path: Path) -> None:
         side_effect=lambda *a, **kw: kw.get("clock_skew") == "+7h",
     ) as mock_krb:
         ok, applied = check_kerberos_with_skew(
-            "corp.local",
-            "svc_sql",
+            "target.example",
+            "svc_user",
             "secret",
             dc_ip="192.168.10.182",
             ws_path=tmp_path,
@@ -65,8 +65,8 @@ def test_check_kerberos_with_skew_probes_after_system_failure(tmp_path: Path) ->
         ) as mock_krb,
     ):
         ok, applied = check_kerberos_with_skew(
-            "corp.local",
-            "svc_sql",
+            "target.example",
+            "svc_user",
             "secret",
             dc_ip="192.168.10.182",
             ws_path=tmp_path,

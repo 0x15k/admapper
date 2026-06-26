@@ -10,11 +10,11 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "corp.local",
+                "domain": "target.example",
                 "hosts": [
                     {
                         "address": "192.168.10.182",
-                        "hostname": "dc01.corp.local",
+                        "hostname": "dc01.target.example",
                         "is_domain_controller": True,
                     }
                 ],
@@ -28,8 +28,8 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
                 "credentials": [
                     {
                         "id": "c1",
-                        "username": "svc_sql",
-                        "secret": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "secret": "KnownPassword123!",
                         "status": "valid",
                         "type": "password",
                         "source": "manual",
@@ -44,8 +44,8 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
             {
                 "candidates": [
                     {
-                        "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "password": "KnownPassword123!",
                         "verified": True,
                         "reason": "stale_log_year_variant",
                     }
@@ -59,8 +59,8 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "password": "KnownPassword123!",
                         "source_file": "Logs/trace.log",
                         "confidence": "medium",
                     }
@@ -75,7 +75,7 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
                 "groups": [
                     {
                         "name": "Protected Users",
-                        "members": ["CN=svc_sql,CN=Users,DC=corp,DC=local"],
+                        "members": ["CN=svc_user,CN=Users,DC=target,DC=example"],
                     }
                 ]
             }
@@ -88,9 +88,9 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
                 "findings": [
                     {
                         "id": "acl-001",
-                        "principal": "svc_sql",
+                        "principal": "svc_user",
                         "right": "genericwrite",
-                        "target_name": "msa_health",
+                        "target_name": "msa_target",
                         "severity": "high",
                     }
                 ]
@@ -116,17 +116,17 @@ def test_engagement_map_shows_next_hop_and_krb5_blocker(tmp_path: Path) -> None:
     text = build_engagement_map(
         ws,
         workspace="target",
-        domain="corp.local",
-        owned_users=["svc_sql"],
-        pivot_user="svc_sql",
+        domain="target.example",
+        owned_users=["svc_user"],
+        pivot_user="svc_user",
     )
 
     assert "ENGAGEMENT MAP" in text
-    assert "svc_sql" in text
-    assert "WelcomePassword123!" in text
+    assert "svc_user" in text
+    assert "KnownPassword123!" in text
     assert "NEXT STEP" in text
     assert "genericwrite" in text
-    assert "msa_health" in text
+    assert "msa_target" in text
     assert "BLOCK" in text
     assert "krb5-user" in text or "krb5" in text
 
@@ -137,11 +137,11 @@ def test_engagement_map_shows_hash_and_winrm_next_hop(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "corp.local",
+                "domain": "target.example",
                 "hosts": [
                     {
                         "address": "192.168.10.182",
-                        "hostname": "dc01.corp.local",
+                        "hostname": "dc01.target.example",
                         "is_domain_controller": True,
                     }
                 ],
@@ -154,7 +154,7 @@ def test_engagement_map_shows_hash_and_winrm_next_hop(tmp_path: Path) -> None:
             {
                 "new_hashes": [
                     {
-                        "account": "msa_health$",
+                        "account": "msa_target$",
                         "nthash": "0123456789abcdef0123456789abcdef",
                     }
                 ]
@@ -166,14 +166,14 @@ def test_engagement_map_shows_hash_and_winrm_next_hop(tmp_path: Path) -> None:
     text = build_engagement_map(
         ws,
         workspace="target",
-        domain="corp.local",
-        owned_users=["svc_sql", "msa_health$"],
-        pivot_user="msa_health$",
+        domain="target.example",
+        owned_users=["svc_user", "msa_target$"],
+        pivot_user="msa_target$",
     )
 
     assert "HASH OBTAINED" in text
     assert "0123456789abcdef0123456789abcdef" in text
-    assert "dc01.corp.local" in text
+    assert "dc01.target.example" in text
     assert "WinRM" in text
     assert "NEXT STEP" in text
     assert "──WinRM──►" in text
@@ -186,11 +186,11 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "corp.local",
+                "domain": "target.example",
                 "hosts": [
                     {
                         "address": "192.168.10.182",
-                        "hostname": "dc01.corp.local",
+                        "hostname": "dc01.target.example",
                         "is_domain_controller": True,
                     }
                 ],
@@ -203,7 +203,7 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
             {
                 "new_hashes": [
                     {
-                        "account": "msa_health$",
+                        "account": "msa_target$",
                         "nthash": "7fdad697aa96c287e6d33381c3755b17",
                     }
                 ],
@@ -211,7 +211,7 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
                     {
                         "phase": "lateral_winrm",
                         "status": "success",
-                        "detail": "msa_health$ @ msa_health.corp.local",
+                        "detail": "msa_target$ @ msa_target.target.example",
                     }
                 ],
             }
@@ -221,7 +221,7 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
     (ws / "postex_scan.json").write_text(
         json.dumps(
             {
-                "shell_user": "msa_health$",
+                "shell_user": "msa_target$",
                 "findings": [
                     {
                         "task_name": "Update Check",
@@ -243,7 +243,7 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
                         "title": "Scheduled task DLL hijack",
                         "severity": "critical",
                         "detail": "Task 'Update Check' runs as jaylee.doe | Drop Settings_Update.zip",
-                        "context": "msa_health$",
+                        "context": "msa_target$",
                         "manual_commands": [],
                     }
                 ]
@@ -255,9 +255,9 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
     text = build_engagement_map(
         ws,
         workspace="target",
-        domain="corp.local",
-        owned_users=["wallace.doe", "msa_health$"],
-        pivot_user="msa_health$",
+        domain="target.example",
+        owned_users=["target.user", "msa_target$"],
+        pivot_user="msa_target$",
     )
 
     assert "──WinRM──►" not in text

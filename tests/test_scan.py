@@ -7,11 +7,11 @@ def test_default_workspace_name_from_ip() -> None:
 
 
 def test_format_hosts_hint() -> None:
-    assert format_hosts_hint("192.168.10.182", "dc01.corp.local") == (
-        "→ add to /etc/hosts: 192.168.10.182  dc01.corp.local"
+    assert format_hosts_hint("192.168.10.182", "dc01.target.example") == (
+        "→ add to /etc/hosts: 192.168.10.182  dc01.target.example"
     )
     assert format_hosts_hint("10.0.0.1", "-") is None
-    assert format_hosts_hint("", "dc01.corp.local") is None
+    assert format_hosts_hint("", "dc01.target.example") is None
 
 
 def test_scan_summary_import() -> None:

@@ -7,9 +7,9 @@ def parse_targets(spec: str) -> list[str]:
     """Expand a host spec into a deduplicated list of IP addresses.
 
     Supports:
-    - single IP: ``192.168.1.10``
-    - CIDR: ``192.168.1.0/24`` (capped at /24 for safety in unauth scans)
-    - comma-separated mix: ``10.0.0.1,10.0.0.0/30``
+    - single IP: ``10.0.0.10``
+    - CIDR: ``10.0.0.0/24`` (capped at /24 for safety in unauth scans)
+    - comma-separated mix: ``10.0.0.1,10.0.0.2/30``
     """
     addresses: list[str] = []
     seen: set[str] = set()

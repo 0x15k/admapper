@@ -19,7 +19,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                 "credentials": [
                     {
                         "id": "cred-001",
-                        "username": "wallace.doe",
+                        "username": "target.user",
                         "status": "valid",
                         "type": "password",
                         "source": "run",
@@ -27,7 +27,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                     },
                     {
                         "id": "cred-002",
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "status": "invalid",
                         "type": "password",
                         "source": "share_loot",
@@ -43,8 +43,8 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_sql",
-                        "password": "WelcomePassword123!",
+                        "username": "svc_user",
+                        "password": "KnownPassword123!",
                         "confidence": "high",
                         "pattern": "bind_user_pass",
                         "source_file": "Logs/script.ps1",
@@ -59,7 +59,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "corp.local",
+                "domain": "target.example",
                 "hosts": [
                     {
                         "address": "192.168.10.182",
@@ -77,7 +77,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                 "groups": [
                     {
                         "name": "Protected Users",
-                        "members": ["CN=svc_sql,CN=Users,DC=corp,DC=local"],
+                        "members": ["CN=svc_user,CN=Users,DC=target,DC=example"],
                     }
                 ]
             }
@@ -89,15 +89,15 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
     text = build_scenario_report(
         ws,
         workspace="target",
-        domain="corp.local",
-        owned_users=["wallace.doe"],
-        pivot_user="wallace.doe",
+        domain="target.example",
+        owned_users=["target.user"],
+        pivot_user="target.user",
     )
 
-    assert "corp.local" in text
-    assert "wallace.doe" in text
-    assert "svc_sql" in text
-    assert "WelcomePassword123!" in text
+    assert "target.example" in text
+    assert "target.user" in text
+    assert "svc_user" in text
+    assert "KnownPassword123!" in text
     assert "RECOMMENDED ACTIONS" in text
     assert "RECOMMENDED" in text
     assert "ACCESS MATRIX" in text
@@ -116,10 +116,10 @@ def test_resolve_top_actions_gmsa_not_pywhisker(tmp_path: Path) -> None:
                         "id": "acl-001",
                         "principal": "pivot",
                         "right": "GenericWrite",
-                        "target_name": "msa_health",
+                        "target_name": "msa_target",
                         "severity": "high",
                         "summary": "gMSA genericwrite",
-                        "manual_commands": ["pywhisker --target msa_health -a add"],
+                        "manual_commands": ["pywhisker --target msa_target -a add"],
                     }
                 ]
             }
@@ -130,7 +130,7 @@ def test_resolve_top_actions_gmsa_not_pywhisker(tmp_path: Path) -> None:
         ws,
         pivot="pivot",
         owned=["pivot"],
-        domain="corp.local",
+        domain="target.example",
         workspace="gmsa_cmd",
         limit=1,
     )
@@ -152,9 +152,9 @@ def test_roast_candidates_from_auth_inventory(tmp_path: Path) -> None:
                         "enabled": True,
                     },
                     {
-                        "username": "svc_sql",
+                        "username": "svc_user",
                         "uac": 0x200,
-                        "spns": ["MSSQLSvc/dc01.corp.local:1433"],
+                        "spns": ["MSSQLSvc/dc01.target.example:1433"],
                         "kerberoastable": True,
                         "enabled": True,
                     },
@@ -166,7 +166,7 @@ def test_roast_candidates_from_auth_inventory(tmp_path: Path) -> None:
     line = roast_candidates_line(ws)
     assert line is not None
     assert "asrep: no_preauth" in line
-    assert "kerberoast: svc_sql" in line
+    assert "kerberoast: svc_user" in line
 
 
 def test_resolve_top_actions_returns_three(tmp_path: Path) -> None:
@@ -195,7 +195,7 @@ def test_resolve_top_actions_returns_three(tmp_path: Path) -> None:
         ws,
         pivot="pivot",
         owned=["pivot"],
-        domain="corp.local",
+        domain="target.example",
         workspace="actions",
         limit=3,
     )
@@ -217,7 +217,7 @@ def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
         json.dumps(
             {
                 "new_hashes": [
-                    {"account": "msa_health$", "nthash": "a" * 32},
+                    {"account": "msa_target$", "nthash": "a" * 32},
                 ],
             }
         ),
@@ -241,14 +241,14 @@ def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    owned = ["msa_health$", "jaylee.doe"]
+    owned = ["msa_target$", "jaylee.doe"]
     next_cmd = resolve_next_command(
         ws,
         pivot="jaylee.doe",
         owned=owned,
-        domain="corp.local",
+        domain="target.example",
         workspace="corp-autonomous",
     )
     assert "evil-winrm" not in next_cmd.lower()
-    assert "msa_health" not in next_cmd.lower()
+    assert "msa_target" not in next_cmd.lower()
     assert "wsus" in next_cmd.lower()

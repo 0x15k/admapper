@@ -23,10 +23,10 @@ def test_session_select_workspace_persists_active(tmp_path: Path) -> None:
 def test_session_set_domain_and_mode(tmp_path: Path) -> None:
     session = Session.bootstrap(workspaces_root=tmp_path / "ws")
     session.select_workspace("lab")
-    session.set_domain("forest.htb")
+    session.set_domain("target.example")
     session.set_mode(OperationMode.MANUAL)
 
     reloaded = Session.bootstrap(workspaces_root=tmp_path / "ws")
     assert reloaded.workspace is not None
-    assert reloaded.workspace.domain == "forest.htb"
+    assert reloaded.workspace.domain == "target.example"
     assert reloaded.workspace.mode == OperationMode.MANUAL

@@ -17,10 +17,10 @@ def test_need_creds_stage(tmp_path: Path) -> None:
         json.dumps({"hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]})
     )
     (ws / "users.json").write_text(
-        json.dumps({"users": [{"username": "wallace"}, {"username": "admin"}]})
+        json.dumps({"users": [{"username": "target"}, {"username": "admin"}]})
     )
     state = build_objective_ops_state(
-        ws, workspace="ws", domain="corp.local", owned_users=[], pivot_user=None
+        ws, workspace="ws", domain="target.example", owned_users=[], pivot_user=None
     )
     assert state["stage"] == "need_creds"
     assert state["engagement_over"] is False
@@ -37,7 +37,7 @@ def test_enum_stage_no_users(tmp_path: Path) -> None:
         json.dumps({"hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]})
     )
     state = build_objective_ops_state(
-        ws, workspace="ws", domain="corp.local", owned_users=[], pivot_user=None
+        ws, workspace="ws", domain="target.example", owned_users=[], pivot_user=None
     )
     assert state["stage"] == "enum"
     assert state["engagement_over"] is False
@@ -46,7 +46,7 @@ def test_enum_stage_no_users(tmp_path: Path) -> None:
     assert any(a.get("required") for a in state["actions"])
 
 
-def test_only_svc_sql_verified_for_msa(tmp_path: Path) -> None:
+def test_only_sql_service_verified_for_msa(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "graph.json").write_text(
@@ -55,8 +55,8 @@ def test_only_svc_sql_verified_for_msa(tmp_path: Path) -> None:
                 "nodes": [],
                 "edges": [
                     {
-                        "source": "user:wallace@corp.local",
-                        "target": "computer:msa_health.corp.local",
+                        "source": "user:target@target.example",
+                        "target": "computer:msa_target.target.example",
                         "type": "genericwrite",
                     }
                 ],
@@ -69,9 +69,9 @@ def test_only_svc_sql_verified_for_msa(tmp_path: Path) -> None:
                 "findings": [
                     {
                         "id": "acl-1",
-                        "principal": "svc_sql",
+                        "principal": "svc_user",
                         "right": "genericwrite",
-                        "target_name": "msa_health",
+                        "target_name": "msa_target",
                         "summary": "gMSA abuse",
                     }
                 ]
@@ -82,15 +82,15 @@ def test_only_svc_sql_verified_for_msa(tmp_path: Path) -> None:
         json.dumps(
             {
                 "credentials": [
-                    {"username": "wallace", "status": "valid"},
-                    {"username": "svc_sql", "status": "valid"},
+                    {"username": "target", "status": "valid"},
+                    {"username": "svc_user", "status": "valid"},
                 ]
             }
         )
     )
     info = explain_target_access(
-        ws, domain="corp.local", target="msa_health", owned_users=["wallace", "svc_sql"]
+        ws, domain="target.example", target="msa_target", owned_users=["target", "svc_user"]
     )
-    assert any("svc_sql" in v for v in info["direct_verified"])
-    assert not any("wallace" in v for v in info["direct_verified"])
-    assert any("wallace" in v for v in info["direct_graph_only"])
+    assert any("svc_user" in v for v in info["direct_verified"])
+    assert not any("target" in v for v in info["direct_verified"])
+    assert any("target" in v for v in info["direct_graph_only"])

@@ -95,7 +95,7 @@ def list_callback_candidates() -> list[CallbackCandidate]:
 
 
 def resolve_callback_ip(*, exclude: set[str] | None = None) -> str | None:
-    """Pick the best VPN/tunnel IP for LHOST (e.g. utun6 → 10.10.15.243)."""
+    """Pick the best VPN/tunnel IP for LHOST (prefers point-to-point interfaces)."""
     import os
 
     env = os.environ.get("ADMAPPER_LHOST", "").strip()

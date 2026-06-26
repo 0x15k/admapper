@@ -14,7 +14,7 @@ def test_run_timeroast_exports_targets(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
@@ -23,8 +23,8 @@ def test_run_timeroast_exports_targets(tmp_path: Path) -> None:
         "computers": [
             {
                 "name": "WS01",
-                "dn": "CN=WS01,DC=corp,DC=local",
-                "dns_host": "ws01.corp.local",
+                "dn": "CN=WS01,DC=target,DC=example",
+                "dns_host": "ws01.target.example",
             }
         ]
     }

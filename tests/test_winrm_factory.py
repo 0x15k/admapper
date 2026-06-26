@@ -13,12 +13,12 @@ def test_winrm_client_prefers_workspace_dc_ip(tmp_path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [
             HostRecord(
                 address="192.168.10.182",
-                hostname="DC01.corp.local",
+                hostname="DC01.target.example",
                 is_domain_controller=True,
                 open_ports=[88, 389, 445, 5985],
             )
@@ -26,9 +26,9 @@ def test_winrm_client_prefers_workspace_dc_ip(tmp_path) -> None:
     )
 
     cred = WinRMCred(
-        username="msa_health$",
-        domain="corp.local",
-        host="msa_health.corp.local",
+        username="msa_target$",
+        domain="target.example",
+        host="msa_target.target.example",
         nthash="7fdad697aa96c287e6d33381c3755b17",
     )
     client = winrm_client_for_cred(cred, session)

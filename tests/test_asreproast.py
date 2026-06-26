@@ -17,10 +17,10 @@ UAC_DONT_REQ_PREAUTH = 0x400000
 def test_parse_getnpusers_hashcat_output() -> None:
     stdout = (
         "Impacket v0.12.0\n"
-        "$krb5asrep$23$svc@CORP.LOCAL:deadbeef\n"
-        "$krb5asrep$23$admin@CORP.LOCAL:beefdead\n"
+        "$krb5asrep$23$svc@TARGET.EXAMPLE:deadbeef\n"
+        "$krb5asrep$23$admin@TARGET.EXAMPLE:beefdead\n"
     )
-    hashes = _parse_getnpusers_output(stdout, "corp.local")
+    hashes = _parse_getnpusers_output(stdout, "target.example")
     assert len(hashes) == 2
     assert hashes[0].username == "svc"
     assert hashes[0].hashcat.startswith("$krb5asrep$")
@@ -30,7 +30,7 @@ def test_run_asreproast_stores_hashes(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     HostsStore(manager, "lab").merge(
         [HostRecord(address="10.0.0.1", open_ports=[88, 389], is_domain_controller=True)]
     )
@@ -43,7 +43,7 @@ def test_run_asreproast_stores_hashes(tmp_path: Path) -> None:
         ]
     )
 
-    fake_hashes = [AsRepHash(username="svc", domain="corp.local", hashcat="$krb5asrep$23$svc@corp")]
+    fake_hashes = [AsRepHash(username="svc", domain="target.example", hashcat="$krb5asrep$23$svc@corp")]
 
     with (
         patch("admapper.creds.asreproast.confirm", return_value=True),

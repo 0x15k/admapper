@@ -3,7 +3,7 @@ from pathlib import Path
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge
 
 
-def test_escalate_picks_dll_hijack_from_msa_health(tmp_path: Path) -> None:
+def test_escalate_picks_dll_hijack_from_msa_target(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "postex_ops.json").write_text(
@@ -11,7 +11,7 @@ def test_escalate_picks_dll_hijack_from_msa_health(tmp_path: Path) -> None:
         {"opportunities": [{
             "id": "postex-010",
             "technique": "dll_hijack_scheduled_task",
-            "context": "msa_health$",
+            "context": "msa_target$",
             "severity": "critical",
             "title": "DLL hijack",
             "detail": "Task 'UpdateChecker Agent' runs as jaylee.doe | Binary: x",
@@ -25,10 +25,10 @@ def test_escalate_picks_dll_hijack_from_msa_health(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
-        pivot_user="msa_health$",
-        owned_users=["msa_health$"],
+        pivot_user="msa_target$",
+        owned_users=["msa_target$"],
         ws_path=ws,
-        domain="corp.local",
+        domain="target.example",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None
@@ -41,8 +41,8 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
     ws.mkdir()
     (ws / "auth_inventory.json").write_text(
         """
-        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=corp,DC=local"}],
-         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=corp,DC=local"]}]}
+        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=target,DC=example"}],
+         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=target,DC=example"]}]}
         """,
         encoding="utf-8",
     )
@@ -79,9 +79,9 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
     )
     edges = collect_edges_from_pivot(
         pivot_user="jaylee.doe",
-        owned_users=["msa_health$", "jaylee.doe"],
+        owned_users=["msa_target$", "jaylee.doe"],
         ws_path=ws,
-        domain="corp.local",
+        domain="target.example",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None
@@ -96,9 +96,9 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
         """
         {"findings": [{
             "id": "acl-001",
-            "principal": "svc_sql",
+            "principal": "svc_user",
             "right": "genericwrite",
-            "target_name": "msa_health",
+            "target_name": "msa_target",
             "severity": "high"
         }]}
         """,
@@ -109,7 +109,7 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
         {"opportunities": [{
             "id": "postex-001",
             "technique": "dll_hijack_scheduled_task",
-            "context": "msa_health$",
+            "context": "msa_target$",
             "severity": "high",
             "detail": "runs as jaylee.doe"
         }]}
@@ -121,10 +121,10 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
-        pivot_user="msa_health$",
-        owned_users=["svc_sql", "msa_health$"],
+        pivot_user="msa_target$",
+        owned_users=["svc_user", "msa_target$"],
         ws_path=ws,
-        domain="corp.local",
+        domain="target.example",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None
@@ -138,16 +138,16 @@ def test_escalate_gpo_abuse_edge(tmp_path: Path) -> None:
         """
         {
           "users": [
-            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=corp,DC=local"}
+            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=target,DC=example"}
           ],
           "computers": [
-            {"name": "srv01", "dn": "CN=srv01,OU=Servers,DC=corp,DC=local"}
+            {"name": "srv01", "dn": "CN=srv01,OU=Servers,DC=target,DC=example"}
           ],
           "ous": [
-            {"name": "Servers", "dn": "OU=Servers,DC=corp,DC=local", "gplink": "[LDAP://CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local;0]"}
+            {"name": "Servers", "dn": "OU=Servers,DC=target,DC=example", "gplink": "[LDAP://CN={abc-123},CN=Policies,CN=System,DC=target,DC=example;0]"}
           ],
           "gpos": [
-            {"name": "{abc-123}", "dn": "CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local", "display_name": "VulnerableGPO"}
+            {"name": "{abc-123}", "dn": "CN={abc-123},CN=Policies,CN=System,DC=target,DC=example", "display_name": "VulnerableGPO"}
           ]
         }
         """,
@@ -160,7 +160,7 @@ def test_escalate_gpo_abuse_edge(tmp_path: Path) -> None:
             "id": "acl-001",
             "principal": "attacker",
             "right": "genericwrite",
-            "target_dn": "CN={abc-123},CN=Policies,CN=System,DC=corp,DC=local",
+            "target_dn": "CN={abc-123},CN=Policies,CN=System,DC=target,DC=example",
             "target_name": "VulnerableGPO",
             "target_type": "gpo",
             "severity": "high",
@@ -174,7 +174,7 @@ def test_escalate_gpo_abuse_edge(tmp_path: Path) -> None:
         pivot_user="attacker",
         owned_users=["attacker"],
         ws_path=ws,
-        domain="corp.local",
+        domain="target.example",
     )
     gpo_edges = [e for e in edges if e.technique == "gpo_abuse"]
     assert len(gpo_edges) == 1
@@ -187,18 +187,18 @@ def test_escalate_stale_admin_count_shadow_admin(tmp_path: Path) -> None:
     from unittest.mock import MagicMock, patch
     session = MagicMock()
     session.workspace.name = "lab"
-    session.workspace.domain = "corp.local"
+    session.workspace.domain = "target.example"
     session.workspace.owned_users = ["attacker"]
     session.workspaces.path_for.return_value = ws
     (ws / "auth_inventory.json").write_text(
         """
         {
           "users": [
-            {"username": "shadow_user", "dn": "CN=shadow,CN=Users,DC=corp,DC=local", "admin_count": 1},
-            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=corp,DC=local"}
+            {"username": "shadow_user", "dn": "CN=shadow,CN=Users,DC=target,DC=example", "admin_count": 1},
+            {"username": "attacker", "dn": "CN=attacker,CN=Users,DC=target,DC=example"}
           ],
           "groups": [
-            {"name": "Domain Admins", "dn": "CN=Domain Admins,CN=Users,DC=corp,DC=local", "members": []}
+            {"name": "Domain Admins", "dn": "CN=Domain Admins,CN=Users,DC=target,DC=example", "members": []}
           ]
         }
         """,

@@ -9,7 +9,7 @@ def test_graph_marks_owned_user(tmp_path: Path) -> None:
     manager.create("lab")
     store = GraphStore(manager, "lab")
 
-    graph = store.mark_user_owned("corp.local", "jsmith", cred_id="abc123")
+    graph = store.mark_user_owned("target.example", "jsmith", cred_id="abc123")
     assert any(n.get("owned") and n.get("username") == "jsmith" for n in graph["nodes"])
     assert any(n.get("type") == "domain" for n in graph["nodes"])
     assert graph["edges"]

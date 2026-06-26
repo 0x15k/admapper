@@ -92,7 +92,7 @@ def infer_domain_from_hostname(hostname: str) -> str | None:
 
 
 def dn_to_domain(dn: str) -> str | None:
-    """Convert LDAP DN (DC=corp,DC=local) to DNS domain (corp.local)."""
+    """Convert LDAP DN (<BASE_DN>) to DNS domain (<DOMAIN>)."""
     labels: list[str] = []
     for part in dn.split(","):
         piece = part.strip()

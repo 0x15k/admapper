@@ -112,7 +112,7 @@ def build_postex_opportunities(
     verified_admin_hosts: list[str] = []
     # If session has verified credentials/hashes matching a machine account or DC
     # WinRM access, map to that host. For example, a gMSA hash
-    # (e.g. msa_health$) confirms WinRM on the DC, so we target the DC's FQDN.
+    # (e.g. msa_target$) confirms WinRM on the DC, so we target the DC's FQDN.
     if session.credentials is not None:
         for c in session.credentials.list():
             if c.status == CredentialStatus.VALID:

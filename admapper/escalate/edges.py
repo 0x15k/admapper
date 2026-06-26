@@ -58,7 +58,8 @@ def _is_owned(name: str, owned: set[str]) -> bool:
     lower = name.lower()
     if lower in owned:
         return True
-    # gMSA / machine: msa_health vs msa_health$
+    # gMSA / machine helpers: machine name with or without trailing $
+    # example: msa_target vs msa_target$
     if lower.endswith("$"):
         return lower.rstrip("$") in owned
     return f"{lower}$" in owned

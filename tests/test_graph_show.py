@@ -8,7 +8,7 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "graph.json").write_text(
-        json.dumps({"nodes": [{"id": "user:svc_sql@corp.local", "type": "user", "username": "svc_sql", "owned": True}], "edges": []}),
+        json.dumps({"nodes": [{"id": "user:svc_user@target.example", "type": "user", "username": "svc_user", "owned": True}], "edges": []}),
         encoding="utf-8",
     )
     (ws / "acl_findings.json").write_text(
@@ -16,9 +16,9 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
             {
                 "findings": [
                     {
-                        "principal": "svc_sql",
+                        "principal": "svc_user",
                         "right": "genericwrite",
-                        "target_name": "msa_health",
+                        "target_name": "msa_target",
                         "severity": "high",
                     }
                 ]
@@ -28,10 +28,10 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
     )
     text = build_graph_view(
         ws,
-        domain="corp.local",
-        pivot_user="svc_sql",
-        owned_users=["svc_sql"],
+        domain="target.example",
+        pivot_user="svc_user",
+        owned_users=["svc_user"],
     )
     assert "ATTACK GRAPH" in text
     assert "genericwrite" in text
-    assert "msa_health" in text
+    assert "msa_target" in text

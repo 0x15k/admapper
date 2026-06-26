@@ -26,7 +26,7 @@ def test_build_postex_opportunities_covers_phase14(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
     HostsStore(manager, "lab").merge(
@@ -35,7 +35,7 @@ def test_build_postex_opportunities_covers_phase14(tmp_path: Path) -> None:
 
     inventory = {
         "computers": [
-            {"name": "WS01", "dns_host": "ws01.corp.local"},
+            {"name": "WS01", "dns_host": "ws01.target.example"},
         ],
         "smb_shares": ["SYSVOL", "NETLOGON"],
     }
@@ -70,12 +70,12 @@ def test_run_postex_analysis_writes_playbook(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.workspace.owned_users = ["jsmith"]
     session.persist_workspace()
 
     inv = {
-        "computers": [{"name": "WS01", "dns_host": "ws01.corp.local"}],
+        "computers": [{"name": "WS01", "dns_host": "ws01.target.example"}],
         "smb_shares": ["SYSVOL"],
     }
     (tmp_path / "ws" / "lab" / "auth_inventory.json").write_text(
@@ -216,7 +216,7 @@ def test_remote_scan_uses_monitor_log_when_com_empty(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.persist_workspace()
 
     monitor = (
@@ -244,7 +244,7 @@ def test_remote_scan_uses_monitor_log_when_com_empty(tmp_path: Path) -> None:
                 )
             return CommandResult(stdout="", stderr="", returncode=0, shell=shell)
 
-    cred = type("C", (), {"host": "10.0.0.5", "domain": "corp.local", "username": "svc", "uses_nthash": True, "nthash": "abc", "password": None})()
+    cred = type("C", (), {"host": "10.0.0.5", "domain": "target.example", "username": "svc", "uses_nthash": True, "nthash": "abc", "password": None})()
 
     with (
         patch("admapper.postex.remote_scan.resolve_winrm_cred", return_value=cred),
@@ -271,7 +271,7 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("corp.local")
+    session.set_domain("target.example")
     session.persist_workspace()
     loot_dir = tmp_path / "ws" / "lab" / "loot" / "Logs"
     loot_dir.mkdir(parents=True)
@@ -306,9 +306,9 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
         "C",
         (),
         {
-            "host": "msa_health.corp.local",
-            "domain": "corp.local",
-            "username": "msa_health$",
+            "host": "msa_target.target.example",
+            "domain": "target.example",
+            "username": "msa_target$",
             "uses_nthash": True,
             "nthash": "7fdad697aa96c287e6d33381c3755b17",
             "password": None,
