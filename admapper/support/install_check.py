@@ -50,8 +50,8 @@ def _module_available(name: str) -> bool:
 
 def collect_tool_matrix() -> list[dict[str, str]]:
     """AdStrike Tool Checker (#58) — external CLI matrix for doctor."""
-    from admapper.adcs.certipy import resolve_certipy
     from admapper.support.platform import (
+        resolve_certipy,
         resolve_executable,
         resolve_faketime,
         resolve_impacket_script,

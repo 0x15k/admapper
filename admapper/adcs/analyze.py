@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from admapper.acl.enum import resolve_principal_context
 from admapper.adcs.acl_detect import detect_owned_adcs_abuse
-from admapper.adcs.certipy import certipy_install_hint, resolve_certipy
+from admapper.adcs.certipy import certipy_install_hint
 from admapper.adcs.detect import detect_esc_vulnerabilities
 from admapper.adcs.enum import enumerate_adcs
 from admapper.auth.ldap_session import open_ldap_session
@@ -15,6 +15,7 @@ from admapper.guides.render import print_manual_guide
 from admapper.models.adcs import AdcsFinding
 from admapper.models.credential import Credential, CredentialStatus
 from admapper.support.output import print_info, print_success, print_table, print_warning
+from admapper.support.platform import resolve_certipy
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
