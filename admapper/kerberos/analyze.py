@@ -327,6 +327,16 @@ def run_kerberos_analysis(session: Session) -> KerberosAnalysisResult:
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     result.output_path = str(out_path)
 
+    try:
+        finding = _check_krbtgt_password_age(session)
+        if finding:
+            from admapper.stores.findings import FindingsStore
+            findings_store = FindingsStore(session.workspaces, ws_name)
+            findings_store.merge([finding])
+            print_success("KRBTGT password age check complete → findings.json")
+    except Exception as exc:
+        print_warning(f"KRBTGT password age check failed: {exc}")
+
     owned_ops = [o for o in unique if o.owned_relevant]
     if owned_ops:
         graph_store = GraphStore(session.workspaces, ws_name)
@@ -369,4 +379,86 @@ def get_kerberos_op(session: Session, op_id: str) -> dict[str, Any] | None:
     for item in data.get("opportunities", []):
         if str(item.get("id")) == op_id:
             return item
+    return None
+
+
+def _check_krbtgt_password_age(session: Session) -> Finding | None:
+    """LDAP query for krbtgt account to find password age."""
+    from admapper.creds.common import pick_dc_ip
+    from admapper.auth.ldap_session import open_ldap_session
+    from admapper.models.credential import CredentialStatus
+    from admapper.models.finding import Finding, FindingSeverity
+    from datetime import datetime, UTC
+    from ldap3 import SUBTREE
+    
+    domain = session.workspace.domain if session.workspace else None
+    if not domain or not session.credentials:
+        return None
+        
+    dc_ip = pick_dc_ip(session)
+    if not dc_ip:
+        return None
+        
+    # Get active password credential
+    cred = next((c for c in session.credentials.list() if c.status == CredentialStatus.VERIFIED), None)
+    if not cred:
+        cred = next((c for c in session.credentials.list() if c.secret), None)
+    if not cred:
+        return None
+        
+    ws_path = session.workspaces.path_for(session.workspace.name)
+    ldap_session, err = open_ldap_session(dc_ip, cred, domain, ws_path=str(ws_path))
+    if ldap_session is None:
+        return None
+        
+    try:
+        ldap_session.conn.search(
+            search_base=ldap_session.base_dn,
+            search_filter="(&(objectClass=user)(sAMAccountName=krbtgt))",
+            search_scope=SUBTREE,
+            attributes=["sAMAccountName", "pwdLastSet", "distinguishedName"],
+        )
+        if not ldap_session.conn.entries:
+            return None
+            
+        entry = ldap_session.conn.entries[0]
+        pwd_last_set = entry.pwdLastSet.value
+        dn = entry.distinguishedName.value
+        
+        if not pwd_last_set:
+            return None
+            
+        try:
+            pwd_last_set_val = int(pwd_last_set)
+        except (ValueError, TypeError):
+            return None
+            
+        if pwd_last_set_val == 0:
+            return None
+            
+        us_seconds = (pwd_last_set_val / 10000000) - 11644473600
+        krbtgt_date = datetime.fromtimestamp(us_seconds, UTC)
+        days_age = (datetime.now(UTC) - krbtgt_date).days
+        
+        severity = FindingSeverity.HIGH if days_age > 180 else (FindingSeverity.MEDIUM if days_age > 90 else FindingSeverity.INFO)
+        if severity == FindingSeverity.INFO:
+            return None
+            
+        detail = (
+            f"The krbtgt account password was last changed on {krbtgt_date.strftime('%Y-%m-%d %H:%M:%S UTC')} "
+            f"({days_age} days ago). Remediation: Rotate KRBTGT password twice (required for invalidation)."
+        )
+        
+        return Finding(
+            key="krbtgt_password_age",
+            title=f"KRBTGT Password Age — {days_age} days old",
+            severity=severity,
+            source="kerberos",
+            detail=detail,
+            mitre_id="T1558.001",
+        )
+    except Exception:
+        pass
+    finally:
+        ldap_session.close()
     return None

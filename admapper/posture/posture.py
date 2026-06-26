@@ -39,6 +39,7 @@ class PostureResult:
     ldap_signing_required: bool | None = None  # True = required (good)
     da_sessions: list[dict[str, str]] = field(default_factory=list)  # active DA sessions
     stale_computers: list[dict[str, Any]] = field(default_factory=list)  # stale computer accounts
+    unconstrained_delegation: list[dict[str, Any]] = field(default_factory=list)  # unconstrained delegation
     errors: list[str] = field(default_factory=list)
 
 
@@ -86,6 +87,9 @@ def check_security_posture(
     # 6. Stale computers
     result.stale_computers = _check_stale_computers(ws_path)
 
+    # 7. Unconstrained delegation
+    result.unconstrained_delegation = _check_unconstrained_delegation(dc_ip, cred, domain)
+
     # Print summary
     _print_posture_summary(result)
 
@@ -108,6 +112,7 @@ def check_security_posture(
                 "ldap_signing_required": result.ldap_signing_required,
                 "da_sessions": result.da_sessions,
                 "stale_computers": result.stale_computers,
+                "unconstrained_delegation": result.unconstrained_delegation,
                 "errors": result.errors,
             },
             indent=2,
@@ -474,6 +479,15 @@ def _print_posture_summary(result: PostureResult) -> None:
             else "none",
         ]
     )
+    rows.append(
+        [
+            "Unconstrained delegation",
+            str(len(result.unconstrained_delegation)),
+            ", ".join(str(c["name"]) for c in result.unconstrained_delegation[:3])
+            if result.unconstrained_delegation
+            else "none",
+        ]
+    )
 
     print_table("Security posture", ["check", "status", "detail"], rows)
 
@@ -551,6 +565,70 @@ def _emit_findings(
                 mitre_id="T1078.002",
             )
         )
+    for item in result.unconstrained_delegation:
+        name = item["name"]
+        obj_type = item["type"]
+        dn = item["dn"]
+        findings.append(
+            Finding(
+                key=f"unconstrained_delegation_{name.lower().rstrip('$')}",
+                title=f"Unconstrained Kerberos Delegation on {name}",
+                severity=FindingSeverity.HIGH,
+                source="posture",
+                detail=f"{obj_type.capitalize()} {name} has unconstrained delegation enabled (DN: {dn}). Remediation: Remove TRUSTED_FOR_DELEGATION flag or move to Protected Users group.",
+                mitre_id="T1558",
+            )
+        )
 
     if findings:
         findings_store.merge(findings)
+
+
+def _check_unconstrained_delegation(
+    dc_ip: str,
+    cred: Credential,
+    domain: str,
+) -> list[dict[str, Any]]:
+    """Query LDAP for computers/users with unconstrained delegation (excluding DCs)."""
+    delegations = []
+    try:
+        from ldap3 import ALL, SUBTREE, Connection, Server
+
+        base_dn = ",".join(f"DC={p}" for p in domain.split("."))
+        srv = Server(dc_ip, get_info=ALL)
+        conn = Connection(
+            srv,
+            user=f"{domain}\\{cred.username}",
+            password=cred.secret or "",
+            auto_bind=True,
+        )
+        filter_str = (
+            "(&(userAccountControl:1.2.840.113556.1.4.803:=524288)"
+            "(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))"
+        )
+        conn.search(
+            base_dn,
+            filter_str,
+            SUBTREE,
+            attributes=["sAMAccountName", "userAccountControl", "distinguishedName", "operatingSystem"],
+        )
+        for entry in conn.entries:
+            name = str(entry.sAMAccountName.value or "")
+            dn = str(entry.distinguishedName.value or "")
+            uac = entry.userAccountControl.value
+            os_name = str(entry.operatingSystem.value or "") if hasattr(entry, "operatingSystem") else ""
+            
+            # Determine if it's a computer or user (computers have operatingSystem or name ends with $)
+            obj_type = "computer" if (os_name or name.endswith("$")) else "user"
+            
+            delegations.append({
+                "name": name,
+                "dn": dn,
+                "uac": uac,
+                "type": obj_type,
+                "operating_system": os_name,
+            })
+        conn.unbind()
+    except Exception:
+        pass
+    return delegations
