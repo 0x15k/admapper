@@ -77,15 +77,9 @@ def build_attack_chains(
             ),
             None,
         )
-        if not enroll and pivot:
-            # Heuristic: IT group + UpdateSrv in inventory without re-run adcs yet
-            groups = owned_groups_for_user(inventory, pivot) if pivot in owned else []
-            if "IT" in groups:
-                enroll = {"template": "UpdateSrv", "esc": "template_enrollment", "principal": pivot}
-
         enroll_ready = enroll is not None and pivot.lower() in {u.lower() for u in owned}
         enroll_id = str(enroll.get("id", "")) if enroll else None
-        template = str(enroll.get("template", "UpdateSrv")) if enroll else ""
+        template = str(enroll.get("template") or "") if enroll else ""
 
         wsus_op = _find_op(wsus_list, "wsus_cert_chain", context=pivot) or _find_op(
             wsus_list, "wsus_spoof", context=pivot

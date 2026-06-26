@@ -125,9 +125,9 @@ def test_intel_from_monitor_log_updatemonitor_lines() -> None:
 
 
 def test_parse_shell_username_from_whoami() -> None:
-    assert parse_shell_username("logging\\jaylee.clifton\r\n") == "jaylee.clifton"
-    assert parse_shell_username("whoami\r\nlogging\\jaylee.clifton") == "jaylee.clifton"
-    assert parse_shell_username("C:\\Users\\jaylee>whoami\r\nlogging\\jaylee.clifton") == "jaylee.clifton"
+    assert parse_shell_username("logging\\jaylee.doe\r\n") == "jaylee.doe"
+    assert parse_shell_username("whoami\r\nlogging\\jaylee.doe") == "jaylee.doe"
+    assert parse_shell_username("C:\\Users\\jaylee>whoami\r\nlogging\\jaylee.doe") == "jaylee.doe"
 
 
 def test_task_hijack_dedupes_loot_hints_and_detects_writable_acl() -> None:
@@ -160,7 +160,7 @@ def test_task_hijack_dedupes_loot_hints_and_detects_writable_acl() -> None:
 def test_intel_from_com_tasks_extracts_zip_dll_run_as() -> None:
     com = (
         "Backup Task|SYSTEM|C:\\Windows\\System32\\cmd.exe|\n"
-        "Update Check|LOGGING\\jaylee.clifton|C:\\Program Files\\Vendor\\Agent.exe|"
+        "Update Check|LOGGING\\jaylee.doe|C:\\Program Files\\Vendor\\Agent.exe|"
         "-check C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip"
     )
     intel = intel_from_com_tasks(com)
@@ -171,7 +171,7 @@ def test_intel_from_com_tasks_extracts_zip_dll_run_as() -> None:
 
     analysis = analyze_task_hijack(loot=None, com_task_output=com, acl_output="(WD)")
     assert len(analysis.findings) == 1
-    assert analysis.findings[0].run_as_user == "jaylee.clifton"
+    assert analysis.findings[0].run_as_user == "jaylee.doe"
     assert analysis.findings[0].payload_zip == "Settings_Update.zip"
 
 
@@ -188,11 +188,11 @@ Last Result:                          267011
 Author:                               N/A
 Task To Run:                          C:\\Program Files\\Vendor\\Agent.exe -check C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip
 Start In:                             N/A
-Run As User:                          LOGGING\\jaylee.clifton
+Run As User:                          LOGGING\\jaylee.doe
 """
     pipe = parse_schtasks_list_output(schtasks)
     assert "Update Check" in pipe
-    assert "jaylee.clifton" in pipe
+    assert "jaylee.doe" in pipe
     assert "Settings_Update.zip" in pipe
     intel = intel_from_com_tasks(pipe)
     assert intel is not None
@@ -202,7 +202,7 @@ Run As User:                          LOGGING\\jaylee.clifton
 def test_intel_from_com_tasks_subfolder_task_line() -> None:
     """Recursive COM / schtasks emit leaf task name with zip in arguments."""
     com = (
-        "Update Check|LOGGING\\jaylee.clifton|C:\\Program Files\\Vendor\\Agent.exe|"
+        "Update Check|LOGGING\\jaylee.doe|C:\\Program Files\\Vendor\\Agent.exe|"
         "-check C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip"
     )
     intel = intel_from_com_tasks(com)
@@ -222,13 +222,13 @@ def test_remote_scan_uses_monitor_log_when_com_empty(tmp_path: Path) -> None:
     monitor = (
         "Task [Update Check] checking for updates\n"
         "No updates found locally: C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip.\n"
-        "LOGGING\\jaylee.clifton loaded settings_update.dll"
+        "LOGGING\\jaylee.doe loaded settings_update.dll"
     )
 
     class FakeClient:
         def execute(self, script: str, shell: str = "powershell") -> CommandResult:
             if "Get-ChildItem" in script and "monitor.log" in script:
-                return CommandResult(stdout="", stderr="", returncode=0, shell=shell)
+                return CommandResult(stdout="C:\\ProgramData\\Microsoft\\Network\\monitor.log", stderr="", returncode=0, shell=shell)
             if "Get-Content" in script and "monitor.log" in script:
                 return CommandResult(stdout=monitor, stderr="", returncode=0, shell=shell)
             if "schtasks" in script:
@@ -271,7 +271,7 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("logging.htb")
+    session.set_domain("corp.local")
     session.persist_workspace()
     loot_dir = tmp_path / "ws" / "lab" / "loot" / "Logs"
     loot_dir.mkdir(parents=True)
@@ -281,12 +281,12 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
     )
 
     com = (
-        "Update Check|LOGGING\\jaylee.clifton|C:\\Program Files\\Vendor\\Agent.exe|"
+        "Update Check|LOGGING\\jaylee.doe|C:\\Program Files\\Vendor\\Agent.exe|"
         "-check C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip"
     )
 
     monitor_remote = (
-        "LOGGING\\jaylee.clifton loaded settings_update.dll\n"
+        "LOGGING\\jaylee.doe loaded settings_update.dll\n"
         "No updates: C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip"
     )
 
@@ -306,8 +306,8 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
         "C",
         (),
         {
-            "host": "msa_health.logging.htb",
-            "domain": "logging.htb",
+            "host": "msa_health.corp.local",
+            "domain": "corp.local",
             "username": "msa_health$",
             "uses_nthash": True,
             "nthash": "7fdad697aa96c287e6d33381c3755b17",
@@ -328,15 +328,15 @@ def test_remote_scan_ignores_loot_com_filter(tmp_path: Path) -> None:
         result = run_remote_task_hijack_scan(session)
 
     assert result.analysis.findings
-    assert result.analysis.findings[0].run_as_user == "jaylee.clifton"
+    assert result.analysis.findings[0].run_as_user == "jaylee.doe"
     payload = json.loads(Path(result.output_path).read_text(encoding="utf-8"))
-    assert payload.get("findings") and payload["findings"][0]["run_as_user"] == "jaylee.clifton"
+    assert payload.get("findings") and payload["findings"][0]["run_as_user"] == "jaylee.doe"
 
 
 def test_analyze_task_hijack_fallback_from_monitor_only() -> None:
     monitor = (
         "No updates found locally: C:\\ProgramData\\Microsoft\\Network\\Settings_Update.zip.\n"
-        "LOGGING\\jaylee.clifton loaded settings_update.dll"
+        "LOGGING\\jaylee.doe loaded settings_update.dll"
     )
     loot = LootIntelResult(
         zip_dll_refs=["monitor: Settings_Update.zip"],
@@ -349,7 +349,7 @@ def test_analyze_task_hijack_fallback_from_monitor_only() -> None:
         acl_output="(WD)",
     )
     assert len(analysis.findings) == 1
-    assert analysis.findings[0].run_as_user == "jaylee.clifton"
+    assert analysis.findings[0].run_as_user == "jaylee.doe"
     assert analysis.findings[0].payload_zip == "Settings_Update.zip"
 
 
@@ -360,7 +360,7 @@ def test_analysis_from_scan_payload() -> None:
         "findings": [
             {
                 "task_name": "Update Check",
-                "run_as_user": "jaylee.clifton",
+                "run_as_user": "jaylee.doe",
                 "executable": r"C:\Program Files\UpdateMonitor\UpdateMonitor.exe",
                 "arguments": "",
                 "drop_path": r"C:\ProgramData\UpdateMonitor",
@@ -375,7 +375,7 @@ def test_analysis_from_scan_payload() -> None:
     }
     analysis = analysis_from_scan_payload(data)
     assert analysis is not None
-    assert analysis.findings[0].run_as_user == "jaylee.clifton"
+    assert analysis.findings[0].run_as_user == "jaylee.doe"
 
 
 def test_apply_postex_templates() -> None:

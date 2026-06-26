@@ -215,6 +215,7 @@ def deploy_dll_hijack(
         lhost=lhost,
         lport=lport,
         payload_dll=payload_dll,
+        drop_path=drop_path,
         exclude_ips=exclude_ips,
         arch=target_arch,
         payload_mode=payload_mode,
@@ -261,6 +262,7 @@ def deploy_dll_hijack(
                 ca_name=enroll_ca_name,
                 profile=enroll_profile,
                 run_as_user=run_as,
+                drop_path=drop_path,
             )
             enroll_remote = f"{drop_path.rstrip('\\')}\\enroll.ps1"
             enroll_local = ws_path / "certs" / "enroll.ps1"

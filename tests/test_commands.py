@@ -52,7 +52,7 @@ def test_cli_web_with_host_runs_unauth_discovery(tmp_path: Path) -> None:
     ):
         result = runner.invoke(app, [
             "--workspaces-root", str(tmp_path / "ws1"),
-            "web", "-H", "10.129.35.99", "--no-open"
+            "web", "-H", "192.168.10.99", "--no-open"
         ])
         assert result.exit_code == 0
         mock_scan.assert_called_once()
@@ -78,7 +78,7 @@ def test_cli_dashboard_with_host_runs_unauth_discovery(tmp_path: Path) -> None:
     ):
         result = runner.invoke(app, [
             "--workspaces-root", str(tmp_path / "ws2"),
-            "dashboard", "-H", "10.129.35.99", "--no-open"
+            "dashboard", "-H", "192.168.10.99", "--no-open"
         ])
         assert result.exit_code == 0
         mock_scan.assert_called_once()
@@ -98,7 +98,7 @@ def test_cli_web_unreachable_exits_with_error(tmp_path: Path) -> None:
     with patch("admapper.recon.ports.scan_host", return_value=[]) as mock_scan:
         result = runner.invoke(app, [
             "--workspaces-root", str(tmp_path / "ws3"),
-            "web", "-H", "10.129.35.99", "--no-open"
+            "web", "-H", "192.168.10.99", "--no-open"
         ])
         assert result.exit_code != 0
         assert "unreachable or AD ports" in result.stdout
@@ -114,7 +114,7 @@ def test_cli_dashboard_unreachable_exits_with_error(tmp_path: Path) -> None:
     with patch("admapper.recon.ports.scan_host", return_value=[]) as mock_scan:
         result = runner.invoke(app, [
             "--workspaces-root", str(tmp_path / "ws4"),
-            "dashboard", "-H", "10.129.35.99", "--no-open"
+            "dashboard", "-H", "192.168.10.99", "--no-open"
         ])
         assert result.exit_code != 0
         assert "unreachable or AD ports" in result.stdout

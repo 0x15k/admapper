@@ -10,8 +10,8 @@ from admapper.report.engagement_map import loot_clue_rows
 def test_year_suffix_detection() -> None:
     clues = [
         {
-            "user": "svc_recovery",
-            "string": "Em3rg3ncyPa$$2025",
+            "user": "svc_sql",
+            "string": "WelcomePassword123!",
             "source": "Logs/trace.log",
             "confidence": "medium",
             "verify_state": "sin verificar",
@@ -27,8 +27,8 @@ def test_year_suffix_detection() -> None:
 def test_filename_year_mismatch_inference() -> None:
     clues = [
         {
-            "user": "svc_recovery",
-            "string": "Em3rg3ncyPa$$2025",
+            "user": "svc_sql",
+            "string": "WelcomePassword123!",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
             "verify_state": "sin verificar",
@@ -48,8 +48,8 @@ def test_filename_year_mismatch_inference() -> None:
 def test_no_raw_password_list_in_output() -> None:
     clues = [
         {
-            "user": "svc_recovery",
-            "string": "Em3rg3ncyPa$$2025",
+            "user": "svc_sql",
+            "string": "WelcomePassword123!",
             "source": "Logs/IdentitySync_Trace_20260219.log",
             "confidence": "medium",
             "verify_state": "sin verificar",
@@ -57,7 +57,7 @@ def test_no_raw_password_list_in_output() -> None:
     ]
     result = analyze_password_clues(clues)
     blob = json.dumps(result)
-    assert "Em3rg3ncyPa$$2026" not in blob
+    assert "WelcomePassword123!" not in blob
     assert "candidates" not in blob
     assert "wordlist" not in blob
     for key in ("rules", "inferences", "possible_transforms"):
@@ -73,8 +73,8 @@ def test_loot_clue_rows_feed_rules(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_recovery",
-                        "password": "Em3rg3ncyPa$$2025",
+                        "username": "svc_sql",
+                        "password": "WelcomePassword123!",
                         "source_file": "Logs/IdentitySync_Trace_20260219.log",
                         "confidence": "medium",
                     }

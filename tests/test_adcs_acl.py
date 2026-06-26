@@ -16,11 +16,11 @@ def test_detect_template_enrollment_for_owned_group() -> None:
     ]
     principals = [
         PrincipalContext(
-            username="jaylee.clifton",
+            username="jaylee.doe",
             user_dn="CN=jaylee,DC=corp,DC=local",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
-            sid_to_name={it_sid: "IT", "S-1-5-21-1-2-3-2100": "jaylee.clifton"},
+            sid_to_name={it_sid: "IT", "S-1-5-21-1-2-3-2100": "jaylee.doe"},
         )
     ]
     findings = detect_owned_adcs_abuse(

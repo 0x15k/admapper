@@ -88,21 +88,17 @@ def build_guide_context(session: Session) -> GuideContext:
 
 def contextualize_text(text: str, ctx: GuideContext) -> str:
     """Replace generic placeholders with engagement-specific values."""
-    if not ctx.is_contextualized:
-        return text
+    domain = ctx.domain or "<domain>"
+    dc_ip = ctx.dc_ip or "<dc_ip>"
+    dc_host = ctx.dc_host or (ctx.dc_ip if ctx.dc_ip else "<dc_name>")
+    base_dn = ctx.base_dn or "<base_dn>"
+    user = ctx.username or "<username>"
+    password = ctx.password or "<password>"
 
     out = text
-    domain = ctx.domain or "corp.local"
-    dc_ip = ctx.dc_ip or "<DC_IP>"
-    dc_host = ctx.dc_host or dc_ip
-    base_dn = ctx.base_dn or "DC=corp,DC=local"
-    user = ctx.username or "user"
-    password = ctx.password or "pass"
-
     replacements: list[tuple[str, str]] = [
-        ("corp.local/user:pass", f"{domain}/{user}:{password}"),
         ("corp.local/user:pass@", f"{domain}/{user}:{password}@"),
-        (f"corp.local/{user}:{password}", f"{domain}/{user}:{password}"),
+        ("corp.local/user:pass", f"{domain}/{user}:{password}"),
         ("corp.local/", f"{domain}/"),
         ("user@corp.local", f"{user}@{domain}"),
         ("user@domain", f"{user}@{domain}"),
@@ -115,7 +111,8 @@ def contextualize_text(text: str, ctx: GuideContext) -> str:
         ("<USER>", user),
         ("<PASS>", password),
         ("<listener>", dc_host),
-        ("<CA>", f"{domain.split('.')[0]}-DC01-CA"),
+        ("logging-DC01-CA", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
+        ("<CA>", f"{domain.split('.')[0] if '.' in domain else domain}-DC01-CA" if domain != "<domain>" else "<ca_name>"),
     ]
 
     seen: set[str] = set()

@@ -84,50 +84,50 @@ def test_run_unauth_scan_persists_findings(tmp_path: Path) -> None:
 def test_run_unauth_scan_falls_back_when_port_scan_empty(tmp_path: Path) -> None:
     session = _session(tmp_path)
     session.select_workspace("lab")
-    session.set_hosts("10.129.20.182")
+    session.set_hosts("192.168.10.182")
 
     ldap_ok = LdapProbeResult(
-        host="10.129.20.182",
+        host="192.168.10.182",
         port=389,
         reachable=True,
         anonymous_bind=False,
         default_naming_context="DC=logging,DC=htb",
-        dns_host_name="DC01.logging.htb",
+        dns_host_name="DC01.corp.local",
     )
-    smb_ok = SmbProbeResult(host="10.129.20.182", port=445, reachable=True, null_session=False)
+    smb_ok = SmbProbeResult(host="192.168.10.182", port=445, reachable=True, null_session=False)
 
     with (
         patch("admapper.recon.unauth.scan_hosts", return_value={}),
         patch("admapper.recon.unauth.scan_host", return_value=[]),
-        patch("admapper.recon.unauth.discover_domain_from_ldap", return_value=("logging.htb", "dc01.logging.htb", ldap_ok)),
+        patch("admapper.recon.unauth.discover_domain_from_ldap", return_value=("corp.local", "dc01.corp.local", ldap_ok)),
         patch("admapper.recon.unauth.probe_ldap", return_value=ldap_ok),
         patch("admapper.recon.unauth.probe_smb_null", return_value=smb_ok),
-        patch("admapper.recon.unauth.reverse_ptr", return_value="dc01.logging.htb"),
+        patch("admapper.recon.unauth.reverse_ptr", return_value="dc01.corp.local"),
     ):
         result = run_unauth_scan(session)
 
-    assert result.domain == "logging.htb"
+    assert result.domain == "corp.local"
     assert len(result.hosts) == 1
-    assert session.workspace.domain == "logging.htb"
+    assert session.workspace.domain == "corp.local"
 
 
 def test_run_unauth_scan_domain_from_smb_null(tmp_path: Path) -> None:
     session = _session(tmp_path)
     session.select_workspace("lab")
-    session.set_hosts("10.129.20.182")
+    session.set_hosts("192.168.10.182")
 
-    ldap_fail = LdapProbeResult(host="10.129.20.182", port=389, reachable=True, anonymous_bind=False)
+    ldap_fail = LdapProbeResult(host="192.168.10.182", port=389, reachable=True, anonymous_bind=False)
     smb_ok = SmbProbeResult(
-        host="10.129.20.182",
+        host="192.168.10.182",
         port=445,
         reachable=True,
         null_session=True,
-        dns_domain="logging.htb",
-        dns_hostname="dc01.logging.htb",
+        dns_domain="corp.local",
+        dns_hostname="dc01.corp.local",
     )
 
     with (
-        patch("admapper.recon.unauth.scan_hosts", return_value={"10.129.20.182": [88, 389, 445, 636]}),
+        patch("admapper.recon.unauth.scan_hosts", return_value={"192.168.10.182": [88, 389, 445, 636]}),
         patch("admapper.recon.unauth.discover_domain_from_ldap", return_value=(None, None, None)),
         patch("admapper.recon.unauth.probe_ldap", return_value=ldap_fail),
         patch("admapper.recon.unauth.probe_smb_null", return_value=smb_ok),
@@ -135,5 +135,5 @@ def test_run_unauth_scan_domain_from_smb_null(tmp_path: Path) -> None:
     ):
         result = run_unauth_scan(session)
 
-    assert result.domain == "logging.htb"
-    assert result.hosts[0].hostname == "dc01.logging.htb"
+    assert result.domain == "corp.local"
+    assert result.hosts[0].hostname == "dc01.corp.local"

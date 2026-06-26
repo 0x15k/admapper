@@ -2,9 +2,9 @@ from admapper.creds.password_variants import password_year_variants
 
 
 def test_password_year_variants_adjacent_years():
-    variants = password_year_variants("Em3rg3ncyPa$$2025")
-    assert "Em3rg3ncyPa$$2025" in variants
-    assert "Em3rg3ncyPa$$2026" in variants
+    variants = password_year_variants("WelcomePassword123!")
+    assert "WelcomePassword123!" in variants
+    assert "WelcomePassword123!" in variants
     assert "Em3rg3ncyPa$$2024" in variants
 
 

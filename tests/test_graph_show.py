@@ -8,7 +8,7 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "graph.json").write_text(
-        json.dumps({"nodes": [{"id": "user:svc_recovery@logging.htb", "type": "user", "username": "svc_recovery", "owned": True}], "edges": []}),
+        json.dumps({"nodes": [{"id": "user:svc_sql@corp.local", "type": "user", "username": "svc_sql", "owned": True}], "edges": []}),
         encoding="utf-8",
     )
     (ws / "acl_findings.json").write_text(
@@ -16,7 +16,7 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
             {
                 "findings": [
                     {
-                        "principal": "svc_recovery",
+                        "principal": "svc_sql",
                         "right": "genericwrite",
                         "target_name": "msa_health",
                         "severity": "high",
@@ -28,9 +28,9 @@ def test_build_graph_view_shows_acl_and_pivot(tmp_path: Path) -> None:
     )
     text = build_graph_view(
         ws,
-        domain="logging.htb",
-        pivot_user="svc_recovery",
-        owned_users=["svc_recovery"],
+        domain="corp.local",
+        pivot_user="svc_sql",
+        owned_users=["svc_sql"],
     )
     assert "GRAFO DE ATAQUE" in text
     assert "genericwrite" in text

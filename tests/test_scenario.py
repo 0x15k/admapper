@@ -19,7 +19,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                 "credentials": [
                     {
                         "id": "cred-001",
-                        "username": "wallace.everette",
+                        "username": "wallace.doe",
                         "status": "valid",
                         "type": "password",
                         "source": "run",
@@ -27,7 +27,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                     },
                     {
                         "id": "cred-002",
-                        "username": "svc_recovery",
+                        "username": "svc_sql",
                         "status": "invalid",
                         "type": "password",
                         "source": "share_loot",
@@ -43,14 +43,14 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
             {
                 "parsed_credentials": [
                     {
-                        "username": "svc_recovery",
-                        "password": "Em3rg3ncyPa$$2026",
+                        "username": "svc_sql",
+                        "password": "WelcomePassword123!",
                         "confidence": "high",
                         "pattern": "bind_user_pass",
                         "source_file": "Logs/script.ps1",
                     }
                 ],
-                "dc_ip": "10.129.20.182",
+                "dc_ip": "192.168.10.182",
                 "shares_looted": ["Logs", "SYSVOL"],
             }
         ),
@@ -59,10 +59,10 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
     (ws / "unauth_scan.json").write_text(
         json.dumps(
             {
-                "domain": "logging.htb",
+                "domain": "corp.local",
                 "hosts": [
                     {
-                        "address": "10.129.20.182",
+                        "address": "192.168.10.182",
                         "is_domain_controller": True,
                         "open_ports": [88, 389, 445],
                     }
@@ -77,7 +77,7 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
                 "groups": [
                     {
                         "name": "Protected Users",
-                        "members": ["CN=svc_recovery,CN=Users,DC=logging,DC=htb"],
+                        "members": ["CN=svc_sql,CN=Users,DC=logging,DC=htb"],
                     }
                 ]
             }
@@ -89,15 +89,15 @@ def test_build_scenario_report_includes_loot_and_next(tmp_path: Path) -> None:
     text = build_scenario_report(
         ws,
         workspace="target",
-        domain="logging.htb",
-        owned_users=["wallace.everette"],
-        pivot_user="wallace.everette",
+        domain="corp.local",
+        owned_users=["wallace.doe"],
+        pivot_user="wallace.doe",
     )
 
-    assert "logging.htb" in text
-    assert "wallace.everette" in text
-    assert "svc_recovery" in text
-    assert "Em3rg3ncyPa$$2026" in text
+    assert "corp.local" in text
+    assert "wallace.doe" in text
+    assert "svc_sql" in text
+    assert "WelcomePassword123!" in text
     assert "ACCIONES RECOMENDADAS" in text
     assert "[RECOMENDADO]" in text
     assert "MATRIZ DE ACCESO" in text
@@ -130,7 +130,7 @@ def test_resolve_top_actions_gmsa_not_pywhisker(tmp_path: Path) -> None:
         ws,
         pivot="pivot",
         owned=["pivot"],
-        domain="logging.htb",
+        domain="corp.local",
         workspace="gmsa_cmd",
         limit=1,
     )
@@ -230,24 +230,24 @@ def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
                     {
                         "id": "wsus-004",
                         "technique": "wsus_cert_chain",
-                        "context": "jaylee.clifton",
+                        "context": "jaylee.doe",
                         "severity": "critical",
                         "title": "WSUS + AD CS certificate chain",
                         "prerequisites_met": True,
-                        "manual_commands": ["admapper wsus -w logging-autonomous"],
+                        "manual_commands": ["admapper wsus -w corp-autonomous"],
                     }
                 ]
             }
         ),
         encoding="utf-8",
     )
-    owned = ["msa_health$", "jaylee.clifton"]
+    owned = ["msa_health$", "jaylee.doe"]
     next_cmd = resolve_next_command(
         ws,
-        pivot="jaylee.clifton",
+        pivot="jaylee.doe",
         owned=owned,
-        domain="logging.htb",
-        workspace="logging-autonomous",
+        domain="corp.local",
+        workspace="corp-autonomous",
     )
     assert "evil-winrm" not in next_cmd.lower()
     assert "msa_health" not in next_cmd.lower()

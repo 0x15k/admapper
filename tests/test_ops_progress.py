@@ -11,7 +11,7 @@ def _polluted_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "unauth_scan.json").write_text(
-        json.dumps({"domain": "lab.htb", "hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]}),
+        json.dumps({"domain": "corp.local", "hosts": [{"address": "10.0.0.1", "is_domain_controller": True}]}),
         encoding="utf-8",
     )
     (ws / "credentials.json").write_text(
@@ -19,11 +19,11 @@ def _polluted_workspace(tmp_path: Path) -> Path:
             {
                 "credentials": [
                     {
-                        "username": "svc_recovery",
+                        "username": "svc_sql",
                         "secret": "secret",
                         "status": "valid",
                         "type": "password",
-                        "domain": "lab.htb",
+                        "domain": "corp.local",
                         "source": "cli",
                     }
                 ]
@@ -35,7 +35,7 @@ def _polluted_workspace(tmp_path: Path) -> Path:
         json.dumps(
             {
                 "parsed_credentials": [
-                    {"username": "svc_recovery", "password": "Em3rg3ncyPa$$2025", "confidence": "medium"}
+                    {"username": "svc_sql", "password": "WelcomePassword123!", "confidence": "medium"}
                 ]
             }
         ),
@@ -47,7 +47,7 @@ def _polluted_workspace(tmp_path: Path) -> Path:
                 "findings": [
                     {
                         "id": "acl-001",
-                        "principal": "svc_recovery",
+                        "principal": "svc_sql",
                         "right": "genericwrite",
                         "target_name": "msa_health",
                     }
@@ -57,7 +57,7 @@ def _polluted_workspace(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (ws / "state.json").write_text(
-        json.dumps({"owned_users": ["svc_recovery", "wallace.everette"], "pivot_user": "svc_recovery"}),
+        json.dumps({"owned_users": ["svc_sql", "wallace.doe"], "pivot_user": "svc_sql"}),
         encoding="utf-8",
     )
     return ws
@@ -69,37 +69,37 @@ def test_fresh_ops_progress_hides_cli_spoilers(tmp_path: Path) -> None:
     data = build_ops_payload(
         ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         ops_progress=progress,
     )
     assert data["meta"]["blackbox"] is True
     assert data["creds"] == []
     assert data["clues"] == []
     assert data["player"]["owned"] == []
-    assert not any(i["username"] == "svc_recovery" for i in data["selectable_identities"])
+    assert not any(i["username"] == "svc_sql" for i in data["selectable_identities"])
 
 
 def test_progress_after_auth_shows_only_player_cred(tmp_path: Path) -> None:
     ws = _polluted_workspace(tmp_path)
     progress = OpsProgress.fresh()
     progress.scan = True
-    progress.remember_auth("wallace.everette")
+    progress.remember_auth("wallace.doe")
     data = build_ops_payload(
         ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         ops_progress=progress,
-        pivot_user="wallace.everette",
+        pivot_user="wallace.doe",
     )
     assert len(data["creds"]) == 1
-    assert data["creds"][0]["user"] == "wallace.everette"
-    assert not any(c["user"] == "svc_recovery" for c in data["creds"])
+    assert data["creds"][0]["user"] == "wallace.doe"
+    assert not any(c["user"] == "svc_sql" for c in data["creds"])
 
 
 def test_progress_hides_hashes_until_exploit(tmp_path: Path) -> None:
     ws = _polluted_workspace(tmp_path)
     (ws / "state.json").write_text(
-        json.dumps({"owned_users": ["svc_recovery"], "pivot_user": "svc_recovery"}),
+        json.dumps({"owned_users": ["svc_sql"], "pivot_user": "svc_sql"}),
         encoding="utf-8",
     )
     (ws / "exploit_log.json").write_text(
@@ -117,14 +117,14 @@ def test_progress_hides_hashes_until_exploit(tmp_path: Path) -> None:
     )
     progress = OpsProgress.fresh()
     progress.scan = True
-    progress.remember_auth("svc_recovery")
+    progress.remember_auth("svc_sql")
     progress.acls = True
     data = build_ops_payload(
         ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         ops_progress=progress,
-        pivot_user="svc_recovery",
+        pivot_user="svc_sql",
     )
     assert data["hashes"] == []
     assert data["progress"]["exploit"] is False
@@ -133,8 +133,8 @@ def test_progress_hides_hashes_until_exploit(tmp_path: Path) -> None:
     data = build_ops_payload(
         ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         ops_progress=progress,
-        pivot_user="svc_recovery",
+        pivot_user="svc_sql",
     )
     assert len(data["hashes"]) >= 1

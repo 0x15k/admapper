@@ -13,7 +13,7 @@ from admapper.core.session import Session
 from admapper.core.workspace import WorkspaceManager
 
 
-def _session(tmp_path: Path, hosts: str = "10.129.20.182") -> Session:
+def _session(tmp_path: Path, hosts: str = "192.168.10.182") -> Session:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
@@ -24,7 +24,7 @@ def _session(tmp_path: Path, hosts: str = "10.129.20.182") -> Session:
 
 def test_format_unreachable_no_route() -> None:
     msg = format_unreachable_message(
-        TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host")
+        TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host")
     )
     assert "no alcanzable" in msg
     assert "apagada" in msg or "VPN" in msg
@@ -60,7 +60,7 @@ def test_check_target_reachable_no_route() -> None:
         "admapper.core.reachability.socket.create_connection",
         side_effect=OSError("[Errno 113] No route to host"),
     ):
-        ok, detail = check_target_reachable("10.129.20.182")
+        ok, detail = check_target_reachable("192.168.10.182")
 
     assert ok is False
     assert "No route to host" in detail

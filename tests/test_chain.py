@@ -3,7 +3,7 @@ from admapper.chain.analyze import build_attack_chains
 
 def test_build_dll_hijack_chain_detects_pivot() -> None:
     class FakeSession:
-        workspace = type("W", (), {"owned_users": ["jaylee.clifton"]})()
+        workspace = type("W", (), {"owned_users": ["jaylee.doe"]})()
 
     session = FakeSession()
     postex_ops = {
@@ -11,7 +11,7 @@ def test_build_dll_hijack_chain_detects_pivot() -> None:
             {
                 "id": "postex-010",
                 "technique": "dll_hijack_scheduled_task",
-                "detail": "Task 'UpdateChecker Agent' runs as jaylee.clifton | Binary: ...",
+                "detail": "Task 'UpdateChecker Agent' runs as jaylee.doe | Binary: ...",
             }
         ]
     }
@@ -20,7 +20,7 @@ def test_build_dll_hijack_chain_detects_pivot() -> None:
             {
                 "id": "adcs-002",
                 "esc": "template_enrollment",
-                "principal": "jaylee.clifton",
+                "principal": "jaylee.doe",
                 "template": "UpdateSrv",
             }
         ]
@@ -30,13 +30,13 @@ def test_build_dll_hijack_chain_detects_pivot() -> None:
             {
                 "id": "wsus-001",
                 "technique": "wsus_cert_chain",
-                "context": "jaylee.clifton",
+                "context": "jaylee.doe",
                 "prerequisites_met": True,
             }
         ]
     }
     inventory = {
-        "users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}],
     }
     chains = build_attack_chains(
@@ -46,7 +46,7 @@ def test_build_dll_hijack_chain_detects_pivot() -> None:
         wsus_ops=wsus_ops,
         postex_scan=None,
         inventory=inventory,
-        dc_ip="10.129.245.130",
+        dc_ip="192.168.10.130",
     )
     assert chains
     chain = chains[0]

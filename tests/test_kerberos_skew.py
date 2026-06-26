@@ -42,10 +42,10 @@ def test_check_kerberos_with_skew_uses_workspace_cache(tmp_path: Path) -> None:
         side_effect=lambda *a, **kw: kw.get("clock_skew") == "+7h",
     ) as mock_krb:
         ok, applied = check_kerberos_with_skew(
-            "logging.htb",
-            "svc_recovery",
+            "corp.local",
+            "svc_sql",
             "secret",
-            dc_ip="10.129.20.182",
+            dc_ip="192.168.10.182",
             ws_path=tmp_path,
             skip_system_time=True,
         )
@@ -65,10 +65,10 @@ def test_check_kerberos_with_skew_probes_after_system_failure(tmp_path: Path) ->
         ) as mock_krb,
     ):
         ok, applied = check_kerberos_with_skew(
-            "logging.htb",
-            "svc_recovery",
+            "corp.local",
+            "svc_sql",
             "secret",
-            dc_ip="10.129.20.182",
+            dc_ip="192.168.10.182",
             ws_path=tmp_path,
         )
     assert ok is True
@@ -90,7 +90,7 @@ def test_query_dc_time_ldap() -> None:
         patch("admapper.creds.time_sync.Server", return_value=mock_server),
         patch("admapper.creds.time_sync.Connection") as mock_conn,
     ):
-        dc_time = query_dc_time_ldap("10.129.245.130")
+        dc_time = query_dc_time_ldap("192.168.10.130")
 
     assert dc_time is not None
     assert dc_time == datetime(2026, 6, 25, 23, 38, 4, tzinfo=timezone.utc)
@@ -108,7 +108,7 @@ def test_calculate_ldap_clock_skew() -> None:
         patch("admapper.creds.time_sync.datetime") as mock_dt,
     ):
         mock_dt.now.return_value = local_time
-        skew = calculate_ldap_clock_skew("10.129.245.130")
+        skew = calculate_ldap_clock_skew("192.168.10.130")
 
     # +7 hours = 25200 seconds
     assert skew == 25200.0
@@ -124,7 +124,7 @@ def test_ensure_dc_clock_with_ldap_skew(tmp_path: Path) -> None:
         patch("admapper.creds.time_sync.sync_time_to_dc", return_value=(False, "sync failed")),
     ):
         # Even if sync fails, the LDAP derived clock skew will set and return True
-        res = ensure_dc_clock("10.129.245.130", enabled=True, ws_path=tmp_path)
+        res = ensure_dc_clock("192.168.10.130", enabled=True, ws_path=tmp_path)
 
     assert res is True
     assert get_clock_skew() == "+7h"

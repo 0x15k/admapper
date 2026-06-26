@@ -12,16 +12,16 @@ from admapper.winrm import upload as upload_mod
 def _client(*, nthash: bool = False) -> WinRMClient:
     if nthash:
         return WinRMClient(
-            "10.129.20.182",
-            domain="logging.htb",
+            "192.168.10.182",
+            domain="corp.local",
             username="msa_health$",
             ticket_method="nthash",
             nthash="abc123",
-            dc_ip="10.129.20.182",
+            dc_ip="192.168.10.182",
         )
     return WinRMClient(
         "10.0.0.1",
-        domain="logging.htb",
+        domain="corp.local",
         username="user",
         password="pass",
     )

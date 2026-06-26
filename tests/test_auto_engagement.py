@@ -23,7 +23,7 @@ def _session(tmp_path: Path, *, owned: list[str] | None = None) -> Session:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.set_domain("logging.htb")
+    session.set_domain("corp.local")
     if owned:
         session.workspace.owned_users = list(owned)
     session.persist_workspace()
@@ -31,7 +31,7 @@ def _session(tmp_path: Path, *, owned: list[str] | None = None) -> Session:
 
 
 def test_sync_owned_marks_msa_health_from_exploit_log(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.everette"])
+    session = _session(tmp_path, owned=["wallace.doe"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
@@ -39,7 +39,7 @@ def test_sync_owned_marks_msa_health_from_exploit_log(tmp_path: Path) -> None:
                 "new_hashes": [
                     {"account": "msa_health$", "nthash": "a" * 32},
                 ],
-                "new_users": ["jaylee.clifton"],
+                "new_users": ["jaylee.doe"],
             }
         ),
         encoding="utf-8",
@@ -48,13 +48,13 @@ def test_sync_owned_marks_msa_health_from_exploit_log(tmp_path: Path) -> None:
     marked = sync_owned_from_intel(session)
 
     assert "msa_health$" in marked
-    assert "jaylee.clifton" in marked
+    assert "jaylee.doe" in marked
     assert "msa_health$" in session.workspace.owned_users
-    assert "jaylee.clifton" in session.workspace.owned_users
+    assert "jaylee.doe" in session.workspace.owned_users
 
 
 def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.everette", "msa_health$"])
+    session = _session(tmp_path, owned=["wallace.doe", "msa_health$"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
         json.dumps(
@@ -76,7 +76,7 @@ def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
 def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
     session = _session(
         tmp_path,
-        owned=["wallace.everette", "svc_recovery", "msa_health$", "jaylee.clifton"],
+        owned=["wallace.doe", "svc_sql", "msa_health$", "jaylee.doe"],
     )
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
@@ -92,12 +92,12 @@ def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
 
     pivot = auto_set_pivot(session)
 
-    assert pivot == "jaylee.clifton"
-    assert session.workspace.pivot_user == "jaylee.clifton"
+    assert pivot == "jaylee.doe"
+    assert session.workspace.pivot_user == "jaylee.doe"
 
 
 def test_prepare_finalize_minimal_workspace(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.everette"])
+    session = _session(tmp_path, owned=["wallace.doe"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "auth_inventory.json").write_text(
         json.dumps({"users": [], "computers": []}),
@@ -136,7 +136,7 @@ def test_run_auto_postex_scan_calls_analysis_once(tmp_path: Path) -> None:
     )
 
     with (
-        patch("admapper.engage.auto.require_target_reachable", return_value="10.129.20.182"),
+        patch("admapper.engage.auto.require_target_reachable", return_value="192.168.10.182"),
         patch("admapper.postex.remote_scan.run_remote_task_hijack_scan") as mock_scan,
         patch("admapper.postex.analyze.run_postex_analysis") as mock_analysis,
         patch("admapper.core.provenance.print_step"),
@@ -148,7 +148,7 @@ def test_run_auto_postex_scan_calls_analysis_once(tmp_path: Path) -> None:
 
 
 def test_finalize_auto_skips_postex_rescan(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["wallace.everette"])
+    session = _session(tmp_path, owned=["wallace.doe"])
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "auth_inventory.json").write_text(
         json.dumps({"users": [], "computers": []}),
@@ -175,11 +175,11 @@ def test_resolve_pivot_upgrades_stale_machine_pivot(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.workspace.owned_users = ["msa_health$", "jaylee.clifton"]
+    session.workspace.owned_users = ["msa_health$", "jaylee.doe"]
     session.workspace.pivot_user = "msa_health$"
     session.persist_workspace()
 
-    assert resolve_pivot_user(session) == "jaylee.clifton"
+    assert resolve_pivot_user(session) == "jaylee.doe"
 
 
 def test_pick_wired_next_skips_acl_prefers_postex() -> None:
@@ -195,7 +195,7 @@ def test_pick_wired_next_skips_acl_prefers_postex() -> None:
             {
                 "module": "postex",
                 "technique": "dll_hijack_scheduled_task",
-                "target": "jaylee.clifton",
+                "target": "jaylee.doe",
                 "ready": True,
                 "target_owned": False,
                 "op_id": "postex-001",
@@ -212,7 +212,7 @@ def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> 
 
     session = _session(tmp_path, owned=["msa_health$"])
     ws_path = tmp_path / "ws" / "lab"
-    session.workspace.hosts = "10.129.20.182"
+    session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
     (ws_path / "exploit_log.json").write_text(
         json.dumps({"new_hashes": [{"account": "msa_health$", "nthash": "a" * 32}]}),
@@ -222,7 +222,7 @@ def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> 
     with (
         patch(
             "admapper.engage.auto.require_target_reachable",
-            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+            side_effect=TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host"),
         ),
         patch("admapper.postex.remote_scan.run_remote_task_hijack_scan") as mock_scan,
         patch("admapper.engage.auto.print_error") as mock_err,
@@ -234,9 +234,9 @@ def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> 
 
 
 def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["jaylee.clifton"])
+    session = _session(tmp_path, owned=["jaylee.doe"])
     session.workspace.mode = OperationMode.AUTO
-    session.workspace.hosts = "10.129.20.182"
+    session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "escalate.json").write_text(
@@ -246,7 +246,7 @@ def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> 
                     {
                         "module": "wsus",
                         "technique": "wsus_cert_chain",
-                        "target": "10.129.20.182",
+                        "target": "192.168.10.182",
                         "ready": True,
                         "target_owned": False,
                         "op_id": "wsus-004",
@@ -261,7 +261,7 @@ def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> 
 
     with (
         patch("admapper.engage.auto.run_escalate_analysis"),
-        patch("admapper.engage.auto.require_target_reachable", side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host")),
+        patch("admapper.engage.auto.require_target_reachable", side_effect=TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host")),
         patch("admapper.engage.auto.run_escalate_exec") as mock_exec,
         patch("admapper.engage.auto.print_error"),
         patch("admapper.core.provenance.print_step"),
@@ -275,9 +275,9 @@ def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> 
 def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
     from admapper.core.connectivity import TargetUnreachableError
 
-    session = _session(tmp_path, owned=["wallace.everette"])
+    session = _session(tmp_path, owned=["wallace.doe"])
     ws_path = tmp_path / "ws" / "lab"
-    session.workspace.hosts = "10.129.20.182"
+    session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
     (ws_path / "auth_inventory.json").write_text(
         json.dumps({"users": [], "computers": []}),
@@ -287,7 +287,7 @@ def test_finalize_auto_aborts_when_target_unreachable(tmp_path: Path) -> None:
     with (
         patch(
             "admapper.engage.auto.require_target_reachable",
-            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+            side_effect=TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host"),
         ),
         patch("admapper.engage.auto.run_auto_exec") as mock_exec,
         patch("admapper.engage.auto.run_escalate_analysis") as mock_analysis,
@@ -306,13 +306,13 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
 
     session = _session(tmp_path, owned=["msa_health$"])
     session.workspace.mode = OperationMode.AUTO
-    session.workspace.hosts = "10.129.20.182"
+    session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "postex_scan.json").write_text(
         json.dumps(
             {
-                "dc_ip": "10.129.20.182",
+                "dc_ip": "192.168.10.182",
                 "shell_user": "msa_health$",
                 "findings": [
                     {
@@ -320,7 +320,7 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
                         "payload_zip": "payload.zip",
                         "payload_dll": "payload.dll",
                         "task_name": "UpdateChecker Agent",
-                        "run_as_user": "jaylee.clifton",
+                        "run_as_user": "jaylee.doe",
                     }
                 ],
             }
@@ -333,7 +333,7 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
     with (
         patch(
             "admapper.postex.deploy.require_target_reachable",
-            side_effect=TargetUnreachableError("10.129.20.182", "[Errno 113] No route to host"),
+            side_effect=TargetUnreachableError("192.168.10.182", "[Errno 113] No route to host"),
         ),
         patch("admapper.postex.deploy.prepare_hijack_payload") as mock_build,
         patch("admapper.postex.deploy.resolve_winrm_cred"),

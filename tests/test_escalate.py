@@ -14,26 +14,26 @@ def test_escalate_picks_dll_hijack_from_msa_health(tmp_path: Path) -> None:
             "context": "msa_health$",
             "severity": "critical",
             "title": "DLL hijack",
-            "detail": "Task 'UpdateChecker Agent' runs as jaylee.clifton | Binary: x",
+            "detail": "Task 'UpdateChecker Agent' runs as jaylee.doe | Binary: x",
             "manual_commands": ["postex run --op postex-010"]
         }]}
         """,
         encoding="utf-8",
     )
     (ws / "postex_scan.json").write_text(
-        '{"findings": [{"run_as_user": "jaylee.clifton"}]}',
+        '{"findings": [{"run_as_user": "jaylee.doe"}]}',
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
         pivot_user="msa_health$",
         owned_users=["msa_health$"],
         ws_path=ws,
-        domain="logging.htb",
+        domain="corp.local",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None
     assert nxt.technique == "dll_hijack_scheduled_task"
-    assert nxt.target == "jaylee.clifton"
+    assert nxt.target == "jaylee.doe"
 
 
 def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) -> None:
@@ -41,7 +41,7 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
     ws.mkdir()
     (ws / "auth_inventory.json").write_text(
         """
-        {"users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
          "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}]}
         """,
         encoding="utf-8",
@@ -51,7 +51,7 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         {"findings": [{
             "id": "adcs-002",
             "esc": "template_enrollment",
-            "principal": "jaylee.clifton",
+            "principal": "jaylee.doe",
             "template": "UpdateSrv",
             "wsus_chain_step": true,
             "cert_auth_viable": false,
@@ -68,7 +68,7 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         {"opportunities": [{
             "id": "wsus-004",
             "technique": "wsus_cert_chain",
-            "context": "jaylee.clifton",
+            "context": "jaylee.doe",
             "severity": "critical",
             "title": "WSUS + AD CS certificate chain",
             "prerequisites_met": true,
@@ -78,10 +78,10 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
-        pivot_user="jaylee.clifton",
-        owned_users=["msa_health$", "jaylee.clifton"],
+        pivot_user="jaylee.doe",
+        owned_users=["msa_health$", "jaylee.doe"],
         ws_path=ws,
-        domain="logging.htb",
+        domain="corp.local",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None
@@ -96,7 +96,7 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
         """
         {"findings": [{
             "id": "acl-001",
-            "principal": "svc_recovery",
+            "principal": "svc_sql",
             "right": "genericwrite",
             "target_name": "msa_health",
             "severity": "high"
@@ -111,20 +111,20 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
             "technique": "dll_hijack_scheduled_task",
             "context": "msa_health$",
             "severity": "high",
-            "detail": "runs as jaylee.clifton"
+            "detail": "runs as jaylee.doe"
         }]}
         """,
         encoding="utf-8",
     )
     (ws / "postex_scan.json").write_text(
-        '{"findings": [{"run_as_user": "jaylee.clifton"}]}',
+        '{"findings": [{"run_as_user": "jaylee.doe"}]}',
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
         pivot_user="msa_health$",
-        owned_users=["svc_recovery", "msa_health$"],
+        owned_users=["svc_sql", "msa_health$"],
         ws_path=ws,
-        domain="logging.htb",
+        domain="corp.local",
     )
     nxt = pick_next_edge(edges)
     assert nxt is not None

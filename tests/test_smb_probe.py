@@ -5,15 +5,15 @@ from admapper.recon.smb_probe import probe_smb_null
 
 def test_probe_smb_null_extracts_dns_domain() -> None:
     conn = MagicMock()
-    conn.getServerDNSDomainName.return_value = "logging.htb"
-    conn.getServerDNSHostName.return_value = "dc01.logging.htb"
+    conn.getServerDNSDomainName.return_value = "corp.local"
+    conn.getServerDNSHostName.return_value = "dc01.corp.local"
 
     with (
         patch("impacket.smbconnection.SMBConnection", return_value=conn),
         patch("impacket.smbconnection.SessionError", Exception),
     ):
-        result = probe_smb_null("10.129.20.182")
+        result = probe_smb_null("192.168.10.182")
 
     assert result.null_session is True
-    assert result.dns_domain == "logging.htb"
-    assert result.dns_hostname == "dc01.logging.htb"
+    assert result.dns_domain == "corp.local"
+    assert result.dns_hostname == "dc01.corp.local"

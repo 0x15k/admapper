@@ -59,7 +59,7 @@ def test_verify_credential_checks_protected_users_kerberos_only(tmp_path: Path) 
     manager = WorkspaceManager(tmp_path / "ws")
     manager.create("lab")
     store = CredentialStore(manager, "lab")
-    cred = store.add("svc_recovery", "Em3rg3ncyPa$$2026", domain="logging.htb")
+    cred = store.add("svc_sql", "WelcomePassword123!", domain="corp.local")
 
     with patch(
         "admapper.creds.auth_checks.check_ldap",
@@ -71,9 +71,9 @@ def test_verify_credential_checks_protected_users_kerberos_only(tmp_path: Path) 
     ) as mock_krb:
         result = verify_credential_checks(
             cred,
-            "10.129.20.182",
-            "logging.htb",
-            protected_users={"svc_recovery"},
+            "192.168.10.182",
+            "corp.local",
+            protected_users={"svc_sql"},
             ws_path=str(manager.path_for("lab")),
         )
 

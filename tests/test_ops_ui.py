@@ -20,7 +20,7 @@ def _minimal_ws(tmp_path: Path) -> Path:
                 "hosts": [
                     {
                         "address": "10.0.0.1",
-                        "hostname": "dc01.lab.htb",
+                        "hostname": "dc01.corp.local",
                         "is_domain_controller": True,
                         "open_ports": [88, 389, 445],
                     }
@@ -47,7 +47,7 @@ def _minimal_ws(tmp_path: Path) -> Path:
 
 def test_build_ops_payload_phases(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    data = build_ops_payload(ws, workspace="ws", domain="lab.htb", owned_users=["alice"])
+    data = build_ops_payload(ws, workspace="ws", domain="corp.local", owned_users=["alice"])
     assert data["meta"]["dc_ip"] == "10.0.0.1"
     assert len(data["phases"]) == 9
     assert "study_map" in data
@@ -83,7 +83,7 @@ def test_build_ops_payload_recon_placeholder_nodes(tmp_path: Path) -> None:
 
 def test_build_ops_html_real_terms(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    html = build_ops_html(ws, workspace="ws", domain="lab.htb", pivot_user="alice", api_mode=True)
+    html = build_ops_html(ws, workspace="ws", domain="corp.local", pivot_user="alice", api_mode=True)
     assert "AD OPS" in html
     assert "Kerberos" in html
     assert "GenericWrite" in html
@@ -114,7 +114,7 @@ def test_build_ops_html_real_terms(tmp_path: Path) -> None:
 
 def test_write_ops_html(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    out = write_ops_html(ws, workspace="ws", domain="lab.htb")
+    out = write_ops_html(ws, workspace="ws", domain="corp.local")
     assert out.name == "ad_ops.html"
     assert out.exists()
 
@@ -138,7 +138,7 @@ def test_build_ops_payload_includes_mission(tmp_path: Path) -> None:
         )
     )
     data = build_ops_payload(
-        ws, workspace="ws", domain="lab.htb", owned_users=["alice"], pivot_user="alice"
+        ws, workspace="ws", domain="corp.local", owned_users=["alice"], pivot_user="alice"
     )
     assert data["mission"] is not None
     assert data["mission"]["action"] == "exploit"
@@ -201,7 +201,7 @@ def test_build_ops_payload_filters_actions_by_pivot(tmp_path: Path) -> None:
     data = build_ops_payload(
         ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         owned_users=["alice", "bob"],
         pivot_user="alice",
     )
@@ -227,7 +227,7 @@ def test_build_ops_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
         )
     )
     data = build_ops_payload(
-        ws, workspace="ws", domain="lab.htb", owned_users=["alice"], pivot_user="alice"
+        ws, workspace="ws", domain="corp.local", owned_users=["alice"], pivot_user="alice"
     )
     carol = next(r for r in data["selectable_identities"] if r["username"] == "carol")
     assert carol["selectable"] == "view"
@@ -237,7 +237,7 @@ def test_build_ops_payload_view_lens_on_enum_user(tmp_path: Path) -> None:
 
 def test_build_ops_payload_includes_operator_setup(tmp_path: Path) -> None:
     ws = _minimal_ws(tmp_path)
-    data = build_ops_payload(ws, workspace="ws", domain="lab.htb", owned_users=[])
+    data = build_ops_payload(ws, workspace="ws", domain="corp.local", owned_users=[])
     assert "operator_setup" in data
     assert data["operator_setup"]["sync_dc_cmd"] is None or "sync-dc" in data["operator_setup"]["sync_dc_cmd"]
 
@@ -247,7 +247,7 @@ def test_dashboard_server_state_endpoint(tmp_path: Path) -> None:
     ctx = DashboardContext(
         ws_path=ws,
         workspace="ws",
-        domain="lab.htb",
+        domain="corp.local",
         owned_users=["alice"],
         pivot_user="alice",
         host="10.0.0.1",

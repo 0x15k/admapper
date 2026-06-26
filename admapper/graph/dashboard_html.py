@@ -861,7 +861,7 @@ function renderLootPanel(s) {{
     if (item.type === 'hash') {{
       const isMachine = item.user.endsWith('$');
       const reuse = isMachine ? 'Machine account context (low reuse outside own system)' : 'High reuse potential (viable for PTH across domain)';
-      const targets = isMachine ? item.user.replace('$', '').toUpperCase() + ', DC01' : 'DC01, all domain member servers';
+      const targets = isMachine ? item.user.replace('$', '').toUpperCase() + ', DCs' : 'DCs, all domain member servers';
       extraHash = `
         <div style="font-size:0.62rem;color:var(--text-dim);margin-top:0.3rem;display:flex;flex-direction:column;gap:0.15rem;border-top:1px solid rgba(255,255,255,0.03);padding-top:0.25rem;margin-bottom:0.25rem;">
           <div><strong>Status:</strong> <span style="color:var(--orange);font-weight:600;">Uncracked (PTH Viable)</span></div>
@@ -947,7 +947,7 @@ function renderCredentialState(s) {{
     if (c.type === 'NT Hash') {{
       const isMachine = c.user.endsWith('$');
       const reuse = isMachine ? 'Machine account context (low reuse outside own system)' : 'High reuse potential (viable for PTH across domain)';
-      const targets = isMachine ? c.user.replace('$', '').toUpperCase() + ', DC01' : 'DC01, all domain member servers';
+      const targets = isMachine ? c.user.replace('$', '').toUpperCase() + ', DCs' : 'DCs, all domain member servers';
       hashExtra = `
         <div style="font-size:0.62rem;color:var(--text-dim);margin-top:0.25rem;border-top:1px solid rgba(255,255,255,0.03);padding-top:0.2rem;display:flex;flex-direction:column;gap:0.1rem;">
           <div><strong>Hash Status:</strong> <span style="color:var(--orange)">Uncracked (PTH Viable)</span></div>

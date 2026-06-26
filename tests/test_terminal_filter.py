@@ -20,9 +20,9 @@ def test_filter_dedupes_skew_hints() -> None:
 
 def test_filter_folds_invalid_then_valid_cred() -> None:
     f = TerminalFilter()
-    assert f.process("! credential invalid: logging.htb\\svc_recovery (abc)") is None
-    assert f.process("! credential invalid: logging.htb\\svc_recovery (def)") is None
-    out = f.process("✓ credential valid: logging.htb\\svc_recovery (ghi)")
+    assert f.process("! credential invalid: corp.local\\svc_sql (abc)") is None
+    assert f.process("! credential invalid: corp.local\\svc_sql (def)") is None
+    out = f.process("✓ credential valid: corp.local\\svc_sql (ghi)")
     assert out is not None
     assert "Credencial válida" in out
 

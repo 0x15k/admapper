@@ -4,7 +4,7 @@ from admapper.wsus.prerequisites import check_wsus_prerequisites, owned_groups_f
 
 def test_owned_groups_for_user() -> None:
     inventory = {
-        "users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
         "groups": [
             {
                 "name": "IT",
@@ -12,13 +12,13 @@ def test_owned_groups_for_user() -> None:
             }
         ],
     }
-    groups = owned_groups_for_user(inventory, "jaylee.clifton")
+    groups = owned_groups_for_user(inventory, "jaylee.doe")
     assert "IT" in groups
 
 
 def test_wsus_prerequisites_require_adcs() -> None:
     checks = check_wsus_prerequisites(
-        username="jaylee.clifton",
+        username="jaylee.doe",
         groups=["IT"],
         has_adcs=False,
         wsus_share=True,
@@ -31,31 +31,31 @@ def test_wsus_prerequisites_require_adcs() -> None:
 
 def test_build_wsus_cert_chain_when_enrollment_finding() -> None:
     class FakeSession:
-        workspace = type("W", (), {"owned_users": ["jaylee.clifton"]})()
+        workspace = type("W", (), {"owned_users": ["jaylee.doe"]})()
 
     session = FakeSession()
     adcs_findings = {
         "findings": [
             {
                 "esc": "template_enrollment",
-                "principal": "jaylee.clifton",
+                "principal": "jaylee.doe",
                 "template": "UpdateSrv",
-                "ca_name": "logging-DC01-CA",
+                "ca_name": "corp-DC01-CA",
             }
         ]
     }
     inventory = {
-        "users": [{"username": "jaylee.clifton", "dn": "CN=jaylee,DC=logging,DC=htb"}],
+        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=logging,DC=htb"}],
         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=logging,DC=htb"]}],
         "smb_shares": ["WSUSTemp"],
     }
     ops = build_wsus_opportunities(
         session,  # type: ignore[arg-type]
         inventory=inventory,
-        adcs_inventory={"enrollment_services": [{"name": "logging-DC01-CA"}]},
+        adcs_inventory={"enrollment_services": [{"name": "corp-DC01-CA"}]},
         adcs_findings=adcs_findings,
         acl_data=None,
-        dc_ip="10.129.245.130",
+        dc_ip="192.168.10.130",
     )
     techniques = {o.technique for o in ops}
     assert "wsus_cert_chain" in techniques

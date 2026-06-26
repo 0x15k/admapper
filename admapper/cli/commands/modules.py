@@ -117,12 +117,23 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
                     i += 2
                 elif args[i] == "enroll-hijack":
                     from admapper.adcs.runner import run_enroll_hijack
+                    from admapper.creds.common import resolve_dc_fqdn, pick_dc_ip
+
+                    resolved_dns = dns_name
+                    if not resolved_dns:
+                        domain = session.workspace.domain if session.workspace else None
+                        ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
+                        dc_ip = pick_dc_ip(session)
+                        if domain and ws_path:
+                            resolved_dns = resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
+                    if not resolved_dns:
+                        raise ValueError("dns_name could not be resolved from workspace — please specify it with --dns")
 
                     try:
                         run_enroll_hijack(
                             session,
                             finding_id=finding_id,
-                            dns_name=dns_name or "DC01.logging.htb",
+                            dns_name=resolved_dns,
                             op_id="postex-010",
                         )
                     except (ValueError, RuntimeError) as exc:

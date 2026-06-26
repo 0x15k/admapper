@@ -178,7 +178,7 @@ def build_wsus_opportunities(
                 op.manual_commands.extend(
                     [
                         "# No Client Authentication EKU — certipy auth will not work",
-                        "admapper postex run --mode enroll  # or run enroll.ps1 on jaylee shell",
+                        "admapper postex run --mode enroll  # or run enroll.ps1 on target shell",
                         "python3 pywsus.py -s <wsus_host> publish ...",
                     ]
                 )

@@ -21,7 +21,7 @@ def _session(tmp_path: Path) -> Session:
                 "hosts": [
                     {
                         "address": "10.0.0.1",
-                        "hostname": "dc01.lab.htb",
+                        "hostname": "dc01.corp.local",
                         "is_domain_controller": True,
                         "open_ports": [389, 445],
                     }
@@ -40,9 +40,9 @@ def _session(tmp_path: Path) -> Session:
                 "credentials": [
                     {
                         "id": "old-wallace",
-                        "username": "wallace.everette",
+                        "username": "wallace.doe",
                         "secret": "x",
-                        "domain": "lab.htb",
+                        "domain": "corp.local",
                         "status": "valid",
                         "cred_type": "password",
                         "source": "cli",
@@ -54,7 +54,7 @@ def _session(tmp_path: Path) -> Session:
     )
     session = Session.bootstrap(workspaces_root=root)
     session.select_workspace("target-lab", create=True)
-    session.set_domain("lab.htb")
+    session.set_domain("corp.local")
     return session
 
 
@@ -62,9 +62,9 @@ def test_dashboard_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) 
     session = _session(tmp_path)
     verified = Credential(
         id="new-svc",
-        username="svc_recovery",
+        username="svc_sql",
         secret="pw",
-        domain="lab.htb",
+        domain="corp.local",
         status=CredentialStatus.VALID,
     )
 
@@ -78,18 +78,18 @@ def test_dashboard_auth_verifies_submitted_user_not_first_valid(tmp_path: Path) 
 
         result = run_dashboard_credential_auth(
             session,
-            username="svc_recovery",
-            password="Em3rg3ncyPa$$2026",
-            domain="lab.htb",
+            username="svc_sql",
+            password="WelcomePassword123!",
+            domain="corp.local",
         )
 
-    assert result.username == "svc_recovery"
+    assert result.username == "svc_sql"
     added = session.credentials.list()
-    assert any(c.username == "svc_recovery" for c in added)
+    assert any(c.username == "svc_sql" for c in added)
     mock_verify.assert_called_once()
     called_id = mock_verify.call_args[0][1]
-    assert any(c.id == called_id and c.username == "svc_recovery" for c in added)
-    mock_pivot.assert_called_once_with(session, "svc_recovery")
+    assert any(c.id == called_id and c.username == "svc_sql" for c in added)
+    mock_pivot.assert_called_once_with(session, "svc_sql")
 
 
 def test_dashboard_auth_uses_session_target_ip_when_ip_missing(tmp_path: Path) -> None:
@@ -99,9 +99,9 @@ def test_dashboard_auth_uses_session_target_ip_when_ip_missing(tmp_path: Path) -
 
     verified = Credential(
         id="new-svc",
-        username="svc_recovery",
+        username="svc_sql",
         secret="pw",
-        domain="lab.htb",
+        domain="corp.local",
         status=CredentialStatus.VALID,
     )
 
@@ -115,10 +115,10 @@ def test_dashboard_auth_uses_session_target_ip_when_ip_missing(tmp_path: Path) -
 
         run_dashboard_credential_auth(
             session,
-            username="svc_recovery",
-            password="Em3rg3ncyPa$$2026",
-            domain="lab.htb",
+            username="svc_sql",
+            password="WelcomePassword123!",
+            domain="corp.local",
         )
 
     added = session.credentials.list()
-    assert any(c.username == "svc_recovery" for c in added)
+    assert any(c.username == "svc_sql" for c in added)

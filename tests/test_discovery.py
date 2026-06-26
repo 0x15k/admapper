@@ -9,11 +9,11 @@ from admapper.recon.dns import dn_to_domain
 
 
 def test_dn_to_domain() -> None:
-    assert dn_to_domain("DC=logging,DC=htb") == "logging.htb"
+    assert dn_to_domain("DC=logging,DC=htb") == "corp.local"
 
 
 def test_default_workspace_name_from_ip() -> None:
-    assert default_workspace_name("10.129.245.130") == "target-10-129-245-130"
+    assert default_workspace_name("192.168.10.130") == "target-192-168-10-130"
 
 
 def test_resolve_domain_from_findings(tmp_path: Path) -> None:
@@ -48,10 +48,10 @@ def test_ensure_domain_persists_on_session(tmp_path: Path) -> None:
     ws_path = tmp_path / "ws" / "lab"
     ws_path.mkdir(parents=True, exist_ok=True)
     (ws_path / "unauth_scan.json").write_text(
-        json.dumps({"domain": "logging.htb"}),
+        json.dumps({"domain": "corp.local"}),
         encoding="utf-8",
     )
 
     domain = ensure_domain(session, announce=False)
-    assert domain == "logging.htb"
-    assert session.workspace.domain == "logging.htb"
+    assert domain == "corp.local"
+    assert session.workspace.domain == "corp.local"

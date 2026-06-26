@@ -28,10 +28,10 @@ def test_output_prefixes() -> None:
 
 def test_print_scan_line() -> None:
     with patch("admapper.core.output.console.print") as mock_print:
-        print_scan_line("LDAP", "10.129.245.130", "Connection established", level="success")
+        print_scan_line("LDAP", "192.168.10.130", "Connection established", level="success")
         args = mock_print.call_args[0][0]
         assert "LDAP" in args
-        assert "10.129.245.130" in args
+        assert "192.168.10.130" in args
         assert "[bold green][+][/bold green]" in args
         assert "Connection established" in args
 

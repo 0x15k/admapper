@@ -1638,7 +1638,7 @@ def build_ops_html(
 
       html += `<div class="cred-form">
         <label>Autenticar (usuario humano + password)</label>
-        <input id="cred-user" placeholder="usuario (ej. svc_recovery)" autocomplete="off"/>
+        <input id="cred-user" placeholder="usuario (ej. svc_sql)" autocomplete="off"/>
         <input id="cred-pass" type="password" placeholder="contraseña" autocomplete="off"/>
         <button type="button" class="action-btn" id="cred-submit" style="margin-top:0.5rem">▶ AUTENTICAR</button>
       </div>

@@ -91,12 +91,12 @@ def run_certipy_enrollment(
         cred = _pick_pivot_cred(session, principal)
 
     if cred is None:
-        ps = build_local_enroll_powershell(template=template, dns_name=dns, ca_name=ca_name)
+        ps = build_local_enroll_powershell(template=template, dns_name=dns, ca_host=dns, ca_name=ca_name)
         script_path = out_dir / f"enroll_{principal.replace('.', '_')}.ps1"
         script_path.write_text(ps + "\n", encoding="utf-8")
         print_warning(f"no credential for {principal} — use local enrollment on reverse shell")
         print_info(f"script saved → {script_path}")
-        print_info("on jaylee shell: powershell -ep bypass -File <paste script>")
+        print_info("on reverse shell: powershell -ep bypass -File <paste script>")
         return CertEnrollResult(
             finding_id=finding_id,
             template=template,
