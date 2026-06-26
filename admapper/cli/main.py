@@ -481,7 +481,7 @@ def postex_run(
         typer.Option("--payload", help="Path to existing DLL (skips msfvenom)"),
     ] = None,
     wait: Annotated[
-        int, typer.Option("--wait", help="Seconds to poll monitor.log after deploy")
+        int, typer.Option("--wait", help="Seconds to poll service logs after deploy")
     ] = 180,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Plan only")] = False,
     use_ncat: Annotated[
@@ -492,7 +492,7 @@ def postex_run(
     ] = False,
     arch: Annotated[
         str | None,
-        typer.Option("--arch", help="Payload arch: x86 or x64 (default: auto from PE/monitor.log)"),
+        typer.Option("--arch", help="Payload arch: x86 or x64 (default: auto from PE/service logs)"),
     ] = None,
     mode: Annotated[
         str,

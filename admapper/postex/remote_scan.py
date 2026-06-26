@@ -1,10 +1,9 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
 
 import json
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.evil_winrm_output import extract_winrm_command_body, strip_evil_winrm_output
@@ -232,7 +231,7 @@ def _enumerate_scheduled_tasks(
     return merged, "+".join(methods)
 
 
-# Generic: searches any *.log or *.txt modified in last 30 days — not tied to monitor.log
+# Generic: searches *.log/*.txt modified in last 30 days — not tied to any log path
 def _ps_discover_error_logs() -> str:
     return (
         "Get-ChildItem -Path $env:ProgramData -Recurse "
@@ -301,6 +300,17 @@ def _probe_service_logs(client: WinRMClient, intel=None) -> str:
 def _ps_service_log(path: str) -> str:
     safe = path.replace("'", "''")
     return f"if(Test-Path -LiteralPath '{safe}'){{Get-Content -LiteralPath '{safe}' -Tail 25}}"
+
+
+def _ps_service_log_candidates(paths: list[str]) -> str:
+    checks = []
+    for p in paths:
+        safe = p.replace("'", "''")
+        checks.append(
+            f"if(Test-Path -LiteralPath '{safe}')"
+            f"{{Get-Content -LiteralPath '{safe}' -Tail 25;break}}"
+        )
+    return ";".join(checks) if checks else "Write-Output ''"
 
 
 def _ps_acl(path: str) -> str:
@@ -461,12 +471,16 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         )
     else:
         drop_base = intel.drop_path.rstrip("\\") if intel.drop_path else ""
-        monitor_path = intel.monitor_log_path or (
-            f"{drop_base}\\Logs\\monitor.log" if drop_base else ""
-        )
+        monitor_candidates = []
+        if intel.monitor_log_path:
+            monitor_candidates.append(intel.monitor_log_path)
+        if drop_base:
+            for suffix in (r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
+                           r"\app.log", r"\service.log"):
+                monitor_candidates.append(drop_base + suffix)
         acl_scripts = []
         if not monitor_log.strip():
-            acl_scripts.append(("service log", _ps_service_log(monitor_path)))
+            acl_scripts.append(("service log", _ps_service_log_candidates(monitor_candidates)))
         # Always check ACL: log presence does not prove the drop path
         # is writable, which is required to land the payload.
         acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))

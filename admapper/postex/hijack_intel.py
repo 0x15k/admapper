@@ -213,7 +213,7 @@ def intel_from_com_tasks(com_task_output: str) -> HijackIntel | None:
         return None
 
     _, task_name, zip_name, dll_name, drop_path, run_as = best
-    monitor_log_path = f"{drop_path.rstrip(chr(92))}\\Logs\\monitor.log"
+    monitor_log_path = None
     com_filter = task_name or (zip_name.split(".")[0] if zip_name else None)
     return HijackIntel(
         payload_zip=zip_name,

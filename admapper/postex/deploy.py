@@ -107,8 +107,15 @@ def _resolve_target_arch(
     monitor_text = str(scan.get("monitor_log_excerpt") or "")
     if client is not None:
         drop = str(finding.get("drop_path") or r"C:\ProgramData")
-        for rel in (r"\Logs\monitor.log", r"\logs\monitor.log", r"\monitor.log"):
-            path = f"{drop.rstrip('\\')}{rel}"
+        drop_stripped = drop.rstrip('\\')
+        for rel in (
+            r"\Logs\app.log",
+            r"\Logs\service.log",
+            r"\Logs\error.log",
+            r"\app.log",
+            r"\service.log",
+        ):
+            path = f"{drop_stripped}{rel}"
             safe = path.replace("'", "''")
             try:
                 proc = client.execute(
