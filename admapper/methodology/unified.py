@@ -59,7 +59,7 @@ UNIFIED_PHASES: tuple[PhaseDef, ...] = (
         ("Reconnaissance",),
         "Pre-foothold / perimeter",
         "—",
-        "External + host recon (parcial)",
+        "External + host recon (partial)",
         "unauth_scan.json",
         "admapper scan -H <DC>",
     ),
@@ -321,8 +321,7 @@ def phase_status_from_workspace(ws_path: Path) -> dict[str, PhaseStatus]:
     has_scan = bool(unauth.get("hosts"))
     has_users = bool(users.get("users"))
     has_roast_surface = any(
-        u.get("asrep_roastable") or u.get("kerberoastable")
-        for u in (users.get("users") or [])
+        u.get("asrep_roastable") or u.get("kerberoastable") for u in (users.get("users") or [])
     ) or bool(loot.get("parsed_credentials"))
     has_loot = bool(loot.get("file_count"))
     has_enum = bool(inv.get("users"))
@@ -332,9 +331,13 @@ def phase_status_from_workspace(ws_path: Path) -> dict[str, PhaseStatus]:
 
     p02 = has_scan
     p03 = has_users or has_roast_surface
-    p04 = has_loot or has_roast_surface or any(
-        str(c.get("source", "")).lower() in {"spray", "asreproast", "kerberoast", "loot"}
-        for c in creds
+    p04 = (
+        has_loot
+        or has_roast_surface
+        or any(
+            str(c.get("source", "")).lower() in {"spray", "asreproast", "kerberoast", "loot"}
+            for c in creds
+        )
     )
     p05 = bool(valid)
     p06 = has_enum

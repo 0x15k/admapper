@@ -15,11 +15,7 @@ from admapper.report.engagement import _load_json
 
 def _valid_cred_users(ws_path: Path) -> set[str]:
     creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
-    return {
-        str(c.get("username", "")).lower()
-        for c in creds
-        if str(c.get("status")) == "valid"
-    }
+    return {str(c.get("username", "")).lower() for c in creds if str(c.get("status")) == "valid"}
 
 
 def _owned_lower(owned: list[str]) -> set[str]:
@@ -93,7 +89,11 @@ def _mission_action(edge: EscalationEdge) -> str:
     }
     if edge.module == "acls" or tech in exploit:
         return "exploit"
-    if edge.module in {"wsus", "postex", "adcs"} or tech.startswith("wsus") or tech.startswith("esc"):
+    if (
+        edge.module in {"wsus", "postex", "adcs"}
+        or tech.startswith("wsus")
+        or tech.startswith("esc")
+    ):
         return "brief"
     return "exploit"
 
@@ -171,11 +171,7 @@ def collect_identity_capabilities(
                     "enabled": enabled and verified,
                     "blocked_reason": block
                     if not enabled
-                    else (
-                        "Only in graph — run acls to verify"
-                        if graph_only
-                        else None
-                    ),
+                    else ("Only in graph — run acls to verify" if graph_only else None),
                     "action": _mission_action(edge),
                     "mitre": edge.mitre_id,
                     "op_id": edge.op_id or f"{principal}:{edge.technique}:{edge.target}",
@@ -249,7 +245,12 @@ def collect_verified_missions(
             if edge.technique == "member_of":
                 continue
             key = f"{principal}:{edge.technique}:{edge.target}"
-            if any(m.get("id") == edge.op_id or m.get("principal") == principal and m.get("target") == edge.target for m in missions):
+            if any(
+                m.get("id") == edge.op_id
+                or m.get("principal") == principal
+                and m.get("target") == edge.target
+                for m in missions
+            ):
                 continue
             if _acl_confirms(
                 _acl_findings(ws_path),
@@ -330,7 +331,7 @@ def explain_target_access(
             f"Only {', '.join(direct_verified)} has verified ACL on {target}"
             if direct_verified
             else (
-                f"No verified ACL — run acls with each owned principal"
+                "No verified ACL — run acls with each owned principal"
                 if not direct_graph_only
                 else f"Graph suggests {', '.join(direct_graph_only)} — verify with acls"
             )
@@ -362,7 +363,11 @@ def compute_stage_and_actions(
         has_users = ops_progress.enum_users or bool(users_data.get("users"))
         has_creds = bool(valid_users)
         has_enum = ops_progress.enum_users or bool(inv)
-        has_loot = ops_progress.loot or bool(loot.get("file_count")) or bool(loot.get("parsed_credentials"))
+        has_loot = (
+            ops_progress.loot
+            or bool(loot.get("file_count"))
+            or bool(loot.get("parsed_credentials"))
+        )
         has_acls = ops_progress.acls or acl_n > 0
     else:
         valid_users = file_valid_users
@@ -398,7 +403,7 @@ def compute_stage_and_actions(
             {
                 "id": "enum_users",
                 "action": "enum",
-                "button": "▶ ENUMERAR USUARIOS (IDENT)",
+                "button": "▶ ENUMERATE USERS (IDENT)",
                 "enabled": True,
                 "reason": "SAMR · LDAP · AS-REP / Kerberoast surface",
                 "required": True,
@@ -524,9 +529,7 @@ def compute_stage_and_actions(
 
     parsed_loot = loot.get("parsed_credentials") or []
     unverified_loot = [
-        p
-        for p in parsed_loot
-        if str(p.get("username", "")).lower() not in valid_users
+        p for p in parsed_loot if str(p.get("username", "")).lower() not in valid_users
     ]
     if unverified_loot and has_creds:
         item = unverified_loot[0]
@@ -612,9 +615,7 @@ def build_objective_ops_state(
         owned_users=owned_users,
         ops_progress=ops_progress,
     )
-    identities = collect_identity_capabilities(
-        ws_path, domain=domain, owned_users=owned_users
-    )
+    identities = collect_identity_capabilities(ws_path, domain=domain, owned_users=owned_users)
     missions = collect_verified_missions(
         ws_path, workspace=workspace, domain=domain, owned_users=owned_users
     )
@@ -639,9 +640,7 @@ def build_objective_ops_state(
         if t and t not in seen:
             seen.add(t)
             targets.append(
-                explain_target_access(
-                    ws_path, domain=domain, target=t, owned_users=owned_users
-                )
+                explain_target_access(ws_path, domain=domain, target=t, owned_users=owned_users)
             )
 
     pivot = pivot_user or (owned_users[-1] if owned_users else "")

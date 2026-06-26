@@ -6,20 +6,20 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from admapper.auth.bloodhound_export import export_bloodhound_minimal
-from admapper.enum.ldap_enum import LdapAuthEnumResult, enumerate_ldap_authenticated
 from admapper.auth.ldap_session import open_ldap_session
 from admapper.auth.smb_enum import SmbAuthEnumResult, enumerate_smb_authenticated
-from admapper.stores.auth_inventory import AuthInventoryStore
-from admapper.stores.findings import FindingsStore
-from admapper.stores.graph import GraphStore
-from admapper.support.output import print_info, print_success, print_table, print_warning
-from admapper.stores.users import UsersStore
 from admapper.creds.common import apply_cracked_credentials
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context
+from admapper.enum.ldap_enum import LdapAuthEnumResult, enumerate_ldap_authenticated
 from admapper.guides.render import print_manual_guide
 from admapper.models.credential import Credential
 from admapper.models.finding import Finding, FindingSeverity
 from admapper.models.spray import DomainLockoutPolicy
+from admapper.stores.auth_inventory import AuthInventoryStore
+from admapper.stores.findings import FindingsStore
+from admapper.stores.graph import GraphStore
+from admapper.stores.users import UsersStore
+from admapper.support.output import print_table
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -114,9 +114,7 @@ def _merge_graph_inventory(
             edge_key = (member_id, group_id, "MemberOf")
             if edge_key in existing_edges:
                 continue
-            edges.append(
-                {"source": member_id, "target": group_id, "type": "MemberOf"}
-            )
+            edges.append({"source": member_id, "target": group_id, "type": "MemberOf"})
             existing_edges.add(edge_key)
 
     graph["nodes"] = nodes
@@ -166,7 +164,7 @@ def run_auth_enumeration(
             manual=f"nxc smb {dc_ip} -u {cred.username} -p '<pass>' -d {domain}",
         )
     if result.smb.error:
-        print_warn(f"SMB parcial: {result.smb.error}", source=Tool.IMPACKET)
+        print_warn(f"SMB partial: {result.smb.error}", source=Tool.IMPACKET)
 
     users_store = UsersStore(session.workspaces, ws_name)
     if result.ldap.users:
@@ -176,9 +174,7 @@ def run_auth_enumeration(
     refresh_workspace_intel(ws_path, users_store=users_store)
 
     if result.smb.gpp_credentials:
-        cracked = {
-            f"{g.user}@{domain}": g.password for g in result.smb.gpp_credentials
-        }
+        cracked = {f"{g.user}@{domain}": g.password for g in result.smb.gpp_credentials}
         apply_cracked_credentials(session, domain, cracked, source="gpp")
         rows = [[g.user, g.password, g.source_file] for g in result.smb.gpp_credentials]
         print_table("GPP credentials", ["user", "password", "source"], rows)
@@ -251,9 +247,11 @@ def run_auth_enumeration(
     # Phase 8.8 — security posture checks (non-blocking: errors don't fail auth enum)
     try:
         from admapper.posture import check_security_posture
+
         check_security_posture(session, dc_ip, cred, domain)
     except Exception as _posture_exc:
         from admapper.support.output import print_warning as _pw
+
         _pw(f"posture checks skipped: {_posture_exc}")
 
     findings = FindingsStore(session.workspaces, ws_name)

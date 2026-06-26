@@ -6,20 +6,18 @@ from typing import TYPE_CHECKING
 
 from admapper.auth.auth_enum import run_auth_enumeration
 from admapper.auth.ldap_context import fetch_authenticated_user_context
+from admapper.creds.common import pick_dc_ip
+from admapper.creds.verify import run_credential_verify
+from admapper.models.credential import Credential, CredentialStatus
+from admapper.models.finding import Finding, FindingSeverity
 from admapper.stores.findings import FindingsStore
 from admapper.stores.graph import GraphStore
 from admapper.support.output import (
     ConfirmLevel,
     confirm,
-    print_info,
-    print_success,
     print_table,
     print_warning,
 )
-from admapper.creds.common import pick_dc_ip
-from admapper.creds.verify import run_credential_verify
-from admapper.models.credential import Credential, CredentialStatus
-from admapper.models.finding import Finding, FindingSeverity
 
 if TYPE_CHECKING:
     from admapper.support.session import Session
@@ -87,12 +85,12 @@ def run_start_auth(session: Session, *, cred_id: str | None = None) -> AuthStart
 
     cred = _pick_credential(session, cred_id)
     if not confirm(
-        f"Iniciar enum autenticada como {cred.display_user()} @ {dc_ip}?",
+        f"Start authenticated enumeration as {cred.display_user()} @ {dc_ip}?",
         level=ConfirmLevel.WARN,
         mode_auto=session.mode.value == "auto",
         mode_manual=session.mode.value == "manual",
     ):
-        print_warning("start_auth cancelado")
+        print_warning("start_auth cancelled")
         return AuthStartResult(credential=cred, owned_user=cred.username)
 
     from admapper.support.verbosity import print_phase

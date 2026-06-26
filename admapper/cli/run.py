@@ -3,7 +3,7 @@ from __future__ import annotations
 if __name__ == "__main__":
     raise SystemExit(
         "Do not run this file directly.\n\n"
-        "  pip install -e \".[dev]\"\n"
+        '  pip install -e ".[dev]"\n'
         "  admapper run -H <ip> -u <user> -p '<pass>'\n\n"
         "Kali/Linux (PEP 668 — use venv, not system pip):\n"
         "  ./scripts/install.sh --venv\n"
@@ -14,7 +14,6 @@ if __name__ == "__main__":
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from admapper.cli.commands import dispatch
 from admapper.support.discovery import default_workspace_name, ensure_domain
@@ -47,11 +46,10 @@ def run_engagement(
     verbose: bool = False,
     auto: bool = False,
 ) -> None:
-    """Non-interactive engagement — con creds ejecuta analyst por defecto."""
-    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
+    """Non-interactive engagement — with credentials, runs analyst by default."""
     from admapper.kerberos.skew import apply_clock_skew_option
     from admapper.kerberos.time_sync import ensure_dc_clock
-
+    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
     from admapper.support.verbosity import set_verbose
 
     apply_clock_skew_option(clock_skew)
@@ -79,22 +77,14 @@ def run_engagement(
             ensure_domain(session)
         except ValueError as exc:
             print_info(str(exc))
-        ws_path = (
-            session.workspaces.path_for(session.workspace.name)
-            if session.workspace
-            else None
-        )
+        ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
         ensure_dc_clock(host, enabled=sync_clock, ws_path=ws_path)
         print_scan_summary(session, sync_hosts=sync_hosts)
         if session.workspace is not None:
             session.persist_workspace()
         return
 
-    ws_path = (
-        session.workspaces.path_for(session.workspace.name)
-        if session.workspace
-        else None
-    )
+    ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
     unauth_cache = _load_json(ws_path / "unauth_scan.json") if ws_path else None
     unauth_has_domain = bool(unauth_cache and unauth_cache.get("domain"))
     unauth_cached = bool(ws_path and (ws_path / "unauth_scan.json").is_file() and unauth_has_domain)
@@ -115,8 +105,8 @@ def run_engagement(
     sync_hosts_from_session(session, enabled=sync_hosts)
 
     if not session.workspace or not session.workspace.domain:
-        from admapper.recon.ldap_probe import discover_domain_from_bind
         from admapper.kerberos.skew import ensure_workspace_skew
+        from admapper.recon.ldap_probe import discover_domain_from_bind
 
         if ws_path:
             ensure_workspace_skew(ws_path)

@@ -6,14 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from admapper.creds.policy import apply_lockout_states, fetch_lockout_context, filter_spray_targets
+from admapper.dashboard.ops_progress import filtered_loot_clues
 from admapper.dashboard.ops_state import collect_identity_capabilities
+from admapper.intelligence.attack_readiness import build_attack_readiness
+from admapper.intelligence.password_rules import analyze_password_clues
 from admapper.models.spray import DomainLockoutPolicy
 from admapper.models.user import UserRecord
 from admapper.report.engagement import _load_json
-from admapper.dashboard.ops_progress import filtered_loot_clues
-
-from admapper.intelligence.attack_readiness import build_attack_readiness
-from admapper.intelligence.password_rules import analyze_password_clues
 
 
 def _load_lockout_policy(ws_path: Path) -> dict[str, Any] | None:
@@ -105,7 +104,9 @@ def _lockout_budget(users: list[UserRecord], policy: DomainLockoutPolicy) -> lis
                 "locked": bool(user.lockout_time and user.lockout_time != 0),
             }
         )
-    return sorted(rows, key=lambda r: (r["attempts_remaining"] is None, r["attempts_remaining"] or 0))
+    return sorted(
+        rows, key=lambda r: (r["attempts_remaining"] is None, r["attempts_remaining"] or 0)
+    )
 
 
 def resolve_lockout_context(
@@ -191,16 +192,20 @@ def build_engagement_intel(
 
     policy, users, lockout_error = resolve_lockout_context(ws_path, fetch_if_missing=False)
     if lockout_error is None and not _load_lockout_policy(ws_path):
-        lockout_error = "sin lockout_policy.json — ejecuta enum LDAP autenticada"
+        lockout_error = "no lockout_policy.json found — run authenticated LDAP enumeration first"
     humans = _human_users(users)
 
     eligible, skipped = filter_spray_targets(humans, policy)
     clues = filtered_loot_clues(ws_path, ops_progress)  # type: ignore[arg-type]
-    password_analysis = analyze_password_clues(clues) if clues else {
-        "rules": [],
-        "inferences": [],
-        "transforms": [],
-    }
+    password_analysis = (
+        analyze_password_clues(clues)
+        if clues
+        else {
+            "rules": [],
+            "inferences": [],
+            "transforms": [],
+        }
+    )
     if ops_progress is not None and not getattr(ops_progress, "enum_users", False):
         humans = []
         eligible, skipped = [], []
@@ -224,7 +229,9 @@ def build_engagement_intel(
 
     return {
         "attack_readiness": attack_readiness,
-        "domain_users": [_domain_user_row(u, policy) for u in sorted(humans, key=lambda u: u.username.lower())],
+        "domain_users": [
+            _domain_user_row(u, policy) for u in sorted(humans, key=lambda u: u.username.lower())
+        ],
         "lockout_policy": {
             "lockout_threshold": policy.lockout_threshold,
             "lockout_duration_seconds": policy.lockout_duration_seconds,

@@ -4,8 +4,8 @@ import json
 import re
 from pathlib import Path
 
-from admapper.support.paths import default_workspaces_root
 from admapper.models.workspace import OperationMode, WorkspaceState
+from admapper.support.paths import default_workspaces_root
 
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 
@@ -20,10 +20,11 @@ def _validate_workspace_name(name: str) -> str:
     if not _WORKSPACE_NAME_RE.fullmatch(cleaned):
         hint = ""
         if name.strip().endswith("~"):
-            hint = f" — ¿quisiste '{name.strip().rstrip('~')}'? (quita el ~ del pegado)"
+            hint = (
+                f" — did you mean '{name.strip().rstrip('~')}'? (remove bracketed-paste trailing ~)"
+            )
         raise ValueError(
-            "workspace name must be 1-64 chars: letters, digits, '.', '_' or '-'"
-            + hint
+            "workspace name must be 1-64 chars: letters, digits, '.', '_' or '-'" + hint
         )
     return cleaned
 
@@ -58,7 +59,11 @@ class WorkspaceManager:
     def load(self, name: str) -> WorkspaceState:
         state_path = self.path_for(name) / "state.json"
         if not state_path.is_file():
-            from admapper.support.paths import find_repo_root, is_package_source_dir, legacy_repo_workspaces
+            from admapper.support.paths import (
+                find_repo_root,
+                is_package_source_dir,
+                legacy_repo_workspaces,
+            )
 
             hints: list[str] = []
             if is_package_source_dir(Path.cwd()):
@@ -67,12 +72,10 @@ class WorkspaceManager:
                     hints.append(f"cd {repo}")
             legacy = legacy_repo_workspaces()
             if legacy and legacy != self.root and (legacy / name / "state.json").is_file():
-                hints.append(
-                    f"admapper -O {legacy} …  o  set workspaces {legacy}"
-                )
+                hints.append(f"admapper -O {legacy} ... or set workspaces {legacy}")
             suffix = f" — {'; '.join(hints)}" if hints else ""
             raise FileNotFoundError(
-                f"workspace not found: {name} (buscado en {self.root}){suffix}"
+                f"workspace not found: {name} (searched in {self.root}){suffix}"
             )
         data = json.loads(state_path.read_text(encoding="utf-8"))
         return WorkspaceState.from_dict(data)

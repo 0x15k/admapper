@@ -65,6 +65,7 @@ def _global_options(
 ) -> None:
     if no_color:
         from admapper.support.output import set_no_color
+
         set_no_color(True)
     set_cli_workspaces_root(Path(workspaces_root) if workspaces_root else None)
     if ctx.invoked_subcommand is None and not ip_dc:
@@ -84,6 +85,7 @@ def _global_options(
             print_error(str(exc))
             raise typer.Exit(code=1) from exc
         raise typer.Exit()
+
 
 postex_app = typer.Typer(
     help="Post-exploitation playbook (lateral, DLL hijack scan, dumps)",
@@ -122,7 +124,9 @@ def _session_with_workspace(
         session.select_workspace(domain, create=False)
 
     if session.workspace is None:
-        print_error("no active workspace — use: admapper run -H <ip> ... or specify -w <name> / -H <ip>")
+        print_error(
+            "no active workspace — use: admapper run -H <ip> ... or specify -w <name> / -H <ip>"
+        )
         raise typer.Exit(code=1)
     return session
 
@@ -150,8 +154,8 @@ def postex_main(
     """Build post-ex playbook from workspace intel (loot hints + optional postex_scan.json)."""
     if ctx.invoked_subcommand is not None:
         return
-    from admapper.support.output import print_error
     from admapper.postex.analyze import run_postex_analysis
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
@@ -159,6 +163,7 @@ def postex_main(
         if json_output:
             import json
             from pathlib import Path
+
             if res.output_path and Path(res.output_path).is_file():
                 typer.echo(Path(res.output_path).read_text(encoding="utf-8").strip())
             else:
@@ -166,6 +171,7 @@ def postex_main(
     except (ValueError, RuntimeError) as exc:
         if json_output:
             import json
+
             typer.echo(json.dumps({"error": str(exc)}, indent=2))
         else:
             print_error(str(exc))
@@ -188,8 +194,8 @@ def postex_scan(
     ] = None,
 ) -> None:
     """Remote WinRM scan: COM scheduled tasks + DLL hijack detection from loot intel."""
-    from admapper.support.output import print_error
     from admapper.postex.analyze import run_postex_analysis
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, domain=domain)
     try:
@@ -258,10 +264,12 @@ def escalate_show(
         state = run_escalate_analysis(session, quiet=json_output)
         if json_output:
             import json
+
             typer.echo(json.dumps(state.to_dict(), indent=2, sort_keys=True))
     except (ValueError, RuntimeError) as exc:
         if json_output:
             import json
+
             typer.echo(json.dumps({"error": str(exc)}, indent=2))
         else:
             print_error(str(exc))
@@ -289,8 +297,8 @@ def escalate_mark(
     ] = False,
 ) -> None:
     """Mark a user as owned and set them as the active pivot."""
-    from admapper.support.output import print_error
     from admapper.escalate.analyze import mark_user_owned
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
@@ -317,8 +325,8 @@ def escalate_pivot(
     ] = None,
 ) -> None:
     """Change the active pivot without adding the user to owned."""
-    from admapper.support.output import print_error
     from admapper.escalate.analyze import run_escalate_analysis, set_pivot_user
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
@@ -331,7 +339,9 @@ def escalate_pivot(
 
 @postex_app.command("show")
 def postex_show(
-    op_id: Annotated[str, typer.Argument(help="Opportunity id from postex_ops.json (e.g. postex-010)")],
+    op_id: Annotated[
+        str, typer.Argument(help="Opportunity id from postex_ops.json (e.g. postex-010)")
+    ],
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
@@ -350,18 +360,21 @@ def postex_show(
     ] = False,
 ) -> None:
     """Show one post-ex opportunity with manual commands."""
-    from admapper.support.output import print_error, print_info
     from admapper.postex.analyze import get_postex_op
     from admapper.postex.render import print_postex_detail
+    from admapper.support.output import print_error, print_info
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     detail = get_postex_op(session, op_id)
     if detail is None:
         if json_output:
             import json
+
             typer.echo(json.dumps({"error": f"post-ex opportunity not found: {op_id}"}, indent=2))
         else:
-            print_error(f"post-ex opportunity not found: {op_id} — run: admapper postex -w <workspace>")
+            print_error(
+                f"post-ex opportunity not found: {op_id} — run: admapper postex -w <workspace>"
+            )
             path = session.workspaces.path_for(session.workspace.name) / "postex_ops.json"
             if path.is_file():
                 import json
@@ -373,6 +386,7 @@ def postex_show(
         raise typer.Exit(code=1)
     if json_output:
         import json
+
         typer.echo(json.dumps(detail, indent=2))
     else:
         print_postex_detail(detail)
@@ -409,13 +423,15 @@ def postex_deploy(
         str | None,
         typer.Option("--payload", help="Path to existing DLL (skips msfvenom)"),
     ] = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="Build payload only, no upload")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Build payload only, no upload")
+    ] = False,
 ) -> None:
     """Deploy scheduled-task DLL hijack payload from postex_scan.json intel."""
     from pathlib import Path
 
-    from admapper.support.output import print_error
     from admapper.postex.deploy import deploy_dll_hijack
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     try:
@@ -464,10 +480,16 @@ def postex_run(
         str | None,
         typer.Option("--payload", help="Path to existing DLL (skips msfvenom)"),
     ] = None,
-    wait: Annotated[int, typer.Option("--wait", help="Seconds to poll monitor.log after deploy")] = 180,
+    wait: Annotated[
+        int, typer.Option("--wait", help="Seconds to poll monitor.log after deploy")
+    ] = 180,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Plan only")] = False,
-    use_ncat: Annotated[bool, typer.Option("--use-ncat", help="Use external ncat instead of built-in listener")] = False,
-    no_listener: Annotated[bool, typer.Option("--no-listener", help="Skip built-in listener")] = False,
+    use_ncat: Annotated[
+        bool, typer.Option("--use-ncat", help="Use external ncat instead of built-in listener")
+    ] = False,
+    no_listener: Annotated[
+        bool, typer.Option("--no-listener", help="Skip built-in listener")
+    ] = False,
     arch: Annotated[
         str | None,
         typer.Option("--arch", help="Payload arch: x86 or x64 (default: auto from PE/monitor.log)"),
@@ -487,10 +509,10 @@ def postex_run(
     """Auto: VPN IP + msfvenom + listener + deploy + wait for reverse shell."""
     from pathlib import Path
 
-    from admapper.support.output import print_error
-    from admapper.postex.pe_arch import normalize_arch
     from admapper.postex.payload import PayloadMode
+    from admapper.postex.pe_arch import normalize_arch
     from admapper.postex.runner import run_dll_hijack
+    from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     payload_arch = normalize_arch(arch) if arch else None
@@ -554,8 +576,8 @@ def scan(
     ] = False,
 ) -> None:
     """Black-box recon: discover domain and AD surface from DC IP only (no credentials)."""
-    from admapper.support.output import print_error
     from admapper.cli.scan import scan_engagement
+    from admapper.support.output import print_error
 
     session = Session.bootstrap()
     try:
@@ -660,7 +682,7 @@ def run(
         typer.Option("--auto", help="Chain owned/pivot, postex scan, and wired escalate steps"),
     ] = False,
 ) -> None:
-    """Auth + analyst por defecto. Sin creds equivale a ``scan``."""
+    """Auth + analyst by default. Without credentials, equivalent to ``scan``."""
     session = Session.bootstrap()
     run_engagement(
         session,
@@ -819,9 +841,9 @@ def graph(
     ] = False,
 ) -> None:
     """Attack graph — interactive web (default) or ASCII terminal."""
+    from admapper.intelligence.user_match import refresh_workspace_intel
     from admapper.support.output import print_error, print_info, print_success
     from admapper.support.session import Session
-    from admapper.intelligence.user_match import refresh_workspace_intel
 
     session = Session.bootstrap()
     if workspace:
@@ -942,10 +964,10 @@ def web(
 ) -> None:
     """Web dashboard — live attack graph, terminal, and findings."""
     from admapper.cli.commands import dispatch
+    from admapper.dashboard.dashboard_server import run_dashboard_server
     from admapper.support.discovery import default_workspace_name
     from admapper.support.output import print_error, print_info
     from admapper.support.session import Session
-    from admapper.dashboard.dashboard_server import run_dashboard_server
 
     # Require explicit target — never silently reuse the last active workspace
     if not host and not workspace:
@@ -980,13 +1002,14 @@ def web(
         ws = session.workspace
 
     # Try to resolve domain and sync hosts mapping
-    from admapper.support.discovery import resolve_domain, ensure_domain
     from admapper.cli.scan import sync_hosts_from_session
     from admapper.recon.unauth import run_unauth_scan
+    from admapper.support.discovery import ensure_domain, resolve_domain
 
     resolved_domain = ws.domain or resolve_domain(session)
     if not resolved_domain and host:
         from admapper.recon.ports import scan_host
+
         print_info(f"Probing target DC reachability: {host.strip()}...")
         open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
         if not open_ports:
@@ -1020,7 +1043,6 @@ def web(
     )
 
 
-
 @app.command()
 def dashboard(
     host: Annotated[
@@ -1047,11 +1069,11 @@ def dashboard(
 ) -> None:
     """AD Ops — blackbox AD engagement dashboard (IP -> scan -> topology -> escalate)."""
     from admapper.cli.commands import dispatch
+    from admapper.dashboard.dashboard_server import run_dashboard_server
+    from admapper.dashboard.ops_ui import write_ops_html
     from admapper.support.discovery import default_workspace_name
     from admapper.support.output import print_error, print_info
     from admapper.support.session import Session
-    from admapper.dashboard.dashboard_server import run_dashboard_server
-    from admapper.dashboard.ops_ui import write_ops_html
 
     # Require explicit target — never silently reuse the last active workspace
     if not host and not workspace:
@@ -1085,13 +1107,14 @@ def dashboard(
         ws = session.workspace
 
     # Try to resolve domain and sync hosts mapping
-    from admapper.support.discovery import resolve_domain, ensure_domain
     from admapper.cli.scan import sync_hosts_from_session
     from admapper.recon.unauth import run_unauth_scan
+    from admapper.support.discovery import ensure_domain, resolve_domain
 
     resolved_domain = ws.domain or resolve_domain(session)
     if not resolved_domain and host:
         from admapper.recon.ports import scan_host
+
         print_info(f"Probing target DC reachability: {host.strip()}...")
         open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
         if not open_ports:
@@ -1184,15 +1207,25 @@ def winrm(
         str | None,
         typer.Option("--clock-skew", help="libfaketime offset for getTGT (e.g. '+7h')"),
     ] = None,
-    no_sync: Annotated[bool, typer.Option("--no-sync", help="Skip automatic clock sync with the DC")] = False,
-    verbose: Annotated[bool, typer.Option("-v", "--verbose", help="Show kvno/klist and auth attempts")] = False,
-    auto: Annotated[bool, typer.Option("--auto", help="Automatically mark compromised user as owned in the active workspace and run graph analysis")] = False,
+    no_sync: Annotated[
+        bool, typer.Option("--no-sync", help="Skip automatic clock sync with the DC")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("-v", "--verbose", help="Show kvno/klist and auth attempts")
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option(
+            "--auto",
+            help="Automatically mark compromised user as owned in the active workspace and run graph analysis",
+        ),
+    ] = False,
 ) -> None:
     """WinRM shell — Kerberos via pypsrp, or Pass-the-Hash via nxc (--hash, no --dc-ip)."""
     from pathlib import Path
 
-    from admapper.support.output import print_error
     from admapper.creds.common import resolve_dc_fqdn
+    from admapper.support.output import print_error
     from admapper.winrm.shell_cli import run_winrm_shell
 
     if not password and not ccache and not hash:
@@ -1202,8 +1235,10 @@ def winrm(
     if hash:
         # Pass-the-Hash: nxc connects to -H directly; no KDC / --dc-ip required.
         ip = dc_ip
-        fqdn = host if host and not host[0].isdigit() else (
-            resolve_dc_fqdn(None, domain, fallback_ip=ip) or host
+        fqdn = (
+            host
+            if host and not host[0].isdigit()
+            else (resolve_dc_fqdn(None, domain, fallback_ip=ip) or host)
         )
     else:
         ip = dc_ip
@@ -1255,8 +1290,8 @@ def status(
     ] = None,
 ) -> None:
     """Quick dashboard (no re-scan)."""
-    from admapper.support.output import print_error
     from admapper.report.session_status import print_session_status
+    from admapper.support.output import print_error
 
     session = Session.bootstrap()
     if workspace:
@@ -1290,9 +1325,9 @@ def exploit(
     ] = False,
 ) -> None:
     """Auto-exploit chain: share loot → creds → ACL abuse → lateral."""
-    from admapper.support.output import print_error
-    from admapper.kerberos.skew import apply_clock_skew_option
     from admapper.exploit.engine import run_exploit_engagement
+    from admapper.kerberos.skew import apply_clock_skew_option
+    from admapper.support.output import print_error
 
     session = Session.bootstrap()
     if workspace:
@@ -1361,8 +1396,9 @@ def opsec_set(
     normal   Balanced defaults (current ADMapper behaviour)
     lab      Maximum aggression: no delays, no confirmations (lab/testing use)
     """
-    from admapper.support.output import print_error, print_success as _ps
-    from admapper.support.opsec import OpsecProfile, save_workspace_profile, print_opsec_status
+    from admapper.support.opsec import OpsecProfile, print_opsec_status, save_workspace_profile
+    from admapper.support.output import print_error
+    from admapper.support.output import print_success as _ps
 
     try:
         p = OpsecProfile(profile.lower())
