@@ -5,11 +5,11 @@ def test_extract_winrm_body_keeps_monitor_after_banner() -> None:
     raw = """
 Evil-WinRM shell v3.9
 Warning: Remote path completions is disabled
-No updates found locally: C:\\ProgramData\\UpdateMonitor\\Settings_Update.zip.
-CORP\\test.user loaded settings_update.dll
+No payload found locally: C:\\ProgramData\\VendorApp\\payload.zip.
+EXAMPLE\\test.user loaded payload.dll
 """
     out = extract_winrm_command_body(raw)
-    assert "Settings_Update.zip" in out
+    assert "payload.zip" in out
     assert "test.user" in out
 
 
@@ -19,12 +19,12 @@ Evil-WinRM shell v3.9
  
 Warning: Remote path completions is disabled
 Folder: \\
-TaskName:                             \\UpdateMonitor\\Update Check
-Task To Run:                          C:\\Agent.exe -check C:\\ProgramData\\Network\\Settings_Update.zip
-Run As User:                          CORP\\test.user
+TaskName:                             \\VendorApp\\Maintenance Task
+Task To Run:                          C:\\App.exe -check C:\\ProgramData\\Network\\payload.zip
+Run As User:                          EXAMPLE\\test.user
 """
     out = strip_evil_winrm_output(raw)
     assert "Evil-WinRM" not in out
-    assert "Update Check" in out
+    assert "Maintenance Task" in out
     assert "test.user" in out
     assert "|" in out

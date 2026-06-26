@@ -1972,7 +1972,7 @@ def build_ops_html(
         html += '<div class="note-callout warn"><div class="note-block-label" style="color:var(--warn); margin-top:0">Loot</div>';
         filteredClues.forEach(c => {{
           html += noteKv(c.user, `«${{c.string}}»`, 'warn');
-          if (c.source) html += noteKvIndent('archivo', c.source, 'dim');
+          if (c.source) html += noteKvIndent('file', c.source, 'dim');
         }});
         html += '</div>';
       }}

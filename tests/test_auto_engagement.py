@@ -39,7 +39,7 @@ def test_sync_owned_marks_msa_target_from_exploit_log(tmp_path: Path) -> None:
                 "new_hashes": [
                     {"account": "msa_target$", "nthash": "a" * 32},
                 ],
-                "new_users": ["jaylee.doe"],
+                "new_users": ["target.admin"],
             }
         ),
         encoding="utf-8",
@@ -48,9 +48,9 @@ def test_sync_owned_marks_msa_target_from_exploit_log(tmp_path: Path) -> None:
     marked = sync_owned_from_intel(session)
 
     assert "msa_target$" in marked
-    assert "jaylee.doe" in marked
+    assert "target.admin" in marked
     assert "msa_target$" in session.workspace.owned_users
-    assert "jaylee.doe" in session.workspace.owned_users
+    assert "target.admin" in session.workspace.owned_users
 
 
 def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
@@ -76,7 +76,7 @@ def test_auto_set_pivot_prefers_machine_over_human(tmp_path: Path) -> None:
 def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
     session = _session(
         tmp_path,
-        owned=["target.user", "svc_user", "msa_target$", "jaylee.doe"],
+        owned=["target.user", "svc_user", "msa_target$", "target.admin"],
     )
     ws_path = tmp_path / "ws" / "lab"
     (ws_path / "exploit_log.json").write_text(
@@ -92,8 +92,8 @@ def test_auto_set_pivot_prefers_post_machine_human(tmp_path: Path) -> None:
 
     pivot = auto_set_pivot(session)
 
-    assert pivot == "jaylee.doe"
-    assert session.workspace.pivot_user == "jaylee.doe"
+    assert pivot == "target.admin"
+    assert session.workspace.pivot_user == "target.admin"
 
 
 def test_prepare_finalize_minimal_workspace(tmp_path: Path) -> None:
@@ -175,11 +175,11 @@ def test_resolve_pivot_upgrades_stale_machine_pivot(tmp_path: Path) -> None:
     manager = WorkspaceManager(tmp_path / "ws")
     session = Session(config=GlobalConfig(), workspaces=manager)
     session.select_workspace("lab")
-    session.workspace.owned_users = ["msa_target$", "jaylee.doe"]
+    session.workspace.owned_users = ["msa_target$", "target.admin"]
     session.workspace.pivot_user = "msa_target$"
     session.persist_workspace()
 
-    assert resolve_pivot_user(session) == "jaylee.doe"
+    assert resolve_pivot_user(session) == "target.admin"
 
 
 def test_pick_wired_next_skips_acl_prefers_postex() -> None:
@@ -195,7 +195,7 @@ def test_pick_wired_next_skips_acl_prefers_postex() -> None:
             {
                 "module": "postex",
                 "technique": "dll_hijack_scheduled_task",
-                "target": "jaylee.doe",
+                "target": "target.admin",
                 "ready": True,
                 "target_owned": False,
                 "op_id": "postex-001",
@@ -234,7 +234,7 @@ def test_run_auto_postex_scan_aborts_when_target_unreachable(tmp_path: Path) -> 
 
 
 def test_run_auto_exec_aborts_before_deploy_when_unreachable(tmp_path: Path) -> None:
-    session = _session(tmp_path, owned=["jaylee.doe"])
+    session = _session(tmp_path, owned=["target.admin"])
     session.workspace.mode = OperationMode.AUTO
     session.workspace.hosts = "192.168.10.182"
     session.persist_workspace()
@@ -316,11 +316,11 @@ def test_deploy_dll_hijack_aborts_before_payload_build(tmp_path: Path) -> None:
                 "shell_user": "msa_target$",
                 "findings": [
                     {
-                        "drop_path": r"C:\ProgramData\UpdateMonitor",
+                        "drop_path": r"C:\ProgramData\VendorApp",
                         "payload_zip": "payload.zip",
                         "payload_dll": "payload.dll",
                         "task_name": "UpdateChecker Agent",
-                        "run_as_user": "jaylee.doe",
+                        "run_as_user": "target.admin",
                     }
                 ],
             }

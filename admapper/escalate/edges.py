@@ -231,7 +231,7 @@ def collect_edges_from_pivot(
             continue
         esc = str(finding.get("esc") or "")
         template = str(finding.get("template") or "")
-        # Server-Auth-only templates (e.g. UpdateSrv) feed WSUS — not a standalone NEXT hop
+        # Server-Auth-only templates (e.g. <template>) feed WSUS — not a standalone NEXT hop
         if esc == "template_enrollment" and finding.get("wsus_chain_step"):
             continue
         if esc == "template_enrollment" and "group membership suggests" in str(

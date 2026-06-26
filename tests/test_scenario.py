@@ -230,7 +230,7 @@ def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
                     {
                         "id": "wsus-004",
                         "technique": "wsus_cert_chain",
-                        "context": "jaylee.doe",
+                        "context": "target.admin",
                         "severity": "critical",
                         "title": "WSUS + AD CS certificate chain",
                         "prerequisites_met": True,
@@ -241,10 +241,10 @@ def test_next_action_skips_machine_pth_when_human_pivot(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    owned = ["msa_target$", "jaylee.doe"]
+    owned = ["msa_target$", "target.admin"]
     next_cmd = resolve_next_command(
         ws,
-        pivot="jaylee.doe",
+        pivot="target.admin",
         owned=owned,
         domain="target.example",
         workspace="corp-autonomous",

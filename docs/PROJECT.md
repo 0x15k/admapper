@@ -604,7 +604,7 @@ Phase 17 ─── Reporting
 ```
 
 **We start with Phase 0, then Phase 1, and advance sequentially.**  
-Do not skip phases: each validates the previous one with tests and, if possible, an AD lab (HTB Forest is the benchmark for ADScan).
+Do not skip phases: each validates the previous one with tests and, if possible, an AD lab environment.
 
 ---
 
@@ -688,11 +688,11 @@ These capabilities are left out of the MVP but documented to keep track.
 
 ### 8.4 Validation Labs
 
-| Lab | What it validates | Phases |
+| Lab / reference scenario | What it validates | Phases |
 |---|---|---|
-| HTB Forest | AS-REP → SMB null → DCSync chain | 1–4, 8, 10, 14 |
-| HTB Active | GPP → Kerberoast → ACL | 5, 8, 10 |
-| HTB Cicada | ADCS ESC + trust | 8, 12, 13 |
+| Basic AD forest | AS-REP → SMB null → DCSync chain | 1–4, 8, 10, 14 |
+| GPP-enabled network | GPP → Kerberoast → ACL | 5, 8, 10 |
+| AD CS + Trusts Environment | ADCS ESC + trust | 8, 12, 13 |
 | GOAD (Game of Active Directory) | Full chain | All |
 
 ---

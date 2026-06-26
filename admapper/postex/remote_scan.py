@@ -122,7 +122,7 @@ def _cmd_type_file(path: str) -> str:
     return f'cmd.exe /c type "{path}"'
 
 
-def _local_monitor_from_loot(loot_dir) -> str:
+def _local_monitor_from_loot(loot_dir, *, drop_path: str = "") -> str:
     if not loot_dir.is_dir():
         return ""
     for path in sorted(loot_dir.rglob("monitor.log")):
@@ -131,11 +131,13 @@ def _local_monitor_from_loot(loot_dir) -> str:
                 return path.read_text(encoding="utf-8", errors="replace").strip()
             except OSError:
                 continue
+    drop_hints = {drop_path.lower().rstrip("\\/")} if drop_path else set()
     for path in sorted(loot_dir.rglob("*")):
         if not path.is_file():
             continue
         name = path.name.lower()
-        if "updatemonitor" in str(path).lower() or name in ("app.log", "monitor.log"):
+        in_drop = any(h in str(path).lower() for h in drop_hints)
+        if name in ("app.log", "monitor.log") or in_drop:
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
@@ -151,20 +153,24 @@ def _monitor_usable(monitor_log: str) -> bool:
         return False
     return bool(
         _has_hijack_payload_hint(text)
-        or "UpdateMonitor" in text
         or re.search(r"ProgramData\\.*\.zip", text, re.I)
     )
 
 
-def _intel_sufficient(intel, monitor_log: str = "", loot=None) -> bool:
+def _intel_sufficient(
+    intel,
+    monitor_log: str = "",
+    *,
+    loot: Any = None,
+    drop_path: str = "",
+) -> bool:
     """Enough to build DLL-hijack finding without slow full schtasks."""
     if intel and intel.payload_zip:
         return True
-    if _monitor_usable(monitor_log):
-        return True
     if loot and (loot.zip_dll_refs or loot.dll_hijack_refs):
-        loot_intel = extract_hijack_intel(loot)
-        return bool(loot_intel and loot_intel.payload_zip)
+        return True
+    if drop_path and _monitor_usable(monitor_log):
+        return True
     return False
 
 
@@ -372,7 +378,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
     client = winrm_client_for_cred(cred, session)
 
     print_step(
-        f"post-ex scan remoto @ {cred.host} como {cred.domain}\\{cred.username} (COM Task Scheduler)",
+        f"remote post-ex scan @ {cred.host} as {cred.domain}\\{cred.username} (COM Task Scheduler)",
         source=Tool.ADMAPPER,
         manual=f"evil-winrm -i {cred.host} -u '{cred.domain}\\{cred.username}' -H <hash>",
     )
@@ -382,10 +388,12 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
 
     intel = extract_hijack_intel(loot)
 
-    print_info("post-ex: leyendo monitor.log …")
+    print_info("post-ex: reading monitor.log …")
     monitor_log = _probe_monitor_logs(client, intel)
     if not monitor_log:
-        monitor_log = _local_monitor_from_loot(ws_path / "loot")
+        monitor_log = _local_monitor_from_loot(
+            ws_path / "loot", drop_path=intel.drop_path if intel else ""
+        )
         if monitor_log:
             print_ok(
                 f"monitor.log (local loot): {len(monitor_log.splitlines())} line(s)",
@@ -399,10 +407,10 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
 
     com_out = ""
     task_enum_method = ""
-    if not _intel_sufficient(intel, monitor_log, loot):
+    if not _intel_sufficient(intel, monitor_log, loot=loot, drop_path=intel.drop_path if intel else ""):
         task_filter = intel.com_task_filter if intel else None
         if task_filter:
-            print_info(f"task enum: filtro {task_filter!r}")
+            print_info(f"task enum: filter {task_filter!r}")
         try:
             com_out, task_enum_method = _enumerate_scheduled_tasks(client, task_filter)
         except WinRMError as exc:
@@ -410,7 +418,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
             result.errors.append(msg)
             print_warning(msg)
     else:
-        print_ok("DLL-hijack intel (monitor.log/loot) — omitiendo schtasks", source=Tool.ADMAPPER)
+        print_ok("DLL-hijack intel (monitor.log/loot) — skipping schtasks", source=Tool.ADMAPPER)
 
     if intel is None:
         intel = extract_hijack_intel(loot, monitor_log=monitor_log, com_task_output=com_out)

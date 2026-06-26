@@ -6,14 +6,14 @@ from admapper.models.adcs import CertificateTemplateRecord
 
 def test_sanitize_owned_removes_aes_artifact() -> None:
     clean, removed = sanitize_owned_users(
-        ["target.user", "msa_target$", "aes128-cts-hmac-sha1-96:$", "jaylee.doe"]
+        ["target.user", "msa_target$", "aes128-cts-hmac-sha1-96:$", "target.admin"]
     )
     assert "aes128-cts-hmac-sha1-96:$" in removed
-    assert clean == ["target.user", "msa_target$", "jaylee.doe"]
+    assert clean == ["target.user", "msa_target$", "target.admin"]
 
 
 def test_is_valid_owned_username() -> None:
-    assert is_valid_owned_username("jaylee.doe")
+    assert is_valid_owned_username("target.admin")
     assert is_valid_owned_username("msa_target$")
     assert not is_valid_owned_username("aes128-cts-hmac-sha1-96:$")
 
@@ -22,7 +22,7 @@ def test_group_enroll_hints_only_confirmed_aces() -> None:
     it_sid = "S-1-5-21-1-2-3-1105"
     templates = [
         CertificateTemplateRecord(
-            name="UpdateSrv",
+            name="TargetSrv",
             low_priv_enrollment=False,
             security_aces=[{"trustee_sid": it_sid, "rights": ["enroll"]}],
         ),
@@ -34,12 +34,12 @@ def test_group_enroll_hints_only_confirmed_aces() -> None:
     ]
     principals = [
         PrincipalContext(
-            username="jaylee.doe",
-            user_dn="CN=jaylee,DC=target,DC=example",
+            username="target.admin",
+            user_dn="CN=target.admin,DC=target,DC=example",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
             sid_to_name={it_sid: "IT"},
         )
     ]
     hints = _build_group_enroll_hints(principals, templates)
-    assert hints.get("jaylee.doe") == ["UpdateSrv"]
+    assert hints.get("target.admin") == ["TargetSrv"]

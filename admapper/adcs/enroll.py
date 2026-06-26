@@ -107,7 +107,7 @@ def _wsus_esc1_subject(
     """ESC1-style WSUS cert: subject = WSUS/DC FQDN (EnrolleeSuppliesSubject + Server Auth)."""
     if enrollee_supplies_subject and profile.get("wsus_chain_step"):
         return True
-    if profile.get("wsus_chain_step") and template in ("UpdateSrv", "WebServer"):
+    if profile.get("wsus_chain_step") and template in ("User", "WebServer"):
         return True
     return False
 
@@ -118,7 +118,7 @@ def validate_enroll_principal(username: str, *, machine_template: bool) -> list[
     warnings: list[str] = []
     if name.endswith("$") and not machine_template:
         warnings.append(
-            f"{username} is a machine account — user templates (e.g. UpdateSrv) must enroll "
+            f"{username} is a machine account — user templates (e.g. User) must enroll "
             f"as the scheduled-task user, not via WinRM as a machine/gMSA account"
         )
     return warnings

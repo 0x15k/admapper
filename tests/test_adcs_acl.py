@@ -7,7 +7,7 @@ def test_detect_template_enrollment_for_owned_group() -> None:
     it_sid = "S-1-5-21-1-2-3-1105"
     templates = [
         CertificateTemplateRecord(
-            name="UpdateSrv",
+            name="TargetSrv",
             low_priv_enrollment=False,
             security_aces=[
                 {"trustee_sid": it_sid, "rights": ["enroll"]},
@@ -16,11 +16,11 @@ def test_detect_template_enrollment_for_owned_group() -> None:
     ]
     principals = [
         PrincipalContext(
-            username="jaylee.doe",
-            user_dn="CN=jaylee,DC=target,DC=example",
+            username="target.admin",
+            user_dn="CN=target.admin,DC=target,DC=example",
             user_sid="S-1-5-21-1-2-3-2100",
             group_sids={it_sid: "IT"},
-            sid_to_name={it_sid: "IT", "S-1-5-21-1-2-3-2100": "jaylee.doe"},
+            sid_to_name={it_sid: "IT", "S-1-5-21-1-2-3-2100": "target.admin"},
         )
     ]
     findings = detect_owned_adcs_abuse(
@@ -32,7 +32,7 @@ def test_detect_template_enrollment_for_owned_group() -> None:
     )
     escs = {f.esc for f in findings}
     assert "template_enrollment" in escs
-    assert any(f.template == "UpdateSrv" for f in findings)
+    assert any(f.template == "TargetSrv" for f in findings)
 
 
 def test_detect_esc4_template_write() -> None:

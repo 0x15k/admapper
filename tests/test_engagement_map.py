@@ -224,9 +224,9 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
                 "shell_user": "msa_target$",
                 "findings": [
                     {
-                        "task_name": "Update Check",
-                        "run_as_user": "jaylee.doe",
-                        "payload_zip": "Settings_Update.zip",
+                        "task_name": "Maintenance Task",
+                        "run_as_user": "target.admin",
+                        "payload_zip": "payload.zip",
                     }
                 ],
             }
@@ -242,7 +242,7 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
                         "technique": "dll_hijack_scheduled_task",
                         "title": "Scheduled task DLL hijack",
                         "severity": "critical",
-                        "detail": "Task 'Update Check' runs as jaylee.doe | Drop Settings_Update.zip",
+                        "detail": "Task 'Maintenance Task' runs as target.admin | Drop payload.zip",
                         "context": "msa_target$",
                         "manual_commands": [],
                     }
@@ -263,4 +263,4 @@ def test_engagement_map_advances_past_confirmed_winrm(tmp_path: Path) -> None:
     assert "──WinRM──►" not in text
     assert "NEXT STEP" in text
     assert "dll_hijack_scheduled_task" in text
-    assert "jaylee.doe" in text
+    assert "target.admin" in text

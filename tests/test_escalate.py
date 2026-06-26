@@ -14,14 +14,14 @@ def test_escalate_picks_dll_hijack_from_msa_target(tmp_path: Path) -> None:
             "context": "msa_target$",
             "severity": "critical",
             "title": "DLL hijack",
-            "detail": "Task 'UpdateChecker Agent' runs as jaylee.doe | Binary: x",
+            "detail": "Task 'UpdateChecker Agent' runs as target.admin | Binary: x",
             "manual_commands": ["postex run --op postex-010"]
         }]}
         """,
         encoding="utf-8",
     )
     (ws / "postex_scan.json").write_text(
-        '{"findings": [{"run_as_user": "jaylee.doe"}]}',
+        '{"findings": [{"run_as_user": "target.admin"}]}',
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
@@ -33,7 +33,7 @@ def test_escalate_picks_dll_hijack_from_msa_target(tmp_path: Path) -> None:
     nxt = pick_next_edge(edges)
     assert nxt is not None
     assert nxt.technique == "dll_hijack_scheduled_task"
-    assert nxt.target == "jaylee.doe"
+    assert nxt.target == "target.admin"
 
 
 def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) -> None:
@@ -41,8 +41,8 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
     ws.mkdir()
     (ws / "auth_inventory.json").write_text(
         """
-        {"users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=target,DC=example"}],
-         "groups": [{"name": "IT", "members": ["CN=jaylee,DC=target,DC=example"]}]}
+        {"users": [{"username": "target.admin", "dn": "CN=target.admin,DC=target,DC=example"}],
+         "groups": [{"name": "IT", "members": ["CN=target.admin,DC=target,DC=example"]}]}
         """,
         encoding="utf-8",
     )
@@ -51,12 +51,12 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         {"findings": [{
             "id": "adcs-002",
             "esc": "template_enrollment",
-            "principal": "jaylee.doe",
-            "template": "UpdateSrv",
+            "principal": "target.admin",
+            "template": "TargetSrv",
             "wsus_chain_step": true,
             "cert_auth_viable": false,
             "severity": "high",
-            "title": "UpdateSrv enrollment → WSUS chain",
+            "title": "TargetTemplate enrollment → WSUS chain",
             "prerequisites_met": true,
             "manual_commands": ["certipy req ..."]
         }]}
@@ -68,7 +68,7 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         {"opportunities": [{
             "id": "wsus-004",
             "technique": "wsus_cert_chain",
-            "context": "jaylee.doe",
+            "context": "target.admin",
             "severity": "critical",
             "title": "WSUS + AD CS certificate chain",
             "prerequisites_met": true,
@@ -78,8 +78,8 @@ def test_escalate_jaylee_prefers_wsus_over_server_auth_template(tmp_path: Path) 
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(
-        pivot_user="jaylee.doe",
-        owned_users=["msa_target$", "jaylee.doe"],
+        pivot_user="target.admin",
+        owned_users=["msa_target$", "target.admin"],
         ws_path=ws,
         domain="target.example",
     )
@@ -111,13 +111,13 @@ def test_escalate_skips_exploited_gmsa_acl_when_machine_owned(tmp_path: Path) ->
             "technique": "dll_hijack_scheduled_task",
             "context": "msa_target$",
             "severity": "high",
-            "detail": "runs as jaylee.doe"
+            "detail": "runs as target.admin"
         }]}
         """,
         encoding="utf-8",
     )
     (ws / "postex_scan.json").write_text(
-        '{"findings": [{"run_as_user": "jaylee.doe"}]}',
+        '{"findings": [{"run_as_user": "target.admin"}]}',
         encoding="utf-8",
     )
     edges = collect_edges_from_pivot(

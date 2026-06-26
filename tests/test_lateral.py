@@ -41,7 +41,7 @@ def test_check_winrm_password_access_confirmed(tmp_path) -> None:
     ):
         check = check_winrm_password_access(
             session,
-            username="jaylee.doe",
+            username="target.admin",
             password="Secret123!",
             host="192.168.10.182",
         )

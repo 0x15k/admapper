@@ -11,11 +11,11 @@ _DLL_NAME_RE = re.compile(r"([\w.-]+\.dll)", re.IGNORECASE)
 _RUN_AS_RE = re.compile(r"(?:[\w.-]+\\)([\w$.-]+)", re.IGNORECASE)
 _TASK_NAME_RE = re.compile(r"Task \[([^\]]+)\]", re.IGNORECASE)
 _MONITOR_LOCAL_ZIP_RE = re.compile(
-    r"No updates found locally:\s*(.+?)\.\s*$",
+    r"No payload found locally:\s*(.+?)\.\s*$",
     re.IGNORECASE,
 )
 _MONITOR_LOADER_RE = re.compile(
-    r"Loading update applier:\s*(\S+)",
+    r"Loading plugin loader:\s*(\S+)",
     re.IGNORECASE,
 )
 _MONITOR_CORE_ZIP_RE = re.compile(
@@ -23,7 +23,7 @@ _MONITOR_CORE_ZIP_RE = re.compile(
     re.IGNORECASE,
 )
 _DLL_HIJACK_LINE_RE = re.compile(
-    r"\.dll|\.zip|scheduled.?task|hijack|load(?:ing)?\s+\w+\.dll|update check|monitor|no updates found locally",
+    r"\.dll|\.zip|scheduled.?task|load(?:ing)?\s+[\w.-]+\.dll|update.?check|monitor|no updates found locally|task\s*\[",
     re.IGNORECASE,
 )
 

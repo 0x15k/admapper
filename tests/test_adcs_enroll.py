@@ -7,7 +7,7 @@ from admapper.adcs.enroll import (
 
 def test_update_srv_user_context_uses_empty_subject_and_san_dns() -> None:
     profile = EnrollProfile.from_template(
-        template="UpdateSrv",
+        template="TargetSrv",
         dns_name="dc01.target.example",
         ca_host="dc01.target.example",
         ca_name="corp-DC01-CA",
@@ -36,7 +36,7 @@ def test_machine_template_uses_machine_keyset() -> None:
 
 def test_wsus_esc1_uses_subject_cn_for_wsus_fqdn() -> None:
     profile = EnrollProfile(
-        template="UpdateSrv",
+        template="TargetSrv",
         dns_name="dc01.target.example",
         ca_host="dc01.target.example",
         ca_name="corp-DC01-CA",

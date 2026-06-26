@@ -28,12 +28,12 @@ def _client(*, nthash: bool = False) -> WinRMClient:
 
 
 def test_manual_upload_instructions_interactive(tmp_path: Path) -> None:
-    local = tmp_path / "Settings_Update.zip"
+    local = tmp_path / "payload.zip"
     local.write_bytes(b"x")
     text = upload_mod.manual_upload_instructions(
         _client(nthash=True),
         local,
-        r"C:\ProgramData\UpdateMonitor\Settings_Update.zip",
+        r"C:\ProgramData\VendorApp\payload.zip",
     )
     assert "interactive" in text
     assert "upload " in text
@@ -41,7 +41,7 @@ def test_manual_upload_instructions_interactive(tmp_path: Path) -> None:
 
 
 def test_upload_evil_winrm_first(tmp_path: Path) -> None:
-    local = tmp_path / "Settings_Update.zip"
+    local = tmp_path / "payload.zip"
     local.write_bytes(b"payload")
     client = _client(nthash=True)
     with (
@@ -49,14 +49,14 @@ def test_upload_evil_winrm_first(tmp_path: Path) -> None:
         patch.object(upload_mod, "_upload_via_certutil_b64") as mock_b64,
         patch.object(upload_mod, "_upload_base64_chunks") as mock_chunks,
     ):
-        upload_mod.upload_file(client, local, r"C:\ProgramData\UpdateMonitor\Settings_Update.zip")
+        upload_mod.upload_file(client, local, r"C:\ProgramData\VendorApp\payload.zip")
     mock_ew.assert_called_once()
     mock_b64.assert_not_called()
     mock_chunks.assert_not_called()
 
 
 def test_upload_falls_back_to_certutil(tmp_path: Path) -> None:
-    local = tmp_path / "Settings_Update.zip"
+    local = tmp_path / "payload.zip"
     local.write_bytes(b"payload")
     client = _client(nthash=True)
     with (
@@ -64,13 +64,13 @@ def test_upload_falls_back_to_certutil(tmp_path: Path) -> None:
         patch.object(upload_mod, "_upload_via_certutil_b64", return_value=True) as mock_b64,
         patch.object(upload_mod, "_upload_base64_chunks") as mock_chunks,
     ):
-        upload_mod.upload_file(client, local, r"C:\ProgramData\UpdateMonitor\Settings_Update.zip")
+        upload_mod.upload_file(client, local, r"C:\ProgramData\VendorApp\payload.zip")
     mock_b64.assert_called_once()
     mock_chunks.assert_not_called()
 
 
 def test_upload_requires_dir_verification_not_false_positive(tmp_path: Path) -> None:
-    local = tmp_path / "Settings_Update.zip"
+    local = tmp_path / "payload.zip"
     local.write_bytes(b"payload")
     client = _client(nthash=True)
     with (
@@ -78,16 +78,16 @@ def test_upload_requires_dir_verification_not_false_positive(tmp_path: Path) -> 
         patch.object(upload_mod, "_verify_via_evil_winrm_stdin", return_value=False),
         patch.object(upload_mod, "remote_file_ok", return_value=False),
     ):
-        upload_mod.upload_file(client, local, r"C:\ProgramData\UpdateMonitor\Settings_Update.zip")
+        upload_mod.upload_file(client, local, r"C:\ProgramData\VendorApp\payload.zip")
 
 
 def test_verify_via_stdin_parses_dir(tmp_path: Path) -> None:
     client = _client(nthash=True)
-    output = " Settings_Update.zip              1768  06/10/2026"
+    output = " payload.zip              1768  06/10/2026"
     with patch.object(upload_mod, "_run_evil_winrm_stdin", return_value=output):
         assert upload_mod._verify_via_evil_winrm_stdin(
             client,
-            r"C:\ProgramData\UpdateMonitor\Settings_Update.zip",
+            r"C:\ProgramData\VendorApp\payload.zip",
             expected_size=1768,
         )
 
@@ -95,16 +95,16 @@ def test_verify_via_stdin_parses_dir(tmp_path: Path) -> None:
 def test_parse_dir_size_ignores_stderr_noise() -> None:
     noisy = (
         "Info: Uploading payload\n"
-        "Error: Settings_Update.zip 9999 bytes transferred\n"
-        " Settings_Update.zip              1768  06/10/2026"
+        "Error: payload.zip 9999 bytes transferred\n"
+        " payload.zip              1768  06/10/2026"
     )
-    assert upload_mod._parse_dir_size(noisy, "Settings_Update.zip") == 1768
+    assert upload_mod._parse_dir_size(noisy, "payload.zip") == 1768
 
 
 def test_quote_local_path_with_spaces(tmp_path: Path) -> None:
     folder = tmp_path / "my payloads"
     folder.mkdir()
-    local = folder / "Settings_Update.zip"
+    local = folder / "payload.zip"
     local.write_bytes(b"x")
     quoted = upload_mod._quote_evil_winrm_local(local)
     assert quoted.startswith("'")
@@ -112,10 +112,10 @@ def test_quote_local_path_with_spaces(tmp_path: Path) -> None:
 
 
 def test_upload_via_evil_winrm_builtin_direct_then_copy(tmp_path: Path) -> None:
-    local = tmp_path / "Settings_Update.zip"
+    local = tmp_path / "payload.zip"
     local.write_bytes(b"payload")
     client = _client(nthash=True)
-    remote = r"C:\ProgramData\UpdateMonitor\Settings_Update.zip"
+    remote = r"C:\ProgramData\VendorApp\payload.zip"
     scripts: list[str] = []
 
     def fake_stdin(_client, script, **kwargs):  # noqa: ANN001, ARG001
@@ -132,10 +132,10 @@ def test_upload_via_evil_winrm_builtin_direct_then_copy(tmp_path: Path) -> None:
         )
 
     assert len(scripts) == 2
-    assert f"upload {local.resolve()} C:/ProgramData/UpdateMonitor/Settings_Update.zip" in scripts[0]
-    assert "dir C:/ProgramData/UpdateMonitor/Settings_Update.zip" in scripts[0]
-    assert f"upload {local.resolve()} Settings_Update.zip" in scripts[1]
-    assert "copy .\\Settings_Update.zip C:\\ProgramData\\UpdateMonitor\\Settings_Update.zip" in scripts[1]
+    assert f"upload {local.resolve()} C:/ProgramData/VendorApp/payload.zip" in scripts[0]
+    assert "dir C:/ProgramData/VendorApp/payload.zip" in scripts[0]
+    assert f"upload {local.resolve()} payload.zip" in scripts[1]
+    assert "copy .\\payload.zip C:\\ProgramData\\VendorApp\\payload.zip" in scripts[1]
 
 
 def test_upload_prints_manual_on_failure(tmp_path: Path) -> None:

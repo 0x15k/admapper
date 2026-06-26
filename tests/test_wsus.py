@@ -4,21 +4,21 @@ from admapper.wsus.prerequisites import check_wsus_prerequisites, owned_groups_f
 
 def test_owned_groups_for_user() -> None:
     inventory = {
-        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=target,DC=example"}],
+        "users": [{"username": "target.admin", "dn": "CN=target.admin,DC=target,DC=example"}],
         "groups": [
             {
                 "name": "IT",
-                "members": ["CN=jaylee,DC=target,DC=example"],
+                "members": ["CN=target.admin,DC=target,DC=example"],
             }
         ],
     }
-    groups = owned_groups_for_user(inventory, "jaylee.doe")
+    groups = owned_groups_for_user(inventory, "target.admin")
     assert "IT" in groups
 
 
 def test_wsus_prerequisites_require_adcs() -> None:
     checks = check_wsus_prerequisites(
-        username="jaylee.doe",
+        username="target.admin",
         groups=["IT"],
         has_adcs=False,
         wsus_share=True,
@@ -31,22 +31,22 @@ def test_wsus_prerequisites_require_adcs() -> None:
 
 def test_build_wsus_cert_chain_when_enrollment_finding() -> None:
     class FakeSession:
-        workspace = type("W", (), {"owned_users": ["jaylee.doe"]})()
+        workspace = type("W", (), {"owned_users": ["target.admin"]})()
 
     session = FakeSession()
     adcs_findings = {
         "findings": [
             {
                 "esc": "template_enrollment",
-                "principal": "jaylee.doe",
-                "template": "UpdateSrv",
+                "principal": "target.admin",
+                "template": "TargetSrv",
                 "ca_name": "corp-DC01-CA",
             }
         ]
     }
     inventory = {
-        "users": [{"username": "jaylee.doe", "dn": "CN=jaylee,DC=target,DC=example"}],
-        "groups": [{"name": "IT", "members": ["CN=jaylee,DC=target,DC=example"]}],
+        "users": [{"username": "target.admin", "dn": "CN=target.admin,DC=target,DC=example"}],
+        "groups": [{"name": "IT", "members": ["CN=target.admin,DC=target,DC=example"]}],
         "smb_shares": ["WSUSTemp"],
     }
     ops = build_wsus_opportunities(
