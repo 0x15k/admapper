@@ -171,7 +171,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
     import sys
 
     pip_path = shutil.which("pip") or ""
-    if pip_path and "/.venv/" not in pip_path and "venv" not in pip_path:
+    if sys.prefix == sys.base_prefix and pip_path and "/.venv/" not in pip_path and "venv" not in pip_path:
         issues.append(
             InstallIssue(
                 "warning",
