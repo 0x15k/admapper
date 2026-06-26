@@ -15,7 +15,7 @@ from admapper.report.scenario import print_scenario_report
 if TYPE_CHECKING:
     from admapper.core.session import Session
 
-# Ligero: loot + ACLs + siguiente hop. Deep añade paths/adcs/postex.
+# Light: loot + ACLs + next hop. Deep adds paths/adcs/postex.
 _PIPELINE_LIGHT = ("exploit", "acls", "escalate")
 _PIPELINE_DEEP = ("exploit", "acls", "paths", "adcs", "postex", "escalate")
 _PIPELINE_AUTO = ("exploit", "acls", "postex", "escalate")
@@ -80,7 +80,7 @@ def run_brief(
     deep: bool = False,
     auto: bool = False,
 ) -> None:
-    """Actualiza intel y muestra engagement map (compacto por defecto)."""
+    """Refresh intel and display engagement map (compact by default)."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -97,7 +97,7 @@ def run_brief(
         from admapper import __version__
         from admapper.engage.auto import prepare_auto
 
-        print_info(f"admapper {__version__} — modo --auto")
+        print_info(f"admapper {__version__} — --auto mode")
         prepare_auto(session)
 
     if refresh:
@@ -105,7 +105,7 @@ def run_brief(
             pipeline = _PIPELINE_AUTO
         else:
             pipeline = _PIPELINE_DEEP if deep else _PIPELINE_LIGHT
-        print_phase(f"analyst — {len(pipeline)} módulos …")
+        print_phase(f"analyst — {len(pipeline)} modules …")
         for cmd in pipeline:
             try:
                 if cmd == "exploit":

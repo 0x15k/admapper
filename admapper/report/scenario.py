@@ -134,7 +134,7 @@ def _access_matrix_rows(ws_path: Path) -> list[list[str]]:
 
 
 def _pivot_findings(ws_path: Path, *, pivot: str, domain: str) -> list[str]:
-    """Narrativa: con este pivot qué se encontró (loot, enum, unauth)."""
+    """Narrative: what this pivot found (loot, enum, unauth)."""
     lines: list[str] = []
     inv = _load_json(ws_path / "auth_inventory.json") or {}
     if inv:

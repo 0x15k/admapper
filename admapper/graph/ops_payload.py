@@ -77,14 +77,14 @@ def _mission_button(edge: EscalationEdge) -> str:
     tech = edge.technique.lower()
     target = edge.target or "?"
     labels = {
-        "genericwrite": f"▶ EXPLOTAR GenericWrite → {target}",
-        "readgmsapassword": f"▶ LEER PASSWORD gMSA {target}",
+        "genericwrite": f"▶ EXPLOIT GenericWrite → {target}",
+        "readgmsapassword": f"▶ READ gMSA PASSWORD {target}",
         "genericall": f"▶ GenericAll → {target}",
-        "forcechangepassword": f"▶ CAMBIAR PASSWORD → {target}",
+        "forcechangepassword": f"▶ CHANGE PASSWORD → {target}",
         "dcsync": "▶ DCSYNC",
         "wsus_cert_chain": "▶ CADENA WSUS + AD CS",
         "wsus_spoof": "▶ WSUS SPOOF",
-        "dll_hijack_scheduled_task": "▶ DLL HIJACK (tarea programada)",
+        "dll_hijack_scheduled_task": "▶ DLL HIJACK (scheduled task)",
     }
     return labels.get(tech, f"▶ {edge.title}")
 
@@ -92,12 +92,12 @@ def _mission_button(edge: EscalationEdge) -> str:
 def _mission_reward(edge: EscalationEdge) -> str:
     tech = edge.technique.lower()
     if tech in {"genericwrite", "readgmsapassword"}:
-        return f"Contraseña/hash de {edge.target or 'cuenta'} → nuevo pivot"
+        return f"Password/hash for {edge.target or 'account'} → new pivot"
     if tech == "dcsync":
-        return "Hashes de Domain Admins"
+        return "Domain Admin hashes"
     if "wsus" in tech:
-        return "Shell como SYSTEM / DA"
-    return "Nuevo acceso en la cadena"
+        return "Shell as SYSTEM / DA"
+    return "New access in the chain"
 
 
 def _mission_from_edge(edge: EscalationEdge, *, workspace: str, pivot: str) -> dict[str, Any]:
@@ -185,7 +185,7 @@ def _enrich_graph_for_recon(graph: dict[str, Any], unauth: dict[str, Any]) -> No
             "label": "OPERATOR",
             "group": "operator",
             "color": "#3dffcf",
-            "title": "Tu posición",
+            "title": "Your position",
             "font": {"color": "#080b10"},
             "shape": "box",
         },

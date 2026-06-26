@@ -306,7 +306,7 @@ class WinRMClient:
             try:
                 fb = self._run_evil_winrm(command, shell=shell, timeout=timeout or 90)
                 if (fb.stdout or "").strip():
-                    print_info("WinRM: nxc sin salida — ejecutado vía evil-winrm")
+                    print_info("WinRM: nxc returned no output — executed via evil-winrm")
                     return fb
                 if fb.returncode == 0 or getattr(self, "last_raw_output", ""):
                     return fb

@@ -59,8 +59,8 @@ def test_attack_graph_html(tmp_path: Path) -> None:
     assert "vis-network" in html
     assert "svc_sql" in html
     assert "ldap_auth" in html
-    assert "Estás aquí" in html
-    assert "Siguiente paso" in html or "Hash obtenido" in html
+    assert "You are here" in html
+    assert "Next step" in html or "Hash obtained" in html
 
 
 def test_attack_graph_html_shows_hash_and_krb5_blocker(tmp_path: Path) -> None:
@@ -94,10 +94,10 @@ def test_attack_graph_html_shows_hash_and_krb5_blocker(tmp_path: Path) -> None:
         owned_users=["msa_health$"],
         pivot_user="msa_health$",
     )
-    assert "Hash obtenido" in html
+    assert "Hash obtained" in html
     assert "0123456789abcdef0123456789abcdef" in html
     assert "dc01.corp.local" in html
-    assert "Bloqueo" in html
+    assert "Blocker" in html
     assert "WinRM" in html
 
     path = write_attack_graph_html(

@@ -817,7 +817,7 @@ class DashboardContext:
 
     def run_spray(self, password: str) -> None:
         if not password:
-            self.emit("contraseña requerida para spray", kind="error")
+            self.emit("password required for spray", kind="error")
             return
         import base64
 
@@ -924,19 +924,19 @@ def make_handler(ctx: DashboardContext) -> type[BaseHTTPRequestHandler]:
 
         def _start_background(self, fn: Callable[[], None]) -> None:
             if ctx.running:
-                _json_response(self, 409, {"error": "operación en curso"})
+                _json_response(self, 409, {"error": "operation in progress"})
                 return
             if not ctx.op_lock.acquire(blocking=False):
-                _json_response(self, 409, {"error": "operación en curso"})
+                _json_response(self, 409, {"error": "operation in progress"})
                 return
 
             def wrapper() -> None:
                 ctx.running = True
-                ctx.emit("─── inicio operación ───", kind="phase")
+                ctx.emit("─── operation start ───", kind="phase")
                 try:
                     fn()
                     refresh_workspace_intel(ctx.ws_path)
-                    ctx.emit("─── operación finalizada ───", kind="phase")
+                    ctx.emit("─── operation finished ───", kind="phase")
                     ctx.emit(json.dumps({"refresh": True}), kind="state")
                 except Exception as exc:  # noqa: BLE001 — surface to terminal UI
                     ctx.emit(f"ERROR: {exc}", kind="error")

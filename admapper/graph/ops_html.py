@@ -625,21 +625,21 @@ def build_ops_html(
   <!-- HQ ROOM (2D) -->
   <div id="screen-hq" class="screen">
     <div class="hq-wrap">
-      <div class="hq-header">AD OPS // OPERATOR HQ — usa la laptop para trabajar</div>
+      <div class="hq-header">AD OPS // OPERATOR HQ — use the laptop to operate</div>
       <div class="hq-stage" id="hq-stage">
-        <canvas id="hq-canvas" width="640" height="448" aria-label="Habitación operador"></canvas>
+        <canvas id="hq-canvas" width="640" height="448" aria-label="Operator room"></canvas>
         <div id="hq-fade" class="hq-fade"></div>
         <div id="hq-dialog" class="hq-dialog hidden">
-          <p id="hq-dialog-text">¿Abrir AD OPS en la laptop?</p>
+          <p id="hq-dialog-text">Open AD OPS on the laptop?</p>
           <div class="hq-dialog-btns">
             <button type="button" id="hq-dialog-no">No</button>
-            <button type="button" class="primary" id="hq-dialog-yes">Sí — sentarse</button>
+            <button type="button" class="primary" id="hq-dialog-yes">Yes — sit down</button>
           </div>
         </div>
       </div>
       <div class="hq-hud">
         <div id="hq-prompt" class="hq-prompt"></div>
-        <div class="hq-hint">WASD / flechas · E interactuar</div>
+        <div class="hq-hint">WASD / arrows · E to interact</div>
       </div>
     </div>
   </div>
@@ -716,9 +716,9 @@ def build_ops_html(
       spawnDefault: {{ tx: 10, ty: 9.8 }},
       interactables: [
         {{ id: 'laptop', tx: 3.5, ty: 6.2, r: 1.65, label: 'Laptop AD OPS', face: 'up' }},
-        {{ id: 'bed', tx: 16.2, ty: 10.5, r: 1.5, label: 'Cama', flavor: 'Mejor no dormir — el engagement no se pentestea solo.' }},
-        {{ id: 'shelf', tx: 12.5, ty: 5.4, r: 1.25, label: 'Estantería', flavor: 'CRTP, CRTE, OSCP… La laptop va más rápido.' }},
-        {{ id: 'tv', tx: 16.2, ty: 5.6, r: 1.15, label: 'TV', flavor: 'Solo estática. El mapa real está en AD OPS.' }},
+        {{ id: 'bed', tx: 16.2, ty: 10.5, r: 1.5, label: 'Bed', flavor: "Better not sleep — the engagement won't pentest itself." }},
+        {{ id: 'shelf', tx: 12.5, ty: 5.4, r: 1.25, label: 'Bookshelf', flavor: 'CRTP, CRTE, OSCP… The laptop is faster.' }},
+        {{ id: 'tv', tx: 16.2, ty: 5.6, r: 1.15, label: 'TV', flavor: 'Just static. The real map is in AD OPS.' }},
       ],
     }};
 
@@ -1380,7 +1380,7 @@ def build_ops_html(
     function hqResetDialog() {{
       const yes = $('hq-dialog-yes');
       if (yes) {{
-        yes.textContent = 'Sí — sentarse';
+        yes.textContent = 'Yes — sit down';
         yes.onclick = () => hqBeginDeskSession();
       }}
     }}
@@ -1749,7 +1749,7 @@ def build_ops_html(
       const pivot = activePivot();
       const focus = (graphFocus || (OPS.player || {{}}).pivot || '').toLowerCase();
       const domain = ((OPS.meta || {{}}).domain || '').toLowerCase();
-      const pivotBase = pivot.replace(/\\$$/, '');
+      const pivotBase = pivot.replace(/\\$/g, '');
       const pivotId = pivot && domain ? ('user:' + pivot + '@' + domain) : '';
       const focusId = focus && domain ? ('user:' + focus + '@' + domain) : '';
       nodeData.get().forEach(n => {{
@@ -1759,7 +1759,7 @@ def build_ops_html(
           n.id === pivotId || ul === pivot || ul === pivotBase
           || (pivot.endsWith('$') && String(n.group) === 'gmsa' && pivotBase in nl)
         );
-        const isFocus = focus && (n.id === focusId || ul === focus || ul === focus.replace(/\\$$/, ''));
+        const isFocus = focus && (n.id === focusId || ul === focus || ul === focus.replace(/\$/g, ''));
         const owned = (n.label || '').startsWith('★');
         let color = typeof n.color === 'string' ? n.color : '#64748b';
         if (owned && !isPivot && !isFocus) color = '#22c55e';
@@ -1954,11 +1954,11 @@ def build_ops_html(
       const quests = getDisplayQuests();
       let html = '';
 
-      const activeUser = (graphFocus || activePivot() || '').toLowerCase().replace(/\$$/, '');
+      const activeUser = (graphFocus || activePivot() || '').toLowerCase().replace(/\$/g, '');
       const showAll = !activeUser;
-      const filteredCreds = showAll ? creds : creds.filter(c => (c.user || '').toLowerCase().replace(/\$$/, '') === activeUser);
-      const filteredClues = showAll ? clues : clues.filter(c => (c.user || '').toLowerCase().replace(/\$$/, '') === activeUser);
-      const filteredHashes = showAll ? hashes : hashes.filter(h => (h.account || '').toLowerCase().replace(/\$$/, '') === activeUser);
+      const filteredCreds = showAll ? creds : creds.filter(c => (c.user || '').toLowerCase().replace(/\$/g, '') === activeUser);
+      const filteredClues = showAll ? clues : clues.filter(c => (c.user || '').toLowerCase().replace(/\$/g, '') === activeUser);
+      const filteredHashes = showAll ? hashes : hashes.filter(h => (h.account || '').toLowerCase().replace(/\$/g, '') === activeUser);
 
       if (filteredCreds.length) {{
         html += '<div class="note-callout"><div class="note-block-label" style="color:var(--accent); margin-top:0">Credentials</div>';
@@ -2011,19 +2011,19 @@ def build_ops_html(
     function renderOperatorSetupNote(setup) {{
       setup = setup || {{}};
       const warnings = [];
-      if (!setup.clock_ready) warnings.push('Kerberos puede fallar — sincroniza reloj o libfaketime');
-      if (setup.gssapi_installed === false) warnings.push('Falta gssapi — pip install admapper[full]');
+      if (!setup.clock_ready) warnings.push('Kerberos may fail — sync clock or install libfaketime');
+      if (setup.gssapi_installed === false) warnings.push('gssapi missing — pip install admapper[full]');
       const cmds = [];
-      if (setup.sync_dc_cmd) cmds.push(['Todo en uno', setup.sync_dc_cmd]);
-      if (setup.sync_clock_cmd) cmds.push(['Solo reloj', setup.sync_clock_cmd]);
+      if (setup.sync_dc_cmd) cmds.push(['All-in-one', setup.sync_dc_cmd]);
+      if (setup.sync_clock_cmd) cmds.push(['Clock only', setup.sync_clock_cmd]);
       if (setup.install_faketime_cmd && !setup.libfaketime_installed) {{
         cmds.push(['libfaketime', setup.install_faketime_cmd]);
       }}
       if (setup.hosts_entry) cmds.push(['/etc/hosts', setup.hosts_entry]);
       if (!warnings.length && !cmds.length) return '';
       let html = '<details><summary>Prep local</summary>';
-      warnings.forEach(w => {{ html += noteKv('Aviso', w, 'warn'); }});
-      if (setup.clock_ready) html += noteKv('Reloj', 'OK', 'ok');
+      warnings.forEach(w => {{ html += noteKv('Warning', w, 'warn'); }});
+      if (setup.clock_ready) html += noteKv('Clock', 'OK', 'ok');
       if (setup.gssapi_installed) html += noteKv('gssapi', 'OK', 'ok');
       cmds.forEach(([label, cmd]) => {{
         html += noteKv(label, cmd, 'dim');
@@ -2208,7 +2208,7 @@ def build_ops_html(
       const reader = $('book-reader');
       if (!reader) return;
       let html = '<div class="book-header">';
-      html += `<div class="book-chapter">${{pg.chapter}} · página ${{pg.page}}</div>`;
+      html += `<div class="book-chapter">${{pg.chapter}} · page ${{pg.page}}</div>`;
       html += `<h1>${{pg.title}}</h1>`;
       if (pg.mitre) html += `<div class="book-meta">MITRE ${{pg.mitre}}</div>`;
       html += '</div>';
@@ -2293,7 +2293,7 @@ def build_ops_html(
       }}
       showGraphView();
       if (typeof vis === 'undefined') {{
-        termLine('vis-network no cargado — revisa conexión CDN', 'line-error');
+        termLine('vis-network not loaded — check CDN connection', 'line-error');
         return;
       }}
       const g = activeGraphData();
@@ -2441,7 +2441,7 @@ def build_ops_html(
           body: JSON.stringify(body),
         }});
         if (r.status === 409) {{
-          termLine('operación ya en curso', 'line-error');
+          termLine('operation already in progress', 'line-error');
           setOpState(false);
           return false;
         }}

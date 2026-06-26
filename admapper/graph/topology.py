@@ -114,7 +114,7 @@ def build_network_topology(
         x=-420,
         y=0,
         shape="box",
-        title="Tu posición — sin visibilidad hasta escanear",
+        title="Your position — no visibility until you scan",
     )
 
     if not has_scan:
@@ -122,14 +122,14 @@ def build_network_topology(
             nodes,
             n_seen,
             nid="unknown",
-            label="???\n(no escaneado)",
+            label="???\n(not scanned)",
             group="unknown",
             color="#374151",
             x=120,
             y=0,
             shape="dot",
             size=28,
-            title="Introduce una IP y ejecuta recon",
+            title="Enter an IP and run recon",
         )
         _add_edge(
             edges,

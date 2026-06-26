@@ -255,7 +255,7 @@ def ensure_dc_clock(
             save_workspace_clock_skew(ws_path, derived, dc_ip=dc_ip, stepped_seconds=ldap_skew_seconds)
             from admapper.core.provenance import Tool, print_step
             print_step(
-                f"reloj del DC detectado vía LDAP (skew: {derived}) — configurando libfaketime automáticamente",
+                f"DC clock detected via LDAP (skew: {derived}) — configuring libfaketime automatically",
                 source=Tool.FAKETIME,
             )
 

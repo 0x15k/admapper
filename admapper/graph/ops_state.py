@@ -380,7 +380,7 @@ def compute_stage_and_actions(
             {
                 "id": "scan",
                 "action": "scan",
-                "button": "▶ ESCANEAR SIN AUTENTICACIÓN",
+                "button": "▶ SCAN UNAUTHENTICATED",
                 "enabled": True,
                 "reason": "LDAP · Kerberos 88 · SMB 445",
                 "required": True,
@@ -388,7 +388,7 @@ def compute_stage_and_actions(
         )
         return {
             "stage": "recon",
-            "stage_label": "Sin recon — empieza aquí",
+            "stage_label": "No recon — start here",
             "engagement_over": False,
             "actions": actions,
         }

@@ -126,12 +126,12 @@ def _print_table_compact(title: str, columns: list[str], rows: list[list[str]]) 
         )
         return
     if "post-exploitation" in title_l or "post-exploitation" in title_l.replace("_", "-"):
-        print_info(f"POST-EX: {len(rows)} oportunidad(es) — detalle en panel derecho")
+        print_info(f"POST-EX: {len(rows)} opportunity(ies) — details in right panel")
         return
     if title in {"Engagement", "Domain controller"}:
         return
     if rows:
-        print_info(f"{title}: {len(rows)} fila(s)")
+        print_info(f"{title}: {len(rows)} row(s)")
 
 
 def confirm(
@@ -149,7 +149,7 @@ def confirm(
     - semi (default): safe auto-accept; warn/danger prompt.
     """
     if mode_auto and level in (ConfirmLevel.SAFE, ConfirmLevel.WARN):
-        print_info(f"[admapper] automático: {message}")
+        print_info(f"[admapper] auto: {message}")
         return True
     if mode_manual:
         pass
@@ -163,4 +163,4 @@ def confirm(
     answer = console.input("").strip().lower()
     if not answer:
         return default
-    return answer in {"y", "yes", "s", "si", "sí"}
+    return answer in {"y", "yes", "s"}

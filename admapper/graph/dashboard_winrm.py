@@ -63,10 +63,10 @@ def run_dashboard_winrm_pth(session: Session, account: str) -> str:
     try:
         result = client.execute("whoami", shell="cmd")
     except WinRMError as exc:
-        raise ValueError(f"WinRM PTH falló: {exc}") from exc
+        raise ValueError(f"WinRM PTH failed: {exc}") from exc
 
     if result.returncode != 0 or not result.stdout.strip():
-        raise ValueError(f"WinRM sin salida (rc={result.returncode})")
+        raise ValueError(f"WinRM no output (rc={result.returncode})")
 
     from admapper.escalate.analyze import mark_user_owned
 

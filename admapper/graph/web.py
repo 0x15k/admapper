@@ -474,7 +474,7 @@ def build_attack_graph_html(
         if payload.get("next_hop_cmd"):
             cmd_line = f"<br/><code>{_esc(payload['next_hop_cmd'])}</code>"
         next_hop_block = (
-            "<div class='next'><strong>Siguiente paso</strong><br/>"
+            "<div class='next'><strong>Next step</strong><br/>"
             + _esc(payload.get("next_hop") or "")
             + cmd_line
             + "</div>"
@@ -483,12 +483,12 @@ def build_attack_graph_html(
     blocker_block = ""
     if payload.get("acl_blocker"):
         blocker_block = (
-            "<div class='blocker'><strong>⚠ Bloqueo</strong><br/>"
+            "<div class='blocker'><strong>⚠ Blocker</strong><br/>"
             f"<code>{_esc(payload['acl_blocker'])}</code></div>"
         )
 
     return f"""<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -527,21 +527,21 @@ def build_attack_graph_html(
   </header>
   <div class="layout">
     <aside>
-      <h2>Estás aquí</h2>
-      <p><span class="pill owned">owned</span> {_esc(', '.join(owned_users or []) or '(ninguno)')}</p>
+      <h2>You are here</h2>
+      <p><span class="pill owned">owned</span> {_esc(', '.join(owned_users or []) or '(none)')}</p>
       <p><span class="pill pivot">pivot</span> {_esc(pivot_user or '-')}</p>
       {next_hop_block}
       {blocker_block}
-      <h2>Hash obtenido</h2>
-      <table><thead><tr><th>cuenta</th><th>nthash</th><th>WinRM</th></tr></thead>
-      <tbody>{hash_rows or '<tr><td colspan="3"><em>sin hash de máquina/gMSA</em></td></tr>'}</tbody></table>
+      <h2>Hash obtained</h2>
+      <table><thead><tr><th>account</th><th>nthash</th><th>WinRM</th></tr></thead>
+      <tbody>{hash_rows or '<tr><td colspan="3"><em>no machine/gMSA hash</em></td></tr>'}</tbody></table>
       <h2>User match (LDAP · loot · enum)</h2>
       <table><thead><tr><th>user</th><th>AD</th><th>cred</th><th>sources</th></tr></thead>
       <tbody>{user_rows or '<tr><td colspan="4"><em>run start_auth / enum users</em></td></tr>'}</tbody></table>
-      <h2>Pistas (loot)</h2>
-      <table><thead><tr><th>user</th><th>string del archivo</th><th>estado</th><th>origen</th></tr></thead>
-      <tbody>{clue_rows or '<tr><td colspan="4"><em>sin pistas</em></td></tr>'}</tbody></table>
-      <h2>Leyenda</h2>
+      <h2>Clues (loot)</h2>
+      <table><thead><tr><th>user</th><th>string from file</th><th>status</th><th>source</th></tr></thead>
+      <tbody>{clue_rows or '<tr><td colspan="4"><em>no clues</em></td></tr>'}</tbody></table>
+      <h2>Legend</h2>
       <p class="legend">
         <span style="background:#22c55e"></span>owned
         <span style="background:#f97316"></span>pivot

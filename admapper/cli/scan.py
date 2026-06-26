@@ -196,9 +196,9 @@ def sync_dc_engagement(
     ws_path = session.workspaces.path_for(ws_name)
     print_info(f"sync-dc @ {ip} → workspace {ws_name}")
     if ensure_dc_clock(ip, enabled=True, ws_path=ws_path, force=True):
-        print_success("reloj sincronizado con el DC")
+        print_success("clock synchronized with the DC")
     else:
-        print_info("reloj: usa libfaketime si Kerberos sigue fallando")
+        print_info("clock: use libfaketime if Kerberos still fails")
 
     print_scan_summary(session, sync_hosts=sync_hosts)
     session.persist_workspace()

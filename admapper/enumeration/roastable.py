@@ -1,10 +1,10 @@
-"""Fase 3 — Detección de cuentas roastables (AS-REP + Kerberoast targets).
+"""Phase 3 — Roastable account detection (AS-REP + Kerberoast targets).
 
-Identifica targets sin solicitar ningún ticket:
-  - AS-REP roastable: DONT_REQ_PREAUTH (UAC 0x400000) vía LDAP o SAMR
-  - Kerberoastable: cuentas con SPN (excl. krbtgt + cuentas de máquina)
+Identifies targets without requesting any ticket:
+  - AS-REP roastable: DONT_REQ_PREAUTH (UAC 0x400000) via LDAP or SAMR
+  - Kerberoastable: accounts with SPN (excl. krbtgt + machine accounts)
 
-Prerrequisito: Fase 2 (users.json / auth_inventory.json disponibles).
+Prerequisite: Phase 2 (users.json / auth_inventory.json available).
 MITRE: T1558.004 (AS-REP), T1558.003 (Kerberoast)
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ class RoastableReport:
 
 
 def detect_roastable_targets(session: Session) -> RoastableReport:
-    """Fase 3 — Detect AS-REP and Kerberoast targets from existing inventory.
+    """Phase 3 — Detect AS-REP and Kerberoast targets from existing inventory.
 
     Reads users.json / auth_inventory.json and surfaces roastable accounts
     *before* any ticket is requested. Emits findings and prints summary.
@@ -53,7 +53,7 @@ def detect_roastable_targets(session: Session) -> RoastableReport:
 
     if not users:
         print_warning(
-            "no user inventory found — run 'enum users' first (Fase 2)"
+            "no user inventory found — run 'enum users' first (Phase 2)"
         )
         return report
 

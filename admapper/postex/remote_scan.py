@@ -208,7 +208,7 @@ def _enumerate_scheduled_tasks(
             chunks.append(raw)
             methods.append(method)
             print_ok(
-                f"task enum ({method}): {_pipe_line_count(raw)} tarea(s)",
+                f"task enum ({method}): {_pipe_line_count(raw)} task(s)",
                 source=Tool.ADMAPPER,
             )
             if _has_hijack_payload_hint(raw):
@@ -221,9 +221,9 @@ def _enumerate_scheduled_tasks(
     if not merged:
         raw_hint = (getattr(client, "last_raw_output", "") or "")[:500]
         if raw_hint:
-            print_warning(f"task enum: sin salida parseada — raw nxc: {raw_hint[:200]}…")
+            print_warning(f"task enum: no parsed output — raw nxc: {raw_hint[:200]}…")
         else:
-            print_warning("task enum: sin salida — COM/schtasks/xml vacíos (revisa WinRM o permisos)")
+            print_warning("task enum: no output — COM/schtasks/xml empty (check WinRM or permissions)")
     return merged, "+".join(methods)
 
 
@@ -276,7 +276,7 @@ def _probe_monitor_logs(client: WinRMClient, intel=None) -> str:
                 text = _clean_monitor_log((proc.stdout or "").strip())
                 if text and _monitor_usable(text):
                     print_ok(
-                        f"monitor.log ({path}): {len(text.splitlines())} línea(s)",
+                        f"monitor.log ({path}): {len(text.splitlines())} line(s)",
                         source=Tool.ADMAPPER,
                     )
                     return text
@@ -388,7 +388,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         monitor_log = _local_monitor_from_loot(ws_path / "loot")
         if monitor_log:
             print_ok(
-                f"monitor.log (loot local): {len(monitor_log.splitlines())} línea(s)",
+                f"monitor.log (local loot): {len(monitor_log.splitlines())} line(s)",
                 source=Tool.ADMAPPER,
             )
     monitor_log = _clean_monitor_log(monitor_log)

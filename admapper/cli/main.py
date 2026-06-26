@@ -270,7 +270,7 @@ def escalate_show(
 
 @escalate_app.command("mark")
 def escalate_mark(
-    user: Annotated[str, typer.Argument(help="Usuario o cuenta máquina (ej. msa_health$)")],
+    user: Annotated[str, typer.Argument(help="User or machine account (e.g. msa_health$)")],
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
@@ -285,10 +285,10 @@ def escalate_mark(
     ] = None,
     no_refresh: Annotated[
         bool,
-        typer.Option("--no-refresh", help="No re-ejecutar análisis tras marcar"),
+        typer.Option("--no-refresh", help="Do not re-run analysis after marking"),
     ] = False,
 ) -> None:
-    """Marca usuario owned y lo establece como pivot."""
+    """Mark a user as owned and set them as the active pivot."""
     from admapper.core.output import print_error
     from admapper.escalate.analyze import mark_user_owned
 
@@ -302,7 +302,7 @@ def escalate_mark(
 
 @escalate_app.command("pivot")
 def escalate_pivot(
-    user: Annotated[str, typer.Argument(help="Nuevo pivot")],
+    user: Annotated[str, typer.Argument(help="New pivot")],
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
@@ -316,7 +316,7 @@ def escalate_pivot(
         typer.Option("--domain", "-d", help="Domain hint"),
     ] = None,
 ) -> None:
-    """Cambia el pivot sin añadir a owned."""
+    """Change the active pivot without adding the user to owned."""
     from admapper.core.output import print_error
     from admapper.escalate.analyze import run_escalate_analysis, set_pivot_user
 
@@ -756,12 +756,12 @@ def analyst(
     ] = None,
     deep: Annotated[
         bool,
-        typer.Option("--deep", help="Incluir paths, adcs, postex"),
+        typer.Option("--deep", help="Include paths, adcs, and postex"),
     ] = False,
     no_sync: Annotated[bool, typer.Option("--no-sync", help="Skip clock sync")] = False,
     no_refresh: Annotated[
         bool,
-        typer.Option("--no-refresh", help="Solo leer (como status)"),
+        typer.Option("--no-refresh", help="Read-only (like status)"),
     ] = False,
     verbose: Annotated[
         bool,
@@ -772,7 +772,7 @@ def analyst(
         typer.Option("--auto", help="Chain owned/pivot, postex scan, and wired escalate steps"),
     ] = False,
 ) -> None:
-    """Engagement map: pivot, creds, next hop (compacto por defecto)."""
+    """Engagement map: pivot, creds, next hop (compact by default)."""
     from admapper.cli.brief import run_brief
     from admapper.core.output import print_error
     from admapper.core.verbosity import set_verbose
@@ -1254,7 +1254,7 @@ def status(
         typer.Option("--workspace", "-w", help="Workspace"),
     ] = None,
 ) -> None:
-    """Dashboard rápido (sin re-scan)."""
+    """Quick dashboard (no re-scan)."""
     from admapper.core.output import print_error
     from admapper.report.session_status import print_session_status
 

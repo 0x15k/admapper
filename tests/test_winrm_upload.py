@@ -35,9 +35,9 @@ def test_manual_upload_instructions_interactive(tmp_path: Path) -> None:
         local,
         r"C:\ProgramData\UpdateMonitor\Settings_Update.zip",
     )
-    assert "interactivo" in text
+    assert "interactive" in text
     assert "upload " in text
-    assert "forward slashes" in text or "opción A" in text
+    assert "forward slashes" in text or "option A" in text
 
 
 def test_upload_evil_winrm_first(tmp_path: Path) -> None:

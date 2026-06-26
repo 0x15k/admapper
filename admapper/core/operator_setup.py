@@ -31,7 +31,7 @@ def build_operator_setup(
     skew = load_workspace_clock_skew(ws_path)
     faketime_ok = bool(resolve_faketime())
     hosts_entry = ""
-    if dc_ip and dc_host and dc_host not in {"-", "?", "sin PTR"}:
+    if dc_ip and dc_host and dc_host not in {"-", "?", "no PTR"}:
         hosts_entry = f"{dc_ip}  {dc_host}"
 
     clock_ok = bool(skew) or (dc_ip and was_dc_clock_synced(dc_ip))
@@ -42,18 +42,18 @@ def build_operator_setup(
     notes: list[str] = []
     if not clock_ok and not faketime_ok:
         notes.append(
-            "Kerberos puede fallar hasta sincronizar reloj o instalar libfaketime."
+            "Kerberos may fail until the clock is synchronized or libfaketime is installed."
         )
     elif skew:
-        notes.append(f"Offset Kerberos en workspace: {skew} (libfaketime).")
+        notes.append(f"Workspace Kerberos offset: {skew} (libfaketime).")
     elif clock_ok:
-        notes.append("Reloj sincronizado con el DC en esta sesión.")
+        notes.append("Clock synchronized with the DC in this session.")
     if hosts_entry:
-        notes.append("Añade la línea de hosts si LDAP/Kerberos resuelven mal el FQDN.")
+        notes.append("Add the hosts line if LDAP/Kerberos resolve the FQDN incorrectly.")
     gssapi_ok = _gssapi_installed()
     if not gssapi_ok:
         notes.append(
-            "gssapi no instalado — ▶ genericwrite / gMSA fallará hasta: "
+            "gssapi not installed — ▶ genericwrite / gMSA will fail until: "
             "pip install 'admapper[full]'"
         )
 

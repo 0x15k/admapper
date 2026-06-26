@@ -100,7 +100,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "error",
                 "wrong_cwd",
-                f"Directorio actual es el paquete Python ({here}), no la raíz del repo.",
+                f"Current directory is the Python package ({here}), not the repo root.",
                 fix,
             )
         )
@@ -110,8 +110,8 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "warning",
                 "repo_not_found",
-                "No se encontró la raíz del repo (pyproject.toml + admapper/).",
-                "cd /ruta/al/repo  o  pipx install --editable /ruta/al/repo/.[full]",
+                "Repo root not found (pyproject.toml + admapper/).",
+                "cd /path/to/repo  or  pipx install --editable /path/to/repo/.[full]",
             )
         )
     else:
@@ -119,7 +119,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "info",
                 "repo_root",
-                f"Raíz del repo: {repo}",
+                f"Repo root: {repo}",
                 None,
             )
         )
@@ -130,8 +130,8 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
                     InstallIssue(
                         "warning",
                         f"missing_{marker.replace('/', '_')}",
-                        f"Falta en el repo: {marker}",
-                        f"Monta o copia el proyecto completo en {repo}",
+                        f"Missing from repo: {marker}",
+                        f"Mount or copy the complete project into {repo}",
                     )
                 )
         legacy = legacy_repo_workspaces()
@@ -142,7 +142,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
                     InstallIssue(
                         "info",
                         "legacy_workspaces",
-                        f"Workspaces legacy en repo: {legacy} ({count}) — usa: admapper -O {legacy}",
+                        f"Legacy workspaces in repo: {legacy} ({count}) — use: admapper -O {legacy}",
                         None,
                     )
                 )
@@ -162,7 +162,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "info",
                 "workspaces_default",
-                "Default: ~/.admapper/workspaces (fuera del repo — seguro para git)",
+                "Default: ~/.admapper/workspaces (outside repo — safe for git)",
                 None,
             )
         )
@@ -176,8 +176,8 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "warning",
                 "pip_not_in_venv",
-                f"pip activo no es del venv: {pip_path}",
-                f"source <repo>/.venv/bin/activate  o  <repo>/.venv/bin/pip install -e '.[full]'",
+                f"Active pip is not from a venv: {pip_path}",
+                f"source <repo>/.venv/bin/activate  or  <repo>/.venv/bin/pip install -e '.[full]'",
             )
         )
     if sys.prefix == sys.base_prefix:
@@ -185,7 +185,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "info",
                 "python_not_venv",
-                "Python activo no es un venv — en Kali usa: source .venv/bin/activate",
+                "Active Python is not a venv — on Kali run: source .venv/bin/activate",
                 "./scripts/install.sh --venv",
             )
         )
@@ -196,7 +196,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
                 InstallIssue(
                     "error",
                     f"missing_{mod}",
-                    f"Dependencia core ausente: {label}",
+                    f"Missing core dependency: {label}",
                     fix,
                 )
             )
@@ -207,7 +207,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
                 InstallIssue(
                     "warning",
                     f"missing_{mod}",
-                    f"Dependencia recon ausente: {label} (SMB/Kerberos/WinRM limitados)",
+                    f"Missing recon dependency: {label} (SMB/Kerberos/WinRM limited)",
                     fix,
                 )
             )
@@ -218,7 +218,7 @@ def collect_install_issues(*, cwd: Path | None = None) -> list[InstallIssue]:
             InstallIssue(
                 "info",
                 f"tool_{tool.name}",
-                f"Herramienta externa no encontrada: {tool.name}",
+                f"External tool not found: {tool.name}",
                 tool.hint,
             )
         )
@@ -254,14 +254,14 @@ def print_doctor_report(*, cwd: Path | None = None) -> int:
     warnings = [i for i in issues if i.severity == "warning"]
 
     if errors:
-        print_error(f"{len(errors)} error(es) — corrige antes de usar admapper en este entorno.")
+        print_error(f"{len(errors)} error(s) — fix before using admapper in this environment.")
         for issue in errors:
             if issue.fix:
                 print_info(f"  → {issue.fix}")
         return 1
 
     if warnings:
-        print_warning(f"{len(warnings)} aviso(s) — admapper puede funcionar con limitaciones.")
+        print_warning(f"{len(warnings)} warning(s) — admapper may run with limitations.")
     else:
-        print_success("Instalación y layout OK.")
+        print_success("Installation and layout OK.")
     return 0

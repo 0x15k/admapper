@@ -172,13 +172,13 @@ def manual_upload_instructions(
     filename = remote.rsplit("\\", 1)[-1]
     remote_fwd = remote_path.replace("\\", "/")
     lines = [
-        "# evil-winrm interactivo — usar / en ruta remota o upload+copy",
+        f"# evil-winrm interactive — use / in remote path or upload+copy",
         f"evil-winrm -i {target} -u '{user}' -H {nthash}",
         f"mkdir {parent} -Force",
-        f"# opción A (recomendada): forward slashes",
+        f"# option A (recommended): forward slashes",
         f"upload {local_abs} {remote_fwd}",
         f"dir {remote_fwd}",
-        f"# opción B: subir al cwd y copiar",
+        f"# option B: upload to cwd and copy",
         f"upload {local_abs} {filename}",
         f"copy .\\{filename} {remote}",
         f"dir {remote}",
@@ -397,7 +397,7 @@ def upload_file(
         http_fetch_host=http_fetch_host,
         http_port=http_port,
     )
-    print_error("upload automático falló — usa evil-winrm interactivo (upload builtin):")
+    print_error("automatic upload failed — use interactive evil-winrm (builtin upload):")
     for line in manual.splitlines():
         print_error(f"  {line}")
     raise WinRMError("upload failed — use interactive evil-winrm upload (see above)")
