@@ -202,7 +202,7 @@ def install_pipx(root: Path, pipx: str, extra: str, force: bool) -> None:
         run(*args, cwd=root)
 
     try:
-        run(pipx, "ensurepath", check=False)
+        run(pipx, "ensurepath", check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
     ok("admapper installed globally")
