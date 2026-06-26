@@ -21,7 +21,7 @@ To facilitate flexibility in different environments, ADMapper dependencies are s
 | *(none)* | `pip install admapper` | **CORE**: typer, rich, prompt-toolkit, ldap3, dnspython | ✅ Yes — pure Python code |
 | `recon` | `pip install "admapper[recon]"` | **CORE** + **RECON** (impacket) | ✅ Yes* — pip wheel; requires MSVC runtime on Windows occasionally |
 | `full` | `pip install "admapper[full]"` | Same as `recon` (default recommended tier) | ✅ Yes |
-| `dev` | `pip install -e ".[dev]"` | + pytest, ruff, bandit | ✅ Yes |
+| `dev` | `pip install -e ".[dev]"` | + ruff, bandit | ✅ Yes |
 
 > [!NOTE]
 > Dependencies in `pyproject.toml` use compatible semver ranges (`>=X,<Y`). Impacket is pinned to `<0.13` to ensure compatibility with its internal API.
