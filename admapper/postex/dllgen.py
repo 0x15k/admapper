@@ -197,15 +197,17 @@ def build_cert_enroll_dll_mingw(
     *,
     out_path: Path,
     arch: TargetArch = "x86",
+    drop_path: str = r"C:\ProgramData",
 ) -> Path:
-    """DLL that runs enroll.ps1 from UpdateMonitor dir (deploy script separately via WinRM)."""
+    """DLL that runs enroll.ps1 from a writable drop dir."""
     gcc = ensure_mingw_gcc(arch)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    safe = drop_path.replace("\\", "\\\\").rstrip("\\")
+    code = _MINGW_ENROLL_DLL_C.replace(r"C:\\ProgramData\\UpdateMonitor", safe)
     with tempfile.TemporaryDirectory(prefix="admapper-enroll-dll-") as tmp:
-        source = _MINGW_ENROLL_DLL_C
         src = Path(tmp) / "enroll.c"
         def_file = Path(tmp) / "enroll.def"
-        src.write_text(source, encoding="utf-8")
+        src.write_text(code, encoding="utf-8")
         def_file.write_text(
             f"LIBRARY {out_path.stem}\nEXPORTS\nPreUpdateCheck\n",
             encoding="utf-8",

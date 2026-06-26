@@ -10,7 +10,7 @@ _DROP_LINE = re.compile(
     re.IGNORECASE,
 )
 _HIJACK_BODY = re.compile(
-    r"\.zip|\.dll|Task\s*\[|ProgramData|loaded\s+|jaylee|UpdateMonitor|Settings_Update|No updates",
+    r"\.zip|\.dll|Task\s*\[|ProgramData|loaded\s+|No updates",
     re.IGNORECASE,
 )
 

@@ -36,8 +36,8 @@ class EnrollProfile:
         *,
         template: str,
         dns_name: str,
-        ca_host: str = "DC01.logging.htb",
-        ca_name: str = "logging-DC01-CA",
+        ca_host: str,
+        ca_name: str,
         enrollment_flags: int = 0,
         enrollee_supplies_subject: bool = False,
         enroll_user_cn: str | None = None,
@@ -67,8 +67,8 @@ def load_enroll_profile(
     *,
     template: str,
     dns_name: str,
-    ca_host: str = "DC01.logging.htb",
-    ca_name: str = "logging-DC01-CA",
+    ca_host: str,
+    ca_name: str,
     run_as_user: str | None = None,
 ) -> EnrollProfile:
     """Build enrollment profile from workspace AD CS inventory when available."""

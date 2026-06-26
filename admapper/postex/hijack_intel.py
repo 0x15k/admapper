@@ -29,7 +29,7 @@ _DLL_HIJACK_LINE_RE = re.compile(
 
 
 def _intel_from_monitor_lines(lines: list[str]) -> tuple[str | None, str | None, str | None, str | None]:
-    """Parse UpdateMonitor-style monitor.log → zip, dll, drop_path, monitor_log_path."""
+    """Parse a generic monitor.log → zip, dll, drop_path, monitor_log_path."""
     zip_name = dll_name = drop_path = monitor_log_path = None
     for line in lines:
         local = _MONITOR_LOCAL_ZIP_RE.search(line)

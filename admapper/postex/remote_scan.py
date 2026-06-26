@@ -17,29 +17,26 @@ from admapper.postex.hijack_intel import (
 from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.pe_arch import infer_arch_from_monitor_log, normalize_arch, ps_read_pe_arch_script
 from admapper.postex.loot_intel import scan_loot_directory
-from admapper.postex.scenario_intel import (
-    detect_scenario,
-    scenario_to_finding,
-    scenario_to_hijack_intel,
-)
 from admapper.postex.task_hijack import TaskHijackAnalysis, analyze_task_hijack, analysis_to_dict
-from admapper.winrm.client import WinRMError
+from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.factory import winrm_client_for_cred
 
 if TYPE_CHECKING:
     from admapper.core.session import Session
 
 
-_MONITOR_LOG_PATHS = (
-    r"C:\ProgramData\UpdateMonitor\Logs\monitor.log",
-    r"C:\ProgramData\UpdateMonitor\monitor.log",
+_MONITOR_LOG_PATHS: tuple[str, ...] = (
+    r"C:\ProgramData\{name}\Logs\monitor.log",
+    r"C:\ProgramData\{name}\monitor.log",
+    r"C:\ProgramData\{name}\logs\monitor.log",
 )
 
+
+def _monitor_log_candidates(drop_path: str) -> list[str]:
+    base = drop_path.rstrip("\\/").split("\\")[-1]
+    return [p.format(name=base) for p in _MONITOR_LOG_PATHS]
 # Fast targeted queries before full schtasks /query (slow via evil-winrm)
-_TARGETED_TASK_QUERIES = (
-    ("schtasks_task", r'schtasks /Query /TN "\UpdateMonitor\Update Check" /FO LIST /V'),
-    ("task_xml", r'type "%windir%\System32\Tasks\UpdateMonitor\Update Check"'),
-)
+_TARGETED_TASK_QUERIES: tuple[tuple[str, str], ...] = ()
 
 
 def _ps_com_tasks_recursive(filter_text: str | None) -> str:
@@ -253,8 +250,8 @@ def _monitor_candidate_paths(intel) -> list[str]:
         base = intel.drop_path.rstrip("\\/")
         for suffix in (r"\Logs\monitor.log", r"\logs\monitor.log", r"\monitor.log"):
             _add(base + suffix)
-    for path in _MONITOR_LOG_PATHS:
-        _add(path)
+        for candidate in _monitor_log_candidates(intel.drop_path):
+            _add(candidate)
     return paths
 
 
@@ -384,14 +381,6 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
     monitor_log = acl_out = ""
 
     intel = extract_hijack_intel(loot)
-    scenario = detect_scenario(domain, loot=loot)
-    if scenario:
-        print_ok(
-            f"escenario {domain}: UpdateMonitor → {scenario.next_human} ({scenario.next_chain})",
-            source=Tool.ADMAPPER,
-        )
-        if intel is None:
-            intel = scenario_to_hijack_intel(scenario)
 
     print_info("post-ex: leyendo monitor.log …")
     monitor_log = _probe_monitor_logs(client, intel)
@@ -410,12 +399,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
 
     com_out = ""
     task_enum_method = ""
-    scenario = detect_scenario(domain, loot=loot, monitor_log=monitor_log, com_out=com_out) or scenario
-    if scenario and intel is None:
-        intel = scenario_to_hijack_intel(scenario)
-
-    skip_slow_remote = _intel_sufficient(intel, monitor_log, loot)
-    if not skip_slow_remote:
+    if not _intel_sufficient(intel, monitor_log, loot):
         task_filter = intel.com_task_filter if intel else None
         if task_filter:
             print_info(f"task enum: filtro {task_filter!r}")
@@ -433,27 +417,8 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
     if intel is None and com_out.strip():
         intel = intel_from_com_tasks(com_out)
 
-    if intel is not None:
-        drop_base = intel.drop_path.rstrip("\\") if intel.drop_path else ""
-        monitor_path = intel.monitor_log_path or (
-            f"{drop_base}\\Logs\\monitor.log" if drop_base else ""
-        )
-        acl_scripts: list[tuple[str, str]] = []
-        if not monitor_log.strip():
-            acl_scripts.append(("monitor.log", _ps_monitor_log(monitor_path)))
-        # Always check ACL: monitor.log presence does not prove the drop path
-        # is writable, which is required to land the payload.
-        acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))
-    elif scenario is not None:
-        intel = scenario_to_hijack_intel(scenario)
-        acl_scripts = ()
-        skip_slow_remote = True
-        print_ok(
-            f"escenario {domain}: DLL hijack {scenario.task_name} → {scenario.run_as}",
-            source=Tool.ADMAPPER,
-        )
-    else:
-        acl_scripts = ()
+    if intel is None:
+        acl_scripts: tuple[tuple[str, str], ...] = ()
         if not com_out.strip() and not monitor_log.strip():
             result.errors.append(
                 "could not derive drop paths — need loot with zip/dll hints or COM task paths"
@@ -478,6 +443,17 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
             source=Tool.ADMAPPER,
             manual="admapper postex scan -w <workspace>",
         )
+    else:
+        drop_base = intel.drop_path.rstrip("\\") if intel.drop_path else ""
+        monitor_path = intel.monitor_log_path or (
+            f"{drop_base}\\Logs\\monitor.log" if drop_base else ""
+        )
+        acl_scripts = []
+        if not monitor_log.strip():
+            acl_scripts.append(("monitor.log", _ps_monitor_log(monitor_path)))
+        # Always check ACL: monitor.log presence does not prove the drop path
+        # is writable, which is required to land the payload.
+        acl_scripts.append(("ACL", _ps_acl(intel.drop_path)))
 
     for label, script in acl_scripts:
         try:
@@ -519,14 +495,6 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         acl_output=acl_out,
         target_arch=target_arch,
     )
-
-    if scenario and not result.analysis.findings:
-        import re
-
-        writable = bool(re.search(r"\(WD", acl_out or "", re.I))
-        result.analysis.findings.append(
-            scenario_to_finding(scenario, writable=writable, evidence=["scenario catalog"])
-        )
 
     out_path = _write_scan_payload(
         ws_path,

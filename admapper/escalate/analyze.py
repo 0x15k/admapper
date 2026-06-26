@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from admapper.core.graph import GraphStore
 from admapper.core.output import print_info, print_success, print_warning
+from admapper.creds.common import resolve_dc_fqdn
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 from admapper.escalate.render import print_escalation_state
 from admapper.guides.render import print_manual_guide
@@ -26,7 +27,7 @@ def resolve_pivot_user(session: Session) -> str:
     best = pick_best_pivot(owned, ws_path=ws_path)
     explicit = session.workspace.pivot_user
     if explicit:
-        # Upgrade stale machine pivot when a post-machine human is owned (jaylee after msa_health$).
+        # Upgrade stale machine pivot when a post-machine human is owned.
         if explicit.endswith("$") and best and not best.endswith("$"):
             if explicit.lower() != best.lower():
                 return best
@@ -325,15 +326,16 @@ def run_escalate_exec(session: Session, *, op_id: str | None = None) -> None:
         from admapper.adcs.runner import run_certipy_enrollment, run_enroll_hijack
 
         fid = finding_id or "adcs-002"
-        result = run_certipy_enrollment(session, finding_id=fid, dns_name="DC01.logging.htb")
+        host = resolve_dc_fqdn(str(ws_path), domain) or f"dc01.{domain}"
+        result = run_certipy_enrollment(session, finding_id=fid, dns_name=host)
         if not result.success and result.error and "no pivot credential" in result.error:
-            print_info("no pivot hash — enroll via hijack as jaylee (UpdateSrv → WSUS chain)")
+            print_info("no pivot hash — enroll via DLL-hijack task, then restart the chain")
             from admapper.postex.analyze import resolve_hijack_op_id
 
             result = run_enroll_hijack(
                 session,
                 finding_id=fid,
-                dns_name="DC01.logging.htb",
+                dns_name=host,
                 op_id=resolve_hijack_op_id(session),
             )
         if result.success:

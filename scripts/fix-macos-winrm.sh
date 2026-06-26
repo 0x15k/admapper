@@ -46,11 +46,16 @@ cat <<EOF
 
 Done. Use WinRM on macOS:
 
+  # sync clock first (manual or via ADMapper's libfaketime helpers)
   sudo sntp -sS <DC_IP>
-  admapper winrm -H <DC_IP> -d logging.htb -u svc_recovery -p 'Em3rg3ncyPa\$\$2026'
-  admapper winrm -H DC01.logging.htb -d logging.htb -u svc_recovery -p '...' -x whoami
+
+  # plain password
+  admapper winrm -H <DC_IP> -d <DOMAIN> -u <USER> -p '<PASS>'
+
+  # use Kerberos cache after kinit
+  admapper winrm -H <DC_FQDN> -d <DOMAIN> -u <USER> -k --use-kcache -x whoami
 
 Optional: patch nxc winrm Kerberos bug:
-  $ROOT/scripts/patch-netexec-winrm.sh
+  $ROOT/scripts/patch-netexec-winrm.sh <path/to/netexec/venv>
 
 EOF

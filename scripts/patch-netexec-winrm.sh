@@ -2,13 +2,27 @@
 # Patch NetExec winrm: implement kerberos_login (upstream missing) + fix false-positive kcache auth.
 set -euo pipefail
 
-NXC_VENV="${HOME}/.local/pipx/venvs/netexec"
-WINRM_PY="${NXC_VENV}/lib/python3.13/site-packages/nxc/protocols/winrm.py"
-CONN_PY="${NXC_VENV}/lib/python3.13/site-packages/nxc/connection.py"
+NXC_VENV="${1:-${HOME}/.local/pipx/venvs/netexec}"
+
+if [[ ! -d "$NXC_VENV" ]]; then
+  echo "✗ netexec venv not found at $NXC_VENV" >&2
+  echo "  usage: $0 <path/to/netexec/venv>" >&2
+  echo "  install example: pipx install --python python3.13 git+https://github.com/Pennyw0rth/NetExec" >&2
+  exit 1
+fi
+
+PYTHON_BIN="${NXC_VENV}/bin/python"
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  echo "✗ python interpreter not found at $PYTHON_BIN" >&2
+  exit 1
+fi
+
+SITE_PACKAGES="$($PYTHON_BIN -c 'import site; print(site.getsitepackages()[0])')"
+WINRM_PY="${SITE_PACKAGES}/nxc/protocols/winrm.py"
+CONN_PY="${SITE_PACKAGES}/nxc/connection.py"
 
 if [[ ! -f "$WINRM_PY" ]]; then
-  echo "✗ netexec venv not found at $NXC_VENV" >&2
-  echo "  install: pipx install --python python3.13 git+https://github.com/Pennyw0rth/NetExec" >&2
+  echo "✗ netexec not installed in $NXC_VENV (missing $WINRM_PY)" >&2
   exit 1
 fi
 
@@ -16,7 +30,7 @@ if grep -q "def kerberos_login" "$WINRM_PY"; then
   echo "✓ kerberos_login already present in winrm.py"
 else
   echo "==> Adding kerberos_login to winrm.py"
-  python3 - "$WINRM_PY" <<'PY'
+  "$PYTHON_BIN" - "$WINRM_PY" <<'PY'
 from pathlib import Path
 import sys
 
@@ -67,7 +81,7 @@ if grep -q "if not self.kerberos_login" "$CONN_PY"; then
   echo "✓ connection.py kcache check already patched"
 else
   echo "==> Fixing false-positive kcache auth in connection.py"
-  python3 - "$CONN_PY" <<'PY'
+  "$PYTHON_BIN" - "$CONN_PY" <<'PY'
 from pathlib import Path
 import sys
 
@@ -88,5 +102,5 @@ PY
 fi
 
 echo "Done. Requires: python3 -m pip install gssapi krb5 (in netexec venv)"
-"${NXC_VENV}/bin/python3.13" -m pip install -q gssapi krb5 2>/dev/null || true
-echo "Try: nxc winrm DC01.logging.htb -u svc_recovery -k --use-kcache -d logging.htb -x whoami"
+"$PYTHON_BIN" -m pip install -q gssapi krb5 2>/dev/null || true
+echo "Try: nxc winrm <DC_FQDN> -u <user> -k --use-kcache -d <DOMAIN> -x whoami"
