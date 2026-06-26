@@ -14,7 +14,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
         if not require_workspace(session):
             return True
         ws_path = session.workspaces.path_for(session.workspace.name)  # type: ignore[union-attr]
-        from admapper.creds.kerberos_skew import ensure_workspace_skew
+        from admapper.kerberos.skew import ensure_workspace_skew
         from admapper.analysis.user_match import refresh_workspace_intel
 
         ensure_workspace_skew(ws_path)

@@ -96,7 +96,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
     if cmd == "asreproast":
         if not require_workspace(session):
             return True
-        from admapper.creds.asreproast import run_asreproast
+        from admapper.kerberos.asreproast import run_asreproast
 
         crack = True
         wordlist: Path | None = None
@@ -130,7 +130,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
     if cmd == "kerberoast":
         if not require_workspace(session):
             return True
-        from admapper.creds.kerberoast import run_kerberoast
+        from admapper.kerberos.kerberoast import run_kerberoast
 
         crack = True
         wordlist: Path | None = None

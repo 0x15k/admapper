@@ -1,4 +1,4 @@
-"""User enumeration (SAMR, LDAP, RID cycling)."""
+"""User and domain enumeration (SAMR, LDAP, RID cycling, roastables)."""
 
 from admapper.enum.scan import UserEnumResult, run_user_enumeration
 

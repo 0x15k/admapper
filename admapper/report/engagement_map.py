@@ -9,7 +9,7 @@ from admapper.creds.common import (
     format_admapper_winrm_pth,
     format_evil_winrm_pth,
 )
-from admapper.creds.kerberos_skew import load_workspace_clock_skew
+from admapper.kerberos.skew import load_workspace_clock_skew
 from admapper.escalate.edges import collect_edges_from_pivot, pick_next_edge, sort_edges
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json

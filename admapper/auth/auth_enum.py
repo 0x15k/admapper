@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from admapper.auth.bloodhound_export import export_bloodhound_minimal
-from admapper.auth.ldap_enum import LdapAuthEnumResult, enumerate_ldap_authenticated
+from admapper.enum.ldap_enum import LdapAuthEnumResult, enumerate_ldap_authenticated
 from admapper.auth.ldap_session import open_ldap_session
 from admapper.auth.smb_enum import SmbAuthEnumResult, enumerate_smb_authenticated
 from admapper.stores.auth_inventory import AuthInventoryStore

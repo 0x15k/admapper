@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from admapper.cli.commands import dispatch
 from admapper.support.output import print_info
 from admapper.support.verbosity import is_verbose, print_phase
-from admapper.creds.kerberos_skew import apply_clock_skew_option, ensure_workspace_skew
+from admapper.kerberos.skew import apply_clock_skew_option, ensure_workspace_skew
 from admapper.report.engagement_map import print_engagement_map
 from admapper.report.export import run_export
 from admapper.report.scenario import print_scenario_report

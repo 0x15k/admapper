@@ -207,7 +207,7 @@ def ensure_dc_clock(
 
     from admapper.support.output import print_info, print_success, print_warning
     from admapper.support.platform import get_clock_skew, set_clock_skew
-    from admapper.creds.kerberos_skew import apply_workspace_clock_skew
+    from admapper.kerberos.skew import apply_workspace_clock_skew
 
     if not dc_ip:
         return False
@@ -248,7 +248,7 @@ def ensure_dc_clock(
         pass
 
     if ldap_skew_seconds is not None:
-        from admapper.creds.kerberos_skew import save_workspace_clock_skew, seconds_to_faketime_offset
+        from admapper.kerberos.skew import save_workspace_clock_skew, seconds_to_faketime_offset
         derived = seconds_to_faketime_offset(ldap_skew_seconds)
         if not get_clock_skew() and abs(ldap_skew_seconds) > 10:
             set_clock_skew(derived)
@@ -271,7 +271,7 @@ def ensure_dc_clock(
             if abs(step_seconds) >= _LARGE_STEP_THRESHOLD_SEC:
                 _dc_clock_state["unstable"] = True
                 print_warning(vm_time_sync_warning(step_seconds))
-                from admapper.creds.kerberos_skew import (
+                from admapper.kerberos.skew import (
                     save_workspace_clock_skew,
                     seconds_to_faketime_offset,
                 )
@@ -297,7 +297,7 @@ def ensure_dc_clock(
                 set_clock_skew(None)
         _dc_clock_state["synced_dc"] = dc_ip
         if not _dc_clock_state.get("unstable") and ldap_skew_seconds is None:
-            from admapper.creds.kerberos_skew import save_workspace_clock_skew
+            from admapper.kerberos.skew import save_workspace_clock_skew
 
             set_clock_skew(None)
             save_workspace_clock_skew(ws_path, None)

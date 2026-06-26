@@ -105,13 +105,13 @@ def check_kerberos_tgt(
         return False
 
     from admapper.support.platform import get_clock_skew
-    from admapper.creds.kerberos_skew import check_kerberos_with_skew, seconds_to_faketime_offset
-    from admapper.creds.time_sync import get_last_ntp_step_seconds, is_clock_unstable
+    from admapper.kerberos.skew import check_kerberos_with_skew, seconds_to_faketime_offset
+    from admapper.kerberos.time_sync import get_last_ntp_step_seconds, is_clock_unstable
 
     skew = preferred_clock_skew or get_clock_skew()
     step_seconds = get_last_ntp_step_seconds()
     step_derived = seconds_to_faketime_offset(step_seconds) if step_seconds else None
-    from admapper.creds.time_sync import was_dc_clock_synced
+    from admapper.kerberos.time_sync import was_dc_clock_synced
 
     skip_system_time = (
         kerberos_only

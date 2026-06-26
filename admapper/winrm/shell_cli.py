@@ -6,7 +6,7 @@ import typer
 
 from admapper.support.output import print_error, print_info, print_success
 from admapper.creds.common import resolve_dc_fqdn
-from admapper.creds.time_sync import ensure_dc_clock
+from admapper.kerberos.time_sync import ensure_dc_clock
 from admapper.postex.creds import machine_hash_from_workspace
 from admapper.winrm.client import WinRMClient, WinRMError
 from admapper.winrm.deps import winrm_deps_hint

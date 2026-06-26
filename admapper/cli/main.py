@@ -830,7 +830,7 @@ def graph(
         print_error("sin workspace — usa -w <workspace>")
         raise typer.Exit(1)
     ws_path = session.workspaces.path_for(session.workspace.name)
-    from admapper.creds.kerberos_skew import ensure_workspace_skew
+    from admapper.kerberos.skew import ensure_workspace_skew
 
     ensure_workspace_skew(ws_path)
     refresh_workspace_intel(ws_path)
@@ -1291,7 +1291,7 @@ def exploit(
 ) -> None:
     """Auto-exploit chain: share loot → creds → ACL abuse → lateral."""
     from admapper.support.output import print_error
-    from admapper.creds.kerberos_skew import apply_clock_skew_option
+    from admapper.kerberos.skew import apply_clock_skew_option
     from admapper.exploit.engine import run_exploit_engagement
 
     session = Session.bootstrap()
@@ -1303,7 +1303,7 @@ def exploit(
 
     apply_clock_skew_option(clock_skew)
     if session.workspace is not None:
-        from admapper.creds.kerberos_skew import ensure_workspace_skew, save_workspace_clock_skew
+        from admapper.kerberos.skew import ensure_workspace_skew, save_workspace_clock_skew
 
         ws_path = session.workspaces.path_for(session.workspace.name)
         if clock_skew:

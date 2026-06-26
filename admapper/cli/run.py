@@ -49,8 +49,8 @@ def run_engagement(
 ) -> None:
     """Non-interactive engagement — con creds ejecuta analyst por defecto."""
     from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
-    from admapper.creds.kerberos_skew import apply_clock_skew_option
-    from admapper.creds.time_sync import ensure_dc_clock
+    from admapper.kerberos.skew import apply_clock_skew_option
+    from admapper.kerberos.time_sync import ensure_dc_clock
 
     from admapper.support.verbosity import set_verbose
 
@@ -116,7 +116,7 @@ def run_engagement(
 
     if not session.workspace or not session.workspace.domain:
         from admapper.recon.ldap_probe import discover_domain_from_bind
-        from admapper.creds.kerberos_skew import ensure_workspace_skew
+        from admapper.kerberos.skew import ensure_workspace_skew
 
         if ws_path:
             ensure_workspace_skew(ws_path)

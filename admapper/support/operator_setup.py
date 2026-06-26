@@ -15,8 +15,8 @@ def _gssapi_installed() -> bool:
         return True
     except ImportError:
         return False
-from admapper.creds.kerberos_skew import load_workspace_clock_skew
-from admapper.creds.time_sync import suggest_time_sync, was_dc_clock_synced
+from admapper.kerberos.skew import load_workspace_clock_skew
+from admapper.kerberos.time_sync import suggest_time_sync, was_dc_clock_synced
 
 
 def build_operator_setup(

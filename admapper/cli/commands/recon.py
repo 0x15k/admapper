@@ -76,7 +76,7 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
         if sub != "users":
             print_error("usage: enum users|auth")
             return True
-        from admapper.enumeration.scan import run_user_enumeration
+        from admapper.enum.scan import run_user_enumeration
 
         try:
             run_user_enumeration(session)

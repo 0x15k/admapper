@@ -190,7 +190,7 @@ def check_kerberos_with_skew(
     # Try to query clock skew via LDAP to append a highly precise candidate
     ldap_derived_skew = None
     if dc_ip:
-        from admapper.creds.time_sync import calculate_ldap_clock_skew
+        from admapper.kerberos.time_sync import calculate_ldap_clock_skew
         try:
             ldap_skew_seconds = calculate_ldap_clock_skew(dc_ip)
             if ldap_skew_seconds is not None:

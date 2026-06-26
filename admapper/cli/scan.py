@@ -191,7 +191,7 @@ def sync_dc_engagement(
     session.persist_workspace()
 
     from admapper.support.output import print_info, print_success
-    from admapper.creds.time_sync import ensure_dc_clock
+    from admapper.kerberos.time_sync import ensure_dc_clock
 
     ws_path = session.workspaces.path_for(ws_name)
     print_info(f"sync-dc @ {ip} → workspace {ws_name}")
@@ -244,7 +244,7 @@ def scan_engagement(
         print_warning("domain not inferred — PTR/LDAP may be restricted; set domain manually if known")
 
     from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
-    from admapper.creds.time_sync import ensure_dc_clock
+    from admapper.kerberos.time_sync import ensure_dc_clock
 
     sync_clock = effective_sync_clock(sync_clock)
     sync_hosts = effective_sync_hosts(sync_hosts)

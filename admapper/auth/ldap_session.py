@@ -43,7 +43,7 @@ def _open_kerberos_ldap_session(
     ws_path: str | None = None,
 ) -> tuple[LdapSession | None, str | None]:
     from admapper.auth.kerberos_ldap_client import start_kerberos_ldap_repl
-    from admapper.creds.kerberos_skew import load_workspace_clock_skew
+    from admapper.kerberos.skew import load_workspace_clock_skew
 
     try:
         repl = start_kerberos_ldap_repl(

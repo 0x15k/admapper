@@ -281,7 +281,7 @@ def _is_gmsa_edge(edge) -> bool:
 
 def _edge_to_command(edge, *, workspace: str, ws_path: Path | None = None) -> str:
     if _is_gmsa_edge(edge):
-        from admapper.creds.kerberos_skew import load_workspace_clock_skew
+        from admapper.kerberos.skew import load_workspace_clock_skew
 
         skew = load_workspace_clock_skew(ws_path) if ws_path else None
         skew_arg = f" --clock-skew '{skew}'" if skew else ""

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from admapper.support.output import print_success
 from admapper.creds.common import pick_dc_ip
-from admapper.creds.time_sync import ensure_dc_clock
+from admapper.kerberos.time_sync import ensure_dc_clock
 from admapper.creds.verify import run_credential_verify
 from admapper.escalate.analyze import mark_user_owned, set_pivot_user
 from admapper.models.credential import Credential, CredentialStatus
