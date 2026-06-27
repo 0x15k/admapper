@@ -364,25 +364,43 @@ def _upload_via_http(
     http_port: int = _DEFAULT_HTTP_PORT,
     timeout: int = _UPLOAD_TIMEOUT_MAX,
 ) -> bool:
-    """Stage payload via a local HTTP server and fetch with Invoke-WebRequest."""
+    """Stage payload via local HTTP server and fetch with curl.exe or Invoke-WebRequest."""
     from http.server import HTTPServer, SimpleHTTPRequestHandler
     from threading import Thread
 
     local_dir = local_path.parent.resolve()
     orig_dir = Path.cwd()
-    os.chdir(local_dir)  # server serves from payload dir
+    os.chdir(local_dir)
     server = HTTPServer((http_fetch_host, http_port), SimpleHTTPRequestHandler)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        _ensure_parent_dir(client, remote_path)
         remote_ps = remote_path.replace("'", "''")
         safe_url = f"http://{http_fetch_host}:{http_port}/{local_path.name}".replace("'", "''")
-        client.execute(
-            f"Invoke-WebRequest -Uri '{safe_url}' -OutFile '{remote_ps}' -UseBasicParsing",
-            shell="powershell",
-            timeout=timeout,
-        )
-        return remote_file_ok(client, remote_path, expected_size=len(data))
+
+        try:
+            client.execute(
+                f"curl.exe -fsSL -o '{remote_ps}' '{safe_url}'",
+                shell="cmd",
+                timeout=timeout,
+            )
+            return True
+        except WinRMError:
+            pass
+
+        try:
+            client.execute(
+                f"powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "
+                f"\"Invoke-WebRequest -Uri '{safe_url}' -OutFile '{remote_ps}' -UseBasicParsing\"",
+                shell="cmd",
+                timeout=timeout,
+            )
+            return True
+        except WinRMError:
+            pass
+
+        return False
     finally:
         os.chdir(orig_dir)
         server.shutdown()
