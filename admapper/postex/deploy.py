@@ -196,9 +196,11 @@ def deploy_dll_hijack(
     print_info(f"payload arch: {target_arch}")
 
     mode = session.mode
+    safe_zip = zip_name if session.mode == OperationMode.MANUAL else "payload.zip"
+    safe_run_as = run_as if session.mode == OperationMode.MANUAL else "detected"
     msg = (
-        f"deploy {zip_name} → {remote_path} via WinRM as {cred.domain}\\{cred.username} "
-        f"(task {task_name} → {run_as})"
+        f"deploy {safe_zip} → {remote_path} via WinRM as {cred.domain}\\{cred.username} "
+        f"(task {task_name} → {safe_run_as})"
     )
     if not confirm(
         msg,
