@@ -384,33 +384,42 @@ def get_kerberos_op(session: Session, op_id: str) -> dict[str, Any] | None:
 
 def _check_krbtgt_password_age(session: Session) -> Finding | None:
     """LDAP query for krbtgt account to find password age."""
-    from admapper.creds.common import pick_dc_ip
+    from datetime import UTC, datetime
+
     from admapper.auth.ldap_session import open_ldap_session
+    from admapper.creds.common import pick_dc_ip
     from admapper.models.credential import CredentialStatus
     from admapper.models.finding import Finding, FindingSeverity
-    from datetime import datetime, UTC
-    from ldap3 import SUBTREE
-    
+
+    try:
+        from ldap3 import SUBTREE
+    except Exception as exc:
+        print_warning(f"ldap3 not available, skipping KRBTGT password age check: {exc}")
+        return None
+
     domain = session.workspace.domain if session.workspace else None
     if not domain or not session.credentials:
         return None
-        
+
     dc_ip = pick_dc_ip(session)
     if not dc_ip:
         return None
-        
-    # Get active password credential
-    cred = next((c for c in session.credentials.list() if c.status == CredentialStatus.VERIFIED), None)
+
+    cred = next(
+        (c for c in session.credentials.list() if c.status == CredentialStatus.VERIFIED),
+        None,
+    )
     if not cred:
         cred = next((c for c in session.credentials.list() if c.secret), None)
     if not cred:
         return None
-        
+
     ws_path = session.workspaces.path_for(session.workspace.name)
     ldap_session, err = open_ldap_session(dc_ip, cred, domain, ws_path=str(ws_path))
-    if ldap_session is None:
+    if ldap_session is None or ldap_session.conn is None:
+        print_warning(f"could not open LDAP session for KRBTGT age check: {err or 'no connection'}")
         return None
-        
+
     try:
         ldap_session.conn.search(
             search_base=ldap_session.base_dn,
@@ -420,35 +429,35 @@ def _check_krbtgt_password_age(session: Session) -> Finding | None:
         )
         if not ldap_session.conn.entries:
             return None
-            
+
         entry = ldap_session.conn.entries[0]
         pwd_last_set = entry.pwdLastSet.value
-        dn = entry.distinguishedName.value
-        
+
         if not pwd_last_set:
             return None
-            
+
         try:
             pwd_last_set_val = int(pwd_last_set)
         except (ValueError, TypeError):
             return None
-            
+
         if pwd_last_set_val == 0:
             return None
-            
+
         us_seconds = (pwd_last_set_val / 10000000) - 11644473600
         krbtgt_date = datetime.fromtimestamp(us_seconds, UTC)
         days_age = (datetime.now(UTC) - krbtgt_date).days
-        
-        severity = FindingSeverity.HIGH if days_age > 180 else (FindingSeverity.MEDIUM if days_age > 90 else FindingSeverity.INFO)
-        if severity == FindingSeverity.INFO:
+
+        if days_age <= 90:
             return None
-            
+        severity = FindingSeverity.HIGH if days_age > 180 else FindingSeverity.MEDIUM
+
         detail = (
-            f"The krbtgt account password was last changed on {krbtgt_date.strftime('%Y-%m-%d %H:%M:%S UTC')} "
-            f"({days_age} days ago). Remediation: Rotate KRBTGT password twice (required for invalidation)."
+            f"The krbtgt account password was last changed on "
+            f"{krbtgt_date.strftime('%Y-%m-%d %H:%M:%S UTC')} ({days_age} days ago). "
+            f"Remediation: Rotate KRBTGT password twice (required for invalidation)."
         )
-        
+
         return Finding(
             key="krbtgt_password_age",
             title=f"KRBTGT Password Age — {days_age} days old",
@@ -457,8 +466,11 @@ def _check_krbtgt_password_age(session: Session) -> Finding | None:
             detail=detail,
             mitre_id="T1558.001",
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        print_warning(f"KRBTGT password age LDAP query failed: {exc}")
+        return None
     finally:
-        ldap_session.close()
-    return None
+        try:
+            ldap_session.close()
+        except Exception:
+            pass
