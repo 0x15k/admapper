@@ -27,11 +27,7 @@ def resolve_pivot_user(session: Session) -> str:
     best = pick_best_pivot(owned, ws_path=ws_path)
     explicit = session.workspace.pivot_user
     if explicit:
-        # Upgrade stale machine pivot when a post-machine human is owned.
-        if explicit.endswith("$") and best and not best.endswith("$"):
-            if explicit.lower() != best.lower():
-                return best
-        return explicit
+        return explicit.strip()
     if best:
         return best
     for username in reversed(owned):
@@ -57,6 +53,7 @@ def mark_user_owned(
     username: str,
     *,
     refresh: bool = True,
+    analyze: bool = True,
 ) -> None:
     """BloodHound-style: mark owned, set pivot, refresh outbound edges."""
     from admapper.support.owned import is_valid_owned_username
@@ -82,7 +79,8 @@ def mark_user_owned(
     if refresh:
         run_pivot_refresh(session, username)
 
-    run_escalate_analysis(session, pivot_user=username)
+    if analyze:
+        run_escalate_analysis(session, pivot_user=username)
 
 
 def run_pivot_refresh(session: Session, pivot_user: str) -> None:

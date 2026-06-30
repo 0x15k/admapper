@@ -45,7 +45,7 @@ def _global_options(
             "--workspaces-root",
             "-O",
             envvar=WORKSPACES_ENV_VAR,
-            help="Data directory (default: <repo>/workspaces or ~/.admapper/workspaces)",
+            help="Data directory (default: <repo>/workspaces or ./workspaces)",
         ),
     ] = None,
     ip_dc: Annotated[
@@ -200,6 +200,85 @@ def postex_scan(
     session = _session_with_workspace(workspace, domain=domain)
     try:
         run_postex_analysis(session, remote_scan=True, remote_host=host)
+    except (ValueError, RuntimeError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1) from exc
+
+
+@postex_app.command("handler")
+def postex_handler(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    lport: Annotated[
+        int,
+        typer.Option("--lport", help="Listener port (default: 4444)"),
+    ] = 4444,
+    op_id: Annotated[
+        str | None,
+        typer.Option("--op", help="Optional postex op id for listener.json marker"),
+    ] = None,
+) -> None:
+    """Persistent reverse-shell handler (run in a dedicated terminal)."""
+    from admapper.postex.handler import run_postex_handler
+    from admapper.support.output import print_error
+
+    session = _session_with_workspace(workspace, domain=domain)
+    try:
+        run_postex_handler(session, lport=lport, op_id=op_id or "")
+    except (ValueError, RuntimeError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1) from exc
+
+
+@postex_app.command("listen", hidden=True)
+def postex_listen(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    lport: Annotated[int, typer.Option("--lport", help="Listener port")] = 4444,
+    op_id: Annotated[str | None, typer.Option("--op", help="Opportunity id")] = None,
+) -> None:
+    """Alias for postex handler."""
+    postex_handler(workspace=workspace, domain=domain, lport=lport, op_id=op_id)
+
+
+@postex_app.command("shell")
+def postex_shell(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    lport: Annotated[
+        int,
+        typer.Option("--lport", help="Listener port (default: 4444)"),
+    ] = 4444,
+    command: Annotated[
+        str | None,
+        typer.Option("-c", help="Single command to run; otherwise opens an interactive REPL"),
+    ] = None,
+) -> None:
+    """Interactive reverse-shell REPL over an existing callback."""
+    from admapper.postex.shell_client import connect_shell
+    from admapper.support.output import print_error
+
+    session = _session_with_workspace(workspace, domain=domain)
+    try:
+        connect_shell(session, lport=lport, command=command)
     except (ValueError, RuntimeError) as exc:
         print_error(str(exc))
         raise typer.Exit(code=1) from exc
@@ -392,6 +471,40 @@ def postex_show(
         print_postex_detail(detail)
 
 
+@postex_app.command("logs")
+def postex_logs(
+    workspace: Annotated[
+        str | None,
+        typer.Option("--workspace", "-w", help="Workspace name (default: active workspace)"),
+    ] = None,
+    host: Annotated[
+        str | None,
+        typer.Option("--host", "-H", help="Target IP override"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint"),
+    ] = None,
+    cred_id: Annotated[
+        str | None,
+        typer.Option("--cred-id", help="Credential id override"),
+    ] = None,
+    tail: Annotated[
+        int,
+        typer.Option("--tail", help="Service log lines to fetch"),
+    ] = 25,
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Remove remote ZIP path if it is a directory (blocks upload)"),
+    ] = False,
+) -> None:
+    """Tail remote service monitor log and show payload ZIP status on target."""
+    from admapper.postex.monitor_log import print_postex_diagnostics
+
+    session = _session_with_workspace(workspace, host=host, domain=domain)
+    print_postex_diagnostics(session, host=host, cred_id=cred_id, tail=tail, fix=fix)
+
+
 @postex_app.command("deploy")
 def postex_deploy(
     workspace: Annotated[
@@ -426,14 +539,27 @@ def postex_deploy(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Build payload only, no upload")
     ] = False,
+    generator: Annotated[
+        str,
+        typer.Option(
+            "--generator",
+            help="Payload builder: msfvenom (default), mingw, or auto",
+        ),
+    ] = "msfvenom",
+    arch: Annotated[
+        str | None,
+        typer.Option("--arch", help="Payload arch: x86 or x64 (auto-detect if omitted)"),
+    ] = None,
 ) -> None:
     """Deploy scheduled-task DLL hijack payload from postex_scan.json intel."""
     from pathlib import Path
 
     from admapper.postex.deploy import deploy_dll_hijack
+    from admapper.postex.pe_arch import normalize_arch
     from admapper.support.output import print_error
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
+    payload_arch = normalize_arch(arch) if arch else None
     try:
         deploy_dll_hijack(
             session,
@@ -443,6 +569,8 @@ def postex_deploy(
             lport=lport,
             payload_dll=Path(payload) if payload else None,
             dry_run=dry_run,
+            generator=generator,  # type: ignore[arg-type]
+            arch=payload_arch,
         )
     except (ValueError, RuntimeError, FileNotFoundError) as exc:
         print_error(str(exc))
@@ -492,7 +620,7 @@ def postex_run(
     ] = False,
     arch: Annotated[
         str | None,
-        typer.Option("--arch", help="Payload arch: x86 or x64 (default: auto from PE/service logs)"),
+        typer.Option("--arch", help="Payload arch: x86 or x64 (auto-detect if omitted)"),
     ] = None,
     mode: Annotated[
         str,
@@ -502,9 +630,26 @@ def postex_run(
         bool,
         typer.Option(
             "--auto",
-            help="After shell: mark owned + chain wired next step (escalate exec)",
+            help=(
+                "End-to-end: resolve dll_hijack op, deploy, wait for callback, "
+                "interactive shell, then chain escalate"
+            ),
         ),
     ] = False,
+    keep_listener: Annotated[
+        bool,
+        typer.Option(
+            "--keep-listener",
+            help="Keep listener open after deploy; enter REPL when shell connects",
+        ),
+    ] = False,
+    generator: Annotated[
+        str,
+        typer.Option(
+            "--generator",
+            help="Payload builder: msfvenom (default), mingw, or auto",
+        ),
+    ] = "msfvenom",
 ) -> None:
     """Auto: VPN IP + msfvenom + listener + deploy + wait for reverse shell."""
     from pathlib import Path
@@ -512,15 +657,67 @@ def postex_run(
     from admapper.postex.payload import PayloadMode
     from admapper.postex.pe_arch import normalize_arch
     from admapper.postex.runner import run_dll_hijack
-    from admapper.support.output import print_error
+    from admapper.support.output import print_error, print_info
 
     session = _session_with_workspace(workspace, host=host, domain=domain)
     payload_arch = normalize_arch(arch) if arch else None
     payload_mode: PayloadMode = "enroll" if mode.lower() == "enroll" else "shell"
+    resolved_op_id = op_id
+    if resolved_op_id:
+        from admapper.postex.deploy import _find_postex_op
+
+        ws_path = session.workspaces.path_for(session.workspace.name)  # type: ignore[union-attr]
+        item = _find_postex_op(ws_path, resolved_op_id) if ws_path else None
+        if item is not None and str(item.get("technique")) != "dll_hijack_scheduled_task":
+            from admapper.postex.analyze import resolve_hijack_op_id
+
+            hijack_id = resolve_hijack_op_id(session)
+            if hijack_id and hijack_id != resolved_op_id:
+                print_info(
+                    f"--op {resolved_op_id} is {item.get('technique')} — "
+                    f"using {hijack_id} for deploy"
+                )
+                resolved_op_id = hijack_id
+            else:
+                ws_name = session.workspace.name if session.workspace else workspace or "<workspace>"
+                tech = str(item.get("technique") or "unknown")
+                print_error(
+                    f"postex run only deploys DLL hijack (scheduled task) — "
+                    f"op {resolved_op_id} is {tech}."
+                )
+                if tech == "dcsync":
+                    print_info(f"  DCSync: admapper exploit -w {ws_name}")
+                    print_info(
+                        "  or: secretsdump.py <DOMAIN>/<user>:<pass>@<DC> -just-dc "
+                        "(see postex show)"
+                    )
+                elif tech == "share_loot":
+                    print_info(f"  Share loot: admapper loot -w {ws_name}")
+                else:
+                    print_info(f"  Review: admapper postex show -w {ws_name}")
+                raise typer.Exit(code=1)
+    elif auto_chain:
+        from admapper.postex.analyze import resolve_hijack_op_id, run_postex_analysis
+
+        if session.workspace is None:
+            print_error("no active workspace")
+            raise typer.Exit(code=1)
+        ws_path = session.workspaces.path_for(session.workspace.name)
+        if not (ws_path / "postex_ops.json").is_file():
+            print_info("--auto: running postex analysis to find dll_hijack op")
+            run_postex_analysis(session)
+        resolved_op_id = resolve_hijack_op_id(session)
+        if not resolved_op_id:
+            print_error(
+                "no dll_hijack_scheduled_task op in postex_ops.json — "
+                "run: admapper postex scan -w <workspace>"
+            )
+            raise typer.Exit(code=1)
+        print_info(f"--auto: using {resolved_op_id}")
     try:
         run_dll_hijack(
             session,
-            op_id=op_id,
+            op_id=resolved_op_id,
             cred_id=cred_id,
             lhost=lhost,
             lport=lport,
@@ -531,7 +728,9 @@ def postex_run(
             no_listener=no_listener or payload_mode == "enroll",
             arch=payload_arch,
             payload_mode=payload_mode,
-            auto_chain=auto_chain,
+            auto_chain=auto_chain if auto_chain else None,
+            keep_listener=keep_listener,
+            generator=generator,
         )
     except (ValueError, RuntimeError, FileNotFoundError) as exc:
         print_error(str(exc))
@@ -953,6 +1152,22 @@ def web(
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
     ] = None,
+    user: Annotated[
+        str | None,
+        typer.Option("--user", "-u", help="Domain username — pre-fills dashboard vars"),
+    ] = None,
+    password: Annotated[
+        str | None,
+        typer.Option("--password", "-p", help="Password — pre-fills dashboard vars"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint (optional)"),
+    ] = None,
+    lhost: Annotated[
+        str | None,
+        typer.Option("--lhost", help="Attacker / VPN callback IP for dashboard vars"),
+    ] = None,
     port: Annotated[
         int,
         typer.Option("--port", help="Dashboard server port (default 8766)"),
@@ -973,8 +1188,8 @@ def web(
     if not host and not workspace:
         print_error(
             "specify a target:\n"
-            "  admapper web -H <DC_IP>          # opens/creates workspace for that IP\n"
-            "  admapper web -w <workspace_name> # opens existing workspace"
+            "  admapper web -H <DC_IP> -u <user> -p '<pass>'   # pre-fill dashboard vars\n"
+            "  admapper web -w <workspace_name>                 # existing workspace"
         )
         raise typer.Exit(1)
 
@@ -1031,13 +1246,23 @@ def web(
         session.persist_workspace()
         sync_hosts_from_session(session, enabled=True)
 
+    from admapper.dashboard.cli_launch import build_launch_context
+
+    launch = build_launch_context(
+        session,
+        host=host,
+        username=user,
+        password=password,
+        domain=domain or resolved_domain,
+        lhost=lhost,
+    )
     run_dashboard_server(
-        ws_path=ws_path,
-        workspace=ws.name,
-        domain=ws.domain,
-        owned_users=[],
-        pivot_user=None,
-        host=ws.hosts,
+        ws_path=launch.ws_path,
+        workspace=launch.workspace,
+        domain=launch.domain,
+        owned_users=launch.owned_users,
+        pivot_user=launch.pivot_user,
+        host=launch.host,
         port=port,
         open_browser=open_browser,
     )
@@ -1051,12 +1276,28 @@ def dashboard(
             "-H",
             "--host",
             "--ip",
-            help="Target IP — blackbox start (creates workspace named after the target IP/host)",
+            help="Target IP — pre-fills DC IP in the dashboard (does not name the workspace)",
         ),
     ] = None,
     workspace: Annotated[
         str | None,
         typer.Option("--workspace", "-w", help="Workspace"),
+    ] = None,
+    user: Annotated[
+        str | None,
+        typer.Option("--user", "-u", help="Domain username — pre-fills dashboard vars"),
+    ] = None,
+    password: Annotated[
+        str | None,
+        typer.Option("--password", "-p", help="Password — pre-fills dashboard vars"),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", "-d", help="Domain hint (optional)"),
+    ] = None,
+    lhost: Annotated[
+        str | None,
+        typer.Option("--lhost", help="Attacker / VPN callback IP for dashboard vars"),
     ] = None,
     port: Annotated[
         int,
@@ -1069,87 +1310,106 @@ def dashboard(
 ) -> None:
     """AD Ops — blackbox AD engagement dashboard (IP -> scan -> topology -> escalate)."""
     from admapper.cli.commands import dispatch
+    from admapper.dashboard.cli_launch import build_launch_context
     from admapper.dashboard.dashboard_server import run_dashboard_server
     from admapper.dashboard.ops_ui import write_ops_html
-    from admapper.support.discovery import default_workspace_name
     from admapper.support.output import print_error, print_info
     from admapper.support.session import Session
 
-    # Require explicit target — never silently reuse the last active workspace
-    if not host and not workspace:
-        print_error(
-            "specify a target:\n"
-            "  admapper dashboard -H <DC_IP>          # opens/creates workspace for that IP\n"
-            "  admapper dashboard -w <workspace_name> # opens existing workspace"
-        )
-        raise typer.Exit(1)
+    session = Session.bootstrap(autoload_workspace=False)
+    pending_dc_ip: str | None = None
+    ws_path = None
+    workspace_name: str | None = None
+    resolved_domain: str | None = domain
+    ws = None
 
-    session = Session.bootstrap()
-    if host:
-        ws_name = workspace or default_workspace_name(host)
-        session.select_workspace(ws_name, create=True)
-        dispatch(session, f"set hosts {host.strip()}")
-        session.persist_workspace()
-        print_info(f"blackbox → workspace {ws_name} · target {host.strip()}")
-    elif workspace:
-        session.select_workspace(workspace, create=False)
-    ws = session.workspace
-    ws_path = session.workspaces.path_for(ws.name)
-    if host and ws.hosts and ws.hosts.strip() != host.strip():
-        ws = session.select_workspace(default_workspace_name(host), create=True)
-        dispatch(session, f"set hosts {host.strip()}")
-        session.persist_workspace()
-        ws_path = session.workspaces.path_for(ws.name)
-    elif host and not ws.hosts:
-        dispatch(session, f"set hosts {host.strip()}")
-        session.persist_workspace()
-        ws_path = session.workspaces.path_for(ws.name)
+    if workspace:
+        session.select_workspace(workspace, create=True)
         ws = session.workspace
-
-    # Try to resolve domain and sync hosts mapping
-    from admapper.cli.scan import sync_hosts_from_session
-    from admapper.recon.unauth import run_unauth_scan
-    from admapper.support.discovery import ensure_domain, resolve_domain
-
-    resolved_domain = ws.domain or resolve_domain(session)
-    if not resolved_domain and host:
-        from admapper.recon.ports import scan_host
-
-        print_info(f"Probing target DC reachability: {host.strip()}...")
-        open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
-        if not open_ports:
-            print_error(
-                f"Error: Host {host.strip()} is unreachable or AD ports (88, 389, 445, 636) are closed.\n"
-                "Please verify your connection/VPN and try again."
-            )
+        if ws is None:
+            print_error(f"workspace {workspace} could not be loaded")
             raise typer.Exit(1)
+        workspace_name = ws.name
+        ws_path = session.workspaces.path_for(ws.name)
+        if host:
+            dispatch(session, f"set hosts {host.strip()}")
+            session.persist_workspace()
+            print_info(f"workspace {workspace_name} · target {host.strip()}")
+        else:
+            print_info(f"workspace {workspace_name}")
+    elif host:
+        pending_dc_ip = host.strip()
+        print_info(f"dashboard — set workspace name in UI · DC IP pre-filled: {pending_dc_ip}")
+    else:
+        print_info("dashboard — create or open a workspace in the UI")
 
-        print_info("No domain cached. Running unauthenticated discovery...")
-        try:
-            run_unauth_scan(session)
-            resolved_domain = ensure_domain(session, announce=True)
-        except Exception as exc:
-            print_error(f"Unauthenticated discovery failed: {exc}")
+    if ws_path is not None and ws is not None:
+        from admapper.cli.scan import sync_hosts_from_session
+        from admapper.recon.unauth import run_unauth_scan
+        from admapper.support.discovery import ensure_domain, resolve_domain
 
-    if resolved_domain:
-        ws.domain = resolved_domain
-        session.persist_workspace()
-        sync_hosts_from_session(session, enabled=True)
+        resolved_domain = ws.domain or resolve_domain(session) or domain
+        if not resolved_domain and host:
+            from admapper.recon.ports import scan_host
 
-    write_ops_html(
-        ws_path,
-        workspace=ws.name,
-        domain=ws.domain,
-        pivot_user=ws.pivot_user,
-        owned_users=list(ws.owned_users or []),
-    )
+            print_info(f"Probing target DC reachability: {host.strip()}...")
+            open_ports = scan_host(host.strip(), ports=(88, 389, 445, 636), timeout=1.0)
+            if not open_ports:
+                print_error(
+                    f"Error: Host {host.strip()} is unreachable or AD ports (88, 389, 445, 636) are closed.\n"
+                    "Please verify your connection/VPN and try again."
+                )
+                raise typer.Exit(1)
+
+            print_info("No domain cached. Running unauthenticated discovery...")
+            try:
+                run_unauth_scan(session)
+                resolved_domain = ensure_domain(session, announce=True)
+            except Exception as exc:
+                print_error(f"Unauthenticated discovery failed: {exc}")
+
+        if resolved_domain:
+            ws.domain = resolved_domain
+            session.persist_workspace()
+            sync_hosts_from_session(session, enabled=True)
+
+        write_ops_html(
+            ws_path,
+            workspace=ws.name,
+            domain=ws.domain,
+            pivot_user=ws.pivot_user,
+            owned_users=list(ws.owned_users or []),
+        )
+
+    launch_domain = resolved_domain
+    launch_host = host.strip() if host else None
+    launch_owned: list[str] = []
+    launch_pivot: str | None = None
+    if ws_path is not None and session.workspace is not None:
+        ws = session.workspace
+        launch = build_launch_context(
+            session,
+            host=host,
+            username=user,
+            password=password,
+            domain=domain or launch_domain,
+            lhost=lhost,
+        )
+        launch_domain = launch.domain
+        launch_host = launch.host
+        launch_owned = launch.owned_users
+        launch_pivot = launch.pivot_user
+        workspace_name = launch.workspace
+        ws_path = launch.ws_path
+
     run_dashboard_server(
         ws_path=ws_path,
-        workspace=ws.name,
-        domain=ws.domain,
-        owned_users=[],
-        pivot_user=None,
-        host=ws.hosts,
+        workspace=workspace_name,
+        domain=launch_domain,
+        owned_users=launch_owned,
+        pivot_user=launch_pivot,
+        host=launch_host,
+        pending_dc_ip=pending_dc_ip if ws_path is None else None,
         port=port,
         open_browser=open_browser,
     )

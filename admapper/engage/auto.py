@@ -325,7 +325,7 @@ def finalize_postex_shell(
     from admapper.escalate.analyze import mark_user_owned, record_escalation_step
 
     if (not username or username == "unknown") and probe_output.strip():
-        from admapper.postex.runner import parse_shell_username
+        from admapper.postex.shell_client import parse_shell_username
 
         username = parse_shell_username(probe_output)
     if not username or username == "unknown":

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from admapper.postex.creds import resolve_winrm_cred
@@ -30,9 +31,11 @@ if TYPE_CHECKING:
 
 
 _SERVICE_LOG_PATHS: tuple[str, ...] = (
+    r"C:\ProgramData\{name}\Logs\monitor.log",
     r"C:\ProgramData\{name}\Logs\app.log",
     r"C:\ProgramData\{name}\Logs\service.log",
     r"C:\ProgramData\{name}\Logs\error.log",
+    r"C:\ProgramData\{name}\monitor.log",
     r"C:\ProgramData\{name}\app.log",
     r"C:\ProgramData\{name}\service.log",
 )
@@ -220,6 +223,29 @@ def _enumerate_scheduled_tasks(
             continue
 
     merged = _merge_task_lines(*chunks)
+    if not merged and filter_text:
+        print_info("task enum: filter returned nothing — retrying without filter")
+        for method, script, shell in (
+            ("com_recursive", _ps_com_tasks_recursive(None), "powershell"),
+            ("get_scheduledtask", _ps_get_scheduled_tasks(None), "powershell"),
+            ("tasks_xml", _ps_tasks_from_xml(), "powershell"),
+        ):
+            try:
+                proc = client.execute(script, shell=shell)
+                raw = _normalize_task_enum_output((proc.stdout or "").strip())
+                if not raw or _pipe_line_count(raw) == 0:
+                    continue
+                chunks.append(raw)
+                methods.append(f"{method}_unfiltered")
+                print_ok(
+                    f"task enum ({method}, unfiltered): {_pipe_line_count(raw)} task(s)",
+                    source=Tool.ADMAPPER,
+                )
+                if _has_hijack_payload_hint(raw):
+                    break
+            except WinRMError:
+                continue
+        merged = _merge_task_lines(*chunks)
     if not merged:
         raw_hint = (getattr(client, "last_raw_output", "") or "")[:500]
         if raw_hint:
@@ -258,8 +284,8 @@ def _service_candidate_paths(intel) -> list[str]:
         _add(intel.monitor_log_path)
     if intel and intel.drop_path:
         base = intel.drop_path.rstrip("\\/")
-        for suffix in (r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
-               r"\app.log", r"\service.log"):
+        for suffix in (r"\Logs\monitor.log", r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
+               r"\monitor.log", r"\app.log", r"\service.log"):
             _add(base + suffix)
         for candidate in _service_log_candidates(intel.drop_path):
             _add(candidate)
@@ -267,7 +293,8 @@ def _service_candidate_paths(intel) -> list[str]:
 
 
 # Probes for service logs generically; environment-agnostic
-def _probe_service_logs(client: WinRMClient, intel=None) -> str:
+def _probe_service_logs(client: WinRMClient, intel=None) -> tuple[str, str]:
+    """Return ``(log_excerpt, winning_path)`` — path is empty if nothing matched."""
     discovered: list[str] = []
     try:
         proc = client.execute(_ps_discover_error_logs(), shell="powershell")
@@ -291,10 +318,10 @@ def _probe_service_logs(client: WinRMClient, intel=None) -> str:
                         f"service log ({path}): {len(text.splitlines())} line(s)",
                         source=Tool.ADMAPPER,
                     )
-                    return text
+                    return text, path
             except WinRMError:
                 continue
-    return ""
+    return "", ""
 
 
 def _ps_service_log(path: str) -> str:
@@ -405,7 +432,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
     intel = extract_hijack_intel(loot)
 
     print_info("post-ex: reading service logs …")
-    monitor_log = _probe_service_logs(client, intel)
+    monitor_log, discovered_log_path = _probe_service_logs(client, intel)
     if not monitor_log:
         monitor_log = _local_monitor_from_loot(
             ws_path / "loot", drop_path=intel.drop_path if intel else ""
@@ -418,25 +445,36 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
     monitor_log = _clean_monitor_log(monitor_log)
     if monitor_log:
         intel = extract_hijack_intel(loot, monitor_log=monitor_log) or intel
+        from admapper.postex.hijack_intel import with_discovered_monitor_log_path
+
+        intel = with_discovered_monitor_log_path(intel, discovered_log_path)
     elif not intel:
         intel = extract_hijack_intel(loot)
 
     com_out = ""
     task_enum_method = ""
-    if not _intel_sufficient(
+    intel_sufficient = _intel_sufficient(
         intel, monitor_log, loot=loot, drop_path=intel.drop_path if intel else ""
-    ):
-        task_filter = intel.com_task_filter if intel else None
-        if task_filter:
-            print_info(f"task enum: filter {task_filter!r}")
-        try:
-            com_out, task_enum_method = _enumerate_scheduled_tasks(client, task_filter)
-        except WinRMError as exc:
-            msg = f"task enum: {exc}"
-            result.errors.append(msg)
-            print_warning(msg)
-    else:
-        print_ok("DLL-hijack intel (service log/loot) — skipping schtasks", source=Tool.ADMAPPER)
+    )
+    task_filter = None
+    if intel:
+        if intel.task_name_hint:
+            task_filter = intel.task_name_hint
+        elif intel.drop_path:
+            task_filter = intel.drop_path.rstrip("\\/").split("\\")[-1] or None
+        elif intel.com_task_filter:
+            task_filter = intel.com_task_filter
+    # Loot/log supplies zip+dll paths but not the task Principal — always enumerate.
+    if intel_sufficient:
+        print_info("DLL-hijack paths from log/loot — enumerating scheduled tasks for run-as principal")
+    if task_filter:
+        print_info(f"task enum: filter {task_filter!r}")
+    try:
+        com_out, task_enum_method = _enumerate_scheduled_tasks(client, task_filter)
+    except WinRMError as exc:
+        msg = f"task enum: {exc}"
+        result.errors.append(msg)
+        print_warning(msg)
 
     if intel is None:
         intel = extract_hijack_intel(loot, monitor_log=monitor_log, com_task_output=com_out)
@@ -475,8 +513,8 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         if intel.monitor_log_path:
             monitor_candidates.append(intel.monitor_log_path)
         if drop_base:
-            for suffix in (r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
-                           r"\app.log", r"\service.log"):
+            for suffix in (r"\Logs\monitor.log", r"\Logs\app.log", r"\Logs\service.log", r"\Logs\error.log",
+                           r"\monitor.log", r"\app.log", r"\service.log"):
                 monitor_candidates.append(drop_base + suffix)
         acl_scripts = []
         if not monitor_log.strip():
@@ -524,6 +562,7 @@ def run_remote_task_hijack_scan(session: Session, *, host: str | None = None) ->
         monitor_log=monitor_log,
         acl_output=acl_out,
         target_arch=target_arch,
+        discovered_monitor_log_path=discovered_log_path or None,
     )
 
     out_path = _write_scan_payload(

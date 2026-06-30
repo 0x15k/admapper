@@ -618,7 +618,7 @@ def build_ops_html(
       <div id="boot-terminal"></div>
       <div class="boot-input-row">
         <span>target&gt;</span>
-        <input id="boot-ip" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="10.x.x.x"/>
+        <input id="boot-ip" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="192.168.10.10"/>
       </div>
     </div>
   </div>

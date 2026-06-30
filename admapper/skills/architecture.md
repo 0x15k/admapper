@@ -191,14 +191,98 @@ Never write output files outside the workspace for the current session target.
 | Skill | Scope |
 |-------|-------|
 | admapper/skills/architecture.md | Global rules — read before touching any file |
+| admapper/skills/dashboard.md | Dashboard HTTP/SSE layer — consumer only |
 | admapper/skills/hijack_detection.md | postex/hijack_intel.py + remote_scan.py |
 | admapper/skills/loot_analysis.md | postex/loot_intel.py (pending) |
 | admapper/skills/output_format.md | CLI output formatting (pending) |
 
+## CLI Engine — Command Execution (single source of truth)
+
+All operator actions — REPL, `admapper run`, and the web dashboard — must route through
+the same engine. There is no `admapper/core/` or `admapper/engine/` package; the engine is
+the combination of layers below.
+
+### Execution stack
+
+```
+Browser / REPL line
+    → admapper/cli/commands/dispatch.py     # parse + route (no business logic)
+    → admapper/cli/commands/{meta,recon,...}.handle  # thin command adapters
+    → technique modules (recon/, enum/, exploit/, …)  # business logic + artifacts
+    → admapper/support/session.py           # Session + workspace persistence
+    → admapper/stores/                      # in-memory JSON-backed stores
+```
+
+**Rules:**
+- `dispatch(session, line)` is the only command router. Dashboard ops call
+  `dispatch(session, 'start_unauth')`, not a parallel code path.
+- Technique logic lives in `recon/`, `enum/`, etc. — never in `dashboard/` or duplicated
+  in `dashboard_server.py`.
+- `Session.bootstrap()` + `session.select_workspace()` bind workspace state before any op.
+
+### Recon / Discovery without credentials
+
+| Layer | Module | Responsibility |
+|-------|--------|----------------|
+| Command | `cli/commands/recon.py` | `start_unauth` → `run_unauth_scan(session)` |
+| Engine | `recon/unauth.py` | DNS, port scan, LDAP/SMB probes, writes `unauth_scan.json` |
+| Probes | `recon/ldap_probe.py`, `recon/dns.py`, … | Network I/O only |
+| Summary | `cli/scan.py` | `run_unauth_discovery(session)` + `print_scan_summary(session)` |
+| Output | `support/output.py`, `support/verbosity.py` | Rich console; `quiet_*` / `is_compact()` for dashboard |
+
+If Discovery without auth is broken or quiet, fix **`recon/unauth.py`** or
+**`support/verbosity.py`** — not a dashboard-specific workaround.
+
+### Output and streaming
+
+```
+technique code
+    → support/output.py (print_info, print_success, …)
+    → rich.console.Console  (global `console` in support/output.py)
+```
+
+**Interactive CLI:** stdout is the real terminal.
+
+**Dashboard in-process ops** (`DashboardContext._run_workspace_script`):
+
+```
+enable_dashboard_mode()  → ADMAPPER_DASHBOARD_MODE=1
+console.file = DashboardStream(ctx)   # dashboard/terminal_stream.py
+exec(script with session bound)
+    → dispatch / run_unauth_scan / print_scan_summary
+    → console.print → DashboardStream.write
+    → TerminalFilter.process (strip noise, dedupe)
+    → ctx.emit → events queue
+GET /api/events (SSE) → browser terminal
+```
+
+**External binaries** (`_run_subprocess`): stdout/stderr piped line-by-line through the
+same `TerminalFilter` before `ctx.emit`. Use only when a real subprocess is required
+(e.g. bloodhound-python).
+
+**Rule:** If terminal streaming is broken, fix **`terminal_stream.py`**, **`terminal_filter.py`**, or
+**`support/output.py`** — not by re-emitting duplicate lines from dashboard orchestration.
+
+### Dashboard = consumer only
+
+| Allowed in `dashboard/` | Forbidden in `dashboard/` |
+|-------------------------|---------------------------|
+| HTTP routes, SSE, `DashboardContext` orchestration | Reimplementing LDAP/DNS/port scan logic |
+| `dispatch(session, …)` via `_run_workspace_script` | Parsing `unauth_scan.json` for a parallel summary format |
+| `TerminalFilter` presentation | Duplicating `print_scan_summary` / recon milestones |
+| `build_ops_payload()` UI state | Writing findings or mutating technique artifacts outside Session |
+
+GUI actions map **1:1 to CLI commands** (`dispatch` or the same functions the CLI calls).
+Post-run summaries call **`cli/scan.run_unauth_discovery`** and **`print_scan_summary`** — never dashboard-only helpers.
+
 ## Anti-patterns (never do these)
 ❌ Business logic in runner.py, cli/, or dashboard/
+❌ Dashboard-specific recon or scan-summary logic — use `recon/unauth.py` + `cli/scan.py`
+❌ Duplicate `[*] Running:` from server when the client already logs the op label
+❌ Reimplementing `set hosts` in dashboard scripts when `_persist_target_ip` already ran
 ❌ Network calls in hijack_intel.py or task_hijack.py
 ❌ Hardcoded filenames, service names, or lab-specific strings
+❌ CTF/lab platform names or box codenames in UI placeholders, hints, or docs (use `corp-internal`, `corp.local`, `192.168.x.x`)
 ❌ Returning a default finding when intel is None
 ❌ Importing downstream modules from upstream ones
 ❌ Regex patterns as inline strings inside functions

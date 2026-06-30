@@ -4,7 +4,7 @@ import socket
 import ssl
 from dataclasses import dataclass, field
 
-from ldap3 import ALL, ANONYMOUS, BASE, SIMPLE, Connection, Server
+from ldap3 import ALL, BASE, SIMPLE, Connection, Server
 from ldap3.core.exceptions import LDAPException
 
 from admapper.recon.dns import dn_to_domain, infer_domain_from_hostname
@@ -124,7 +124,7 @@ def probe_ldap(
     timeout: int = 8,
     use_ssl: bool = False,
 ) -> LdapProbeResult:
-    """LDAP RootDSE collection; anonymous bind is optional on hardened DCs."""
+    """LDAP RootDSE collection; uses auto_bind (same as clock-skew probe on hardened DCs)."""
     result = LdapProbeResult(host=host, port=port)
     try:
         server = Server(
@@ -134,15 +134,12 @@ def probe_ldap(
             connect_timeout=timeout,
             get_info=ALL,
         )
-        conn = Connection(server, authentication=ANONYMOUS, receive_timeout=timeout)
-        if not conn.open():
-            result.error = str(conn.last_error or "LDAP open failed")
+        conn = Connection(server, auto_bind=True, receive_timeout=timeout)
+        if not conn.bound:
+            result.error = str(conn.result.get("description", "LDAP bind failed"))
             return result
         result.reachable = True
-        if conn.bind():
-            result.anonymous_bind = True
-        else:
-            result.error = str(conn.result.get("description", "bind failed"))
+        result.anonymous_bind = not bool(conn.user)
         if server.info:
             _apply_rootdse(result, server.info)
         if not result.default_naming_context:

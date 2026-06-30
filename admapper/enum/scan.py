@@ -295,3 +295,27 @@ def run_user_enumeration(session: Session) -> UserEnumResult:
         print_warning(f"roastable detection skipped: {_roast_exc}")
 
     return result
+
+
+def _resolve_credential_id(session: Session, cred_id: str | None) -> str | None:
+    """Return a usable credential id, preferring *cred_id* when still valid."""
+    if session.workspace is None:
+        return None
+    cred_store = CredentialStore(session.workspaces, session.workspace.name)
+    if cred_id:
+        cred = next((c for c in cred_store.list() if c.id == cred_id), None)
+        if cred is not None and cred.status == CredentialStatus.VALID and cred.secret:
+            return cred.id
+    _, picked = _valid_domain_credential(session)
+    return picked
+
+
+def run_domain_enumeration(session: Session, *, cred_id: str | None = None) -> None:
+    """Single enum entry: authenticated start_auth when a cred exists, else pre-auth users."""
+    use_id = _resolve_credential_id(session, cred_id)
+    if use_id:
+        from admapper.auth.start_auth import run_start_auth
+
+        run_start_auth(session, cred_id=use_id)
+        return
+    run_user_enumeration(session)

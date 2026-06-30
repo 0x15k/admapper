@@ -14,14 +14,15 @@ from admapper.winrm.deps import winrm_deps_hint
 
 def _workspace_paths_for_dc(dc_ip: str) -> list[Path]:
     from admapper.support.discovery import default_workspace_name
+    from admapper.support.paths import default_user_workspaces_root, find_repo_root
 
     slug = default_workspace_name(dc_ip)
     legacy_slug = f"target-{dc_ip.replace('.', '-')}"
-    bases = [
-        Path.cwd() / "workspaces",
-        Path.home() / ".admapper" / "workspaces",
-        Path.home() / "Projects" / "admapper" / "workspaces",
-    ]
+    bases: list[Path] = [default_user_workspaces_root()]
+    repo = find_repo_root()
+    if repo is not None:
+        bases.append(repo / "workspaces")
+    bases.append(Path.cwd() / "workspaces")
     found: list[Path] = []
     for base in bases:
         if not base.is_dir():

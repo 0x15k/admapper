@@ -273,7 +273,13 @@ def impacket_tickets(
     raise TicketError(f"getST failed for all HTTP SPNs: {last_err}")
 
 
-def default_ticket_dir() -> Path:
-    path = Path.home() / ".admapper" / "winrm"
+def default_ticket_dir(workspace_dir: Path | None = None) -> Path:
+    """Kerberos ticket cache under the active workspace (not ~/.admapper)."""
+    if workspace_dir is not None:
+        path = Path(workspace_dir) / "winrm"
+    else:
+        from admapper.support.paths import default_user_workspaces_root
+
+        path = default_user_workspaces_root() / ".cache" / "winrm"
     path.mkdir(parents=True, exist_ok=True)
     return path

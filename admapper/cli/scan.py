@@ -101,10 +101,111 @@ def _sync_dc_hosts_entry(ip: str, fqdn: str, *, sync_hosts: bool) -> None:
     )
 
 
+def _emit_scan_summary_default(
+    session: Session,
+    report: dict,
+    *,
+    domain: str,
+    dc_rows: list[list[str]],
+    sync_hosts: bool,
+) -> None:
+    """Line-based recon summary — same output on CLI and dashboard (non-verbose)."""
+    ws = session.workspace
+    if ws is None:
+        return
+
+    domain_s = str(domain).strip() if domain and domain != "-" else None
+    if domain_s:
+        print_success(f"domain: {domain_s}")
+    else:
+        print_warning(
+            "domain not resolved — check VPN, set DOMAIN in vars, or re-run Discovery"
+        )
+
+    dcs_srv = [str(d) for d in (report.get("domain_controllers") or []) if d]
+    if dcs_srv:
+        print_info(f"DCs (DNS SRV): {', '.join(dcs_srv)}")
+
+    for err in (report.get("errors") or [])[:3]:
+        err_s = str(err).strip()
+        if err_s:
+            print_warning(err_s)
+
+    if dc_rows:
+        row = dc_rows[0]
+        line = f"DC {row[0]}"
+        hostname = str(row[1] or "").strip()
+        if hostname and hostname not in {"-", "sin PTR", "?"}:
+            line += f" ({hostname})"
+        elif not domain_s:
+            line += " — no PTR; domain may still be in LDAP output above"
+        if row[2]:
+            line += f" — open: {row[2]}"
+        print_info(line)
+    elif not (report.get("hosts") or []):
+        print_warning("no hosts in unauth scan — check target IP / VPN")
+
+    findings = report.get("findings") or []
+    if findings:
+        print_info(f"findings: {len(findings)} saved → findings.json")
+
+    print_success("Black-box recon complete")
+
+    target = ws.hosts or "<ip>"
+    wflag = f" -w {ws.name}" if ws.name else ""
+    print_info("Next:")
+    print_info(f"  admapper run -H {target} -u <user> -p '<pass>'{wflag}")
+    if domain_s:
+        print_info(f"  optional: set domain {domain_s}")
+    print_warning("No credentials were used — workspace is recon-only until you add creds.")
+
+    if dc_rows:
+        _sync_dc_hosts_entry(str(dc_rows[0][0]), str(dc_rows[0][1]), sync_hosts=sync_hosts)
+
+
+def run_unauth_discovery(
+    session: Session,
+    *,
+    host: str | None = None,
+    sync_clock: bool = True,
+    sync_hosts: bool = True,
+) -> None:
+    """Unauthenticated discovery — single pipeline for CLI and dashboard."""
+    from admapper.kerberos.time_sync import ensure_dc_clock
+    from admapper.support.dashboard_mode import effective_sync_clock, effective_sync_hosts
+    from admapper.support.discovery import ensure_domain
+
+    if session.workspace is None:
+        raise RuntimeError("no active workspace")
+
+    target = (host or session.workspace.hosts or "").strip()
+    if target:
+        first = target.split()[0]
+    else:
+        first = ""
+
+    eff_clock = effective_sync_clock(sync_clock)
+    eff_hosts = effective_sync_hosts(sync_hosts)
+
+    dispatch(session, "start_unauth")
+
+    try:
+        ensure_domain(session, announce=False)
+    except ValueError as exc:
+        print_info(str(exc))
+
+    ws_path = session.workspaces.path_for(session.workspace.name)
+    ensure_dc_clock(first, enabled=eff_clock, ws_path=ws_path)
+    print_scan_summary(session, sync_hosts=eff_hosts)
+    session.persist_workspace()
+
+
 def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
     """Black-box summary after unauthenticated recon."""
     if session.workspace is None:
         return
+
+    from admapper.support.verbosity import is_verbose
 
     ws = session.workspace
     ws_path = session.workspaces.path_for(ws.name)
@@ -133,6 +234,16 @@ def print_scan_summary(session: Session, *, sync_hosts: bool = True) -> None:
                         "",
                     ]
                 )
+
+    if not is_verbose():
+        _emit_scan_summary_default(
+            session,
+            report,
+            domain=str(domain),
+            dc_rows=dc_rows,
+            sync_hosts=sync_hosts,
+        )
+        return
 
     print_success("Black-box recon complete")
     print_table(

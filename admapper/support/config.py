@@ -40,10 +40,22 @@ class GlobalConfig:
 
 
 def load_config(path: Path | None = None) -> GlobalConfig:
+    """Load ~/.admapper/config.json operator preferences.
+
+    Per-workspace options live in ``workspaces/<name>/config.json`` (not this file).
+    Supported workspace keys include ``listener_ttl_seconds`` (int, default 3600) —
+    see ``admapper.postex.shell_client`` for usage.
+    """
     cfg_path = path or global_config_path()
     if not cfg_path.is_file():
         return GlobalConfig()
-    data = json.loads(cfg_path.read_text(encoding="utf-8"))
+    raw = cfg_path.read_text(encoding="utf-8").strip()
+    if not raw:
+        return GlobalConfig()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return GlobalConfig()
     return GlobalConfig.from_dict(data)
 
 

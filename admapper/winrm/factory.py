@@ -23,12 +23,17 @@ def winrm_client_for_cred(
     connect_host = dc_ip or cred.host
     dc_fqdn = cred.host if cred.host and cred.host != connect_host else None
 
+    ticket_dir = None
+    if session is not None and session.workspace is not None:
+        ticket_dir = session.workspaces.path_for(session.workspace.name) / "winrm"
+
     common = {
         "domain": cred.domain,
         "username": cred.username,
         "clock_skew": skew,
         "dc_ip": dc_ip,
         "dc_fqdn": dc_fqdn,
+        "ticket_dir": ticket_dir,
     }
     if cred.uses_nthash:
         return WinRMClient(

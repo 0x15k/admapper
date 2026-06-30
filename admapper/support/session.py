@@ -20,7 +20,12 @@ class Session:
     _dirty: bool = field(default=False, repr=False)
 
     @classmethod
-    def bootstrap(cls, workspaces_root: Path | None = None) -> Session:
+    def bootstrap(
+        cls,
+        workspaces_root: Path | None = None,
+        *,
+        autoload_workspace: bool = True,
+    ) -> Session:
         config = load_config()
         root = resolve_workspaces_root(
             cli_override=workspaces_root,
@@ -28,7 +33,7 @@ class Session:
         )
         manager = WorkspaceManager(root)
         session = cls(config=config, workspaces=manager)
-        if config.active_workspace and manager.exists(config.active_workspace):
+        if autoload_workspace and config.active_workspace and manager.exists(config.active_workspace):
             session.workspace = manager.load(config.active_workspace)
         return session
 

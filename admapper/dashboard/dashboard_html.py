@@ -13,15 +13,57 @@ import html
 from pathlib import Path
 from typing import Any
 
+from admapper.dashboard.bloodhound_overlay import (
+    BLOODHOUND_LEGEND,
+    BLOODHOUND_OVERLAY_CSS,
+    BLOODHOUND_OVERLAY_JS,
+    load_overlay_for_payload,
+)
+from admapper.dashboard.output_parser import (
+    OUTPUT_PARSER_CSS,
+    OUTPUT_PARSER_DRAWER,
+    OUTPUT_PARSER_JS,
+)
+from admapper.dashboard.path_playbook import (
+    PATH_PLAYBOOK_CSS,
+    PATH_PLAYBOOK_JS,
+    PATH_PLAYBOOK_PANEL,
+    PATHS_PANEL,
+    edge_abuse_maps_json,
+    edge_catalog_json,
+    playbook_maps_json,
+)
+from admapper.dashboard.cheatsheet_ui import (
+    CHEATSHEET_CSS,
+    CHEATSHEET_HTML,
+    CHEATSHEET_JS,
+    CHEATSHEET_VIEW_TOGGLE,
+    cheatsheet_data_js,
+)
+from admapper.dashboard.workspace_vars_bridge import WORKSPACE_VARS_JS
+from admapper.dashboard.workspace_ui import (
+    WORKSPACE_MODAL_HTML,
+    WORKSPACE_UI_CSS,
+    WORKSPACE_UI_JS,
+)
+from admapper.dashboard.sharphound_import import (
+    SHARPHOUND_CONTROLS,
+    SHARPHOUND_CSS,
+    SHARPHOUND_DROPZONE,
+    SHARPHOUND_HEAD,
+    SHARPHOUND_JS,
+    SHARPHOUND_LEGEND,
+)
+
 
 def _esc(text: Any) -> str:
     return html.escape(str(text or ""))
 
 
 def build_dashboard_html(
-    ws_path: Path,
+    ws_path: Path | None,
     *,
-    workspace: str,
+    workspace: str | None,
     domain: str | None,
     owned_users: list[str] | None = None,
     pivot_user: str | None = None,
@@ -29,8 +71,12 @@ def build_dashboard_html(
 ) -> str:
     """Return the full HTML dashboard SPA."""
     domain_s = _esc(domain or "")
-    workspace_s = _esc(workspace)
+    workspace_s = _esc(workspace or "workspace")
     pivot_s = _esc(pivot_user or "")
+    edge_catalog_js = f"const EDGE_CATALOG_JS = {edge_catalog_json()};"
+    playbook_maps_js = f"const PLAYBOOK_MAPS = {playbook_maps_json()};"
+    edge_abuse_js = f"const EDGE_ABUSE_CATALOG = {edge_abuse_maps_json()};"
+    cheatsheet_catalog_js = cheatsheet_data_js()
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -40,6 +86,7 @@ def build_dashboard_html(
 <title>ADMapper — {workspace_s}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+{SHARPHOUND_HEAD}
 <style>
 /* ── Reset & Base Styles ─────────────────────────────────── */
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
@@ -99,7 +146,7 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   background:rgba(22,27,34,0.85);padding:0.35rem;border-radius:6px;border:1px solid var(--border);
   backdrop-filter:blur(4px);
 }}
-.filter-group{{display:flex;gap:0.2rem;border-right:1px solid var(--border);padding-right:0.5rem}}
+.filter-group{{display:none}}
 .graph-controls-group{{display:flex;gap:0.2rem}}
 .btn-graph-ctl{{
   background:var(--bg-card);border:1px solid var(--border);color:var(--text);
@@ -112,11 +159,40 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .legend{{
   position:absolute;bottom:0.75rem;left:0.75rem;
   background:rgba(22,27,34,0.9);border:1px solid var(--border);
-  border-radius:6px;padding:0.5rem 0.75rem;font-size:0.65rem;z-index:5;
-  display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;
-  backdrop-filter:blur(4px);
+  border-radius:6px;font-size:0.65rem;z-index:5;
+  backdrop-filter:blur(4px);max-width:calc(100% - 1.5rem);
 }}
+.legend-toggle{{
+  display:flex;align-items:center;gap:0.35rem;width:100%;
+  background:transparent;border:none;color:var(--text-dim);
+  padding:0.45rem 0.65rem;cursor:pointer;font-size:0.65rem;font-weight:600;
+}}
+.legend-toggle:hover{{color:var(--text)}}
+.legend-toggle i{{transition:transform 0.15s;font-size:0.55rem}}
+.legend.collapsed .legend-toggle i{{transform:rotate(-90deg)}}
+.legend-body{{
+  display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;
+  padding:0 0.65rem 0.5rem;
+}}
+.legend.collapsed .legend-body{{display:none}}
 .legend-item{{display:flex;align-items:center;gap:0.3rem;white-space:nowrap;font-weight:500}}
+
+.graph-empty{{
+  position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}}
+.graph-empty-inner{{
+  text-align:center;color:var(--text-dim);max-width:320px;padding:1rem;
+}}
+.graph-empty-inner i{{font-size:1.75rem;color:var(--text-muted);margin-bottom:0.65rem;display:block}}
+.graph-empty-inner p{{font-size:0.78rem;line-height:1.45;margin:0}}
+.header .inline-edit{{cursor:pointer}}
+.header .inline-edit:hover{{color:var(--accent-glow)}}
+.header-inline-input{{
+  background:var(--bg-dark);border:1px solid var(--accent);color:var(--text);
+  font-size:0.8rem;font-weight:600;padding:0.1rem 0.35rem;border-radius:3px;
+  min-width:6rem;max-width:11rem;font-family:inherit;
+}}
 
 /* ── Right Sidebar Panel ────────────────────────────────── */
 .sidebar{{
@@ -212,6 +288,23 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
   padding:0.6rem 0.75rem;
 }}
+.next-action-source{{
+  font-size:0.55rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+  color:var(--orange);margin-bottom:0.2rem;
+}}
+.next-action-headline{{
+  font-size:0.72rem;font-weight:600;color:var(--text);margin-bottom:0.25rem;line-height:1.3;
+}}
+.engagement-strip{{
+  margin:0.45rem 0.55rem 0;padding:0.45rem 0.55rem;border-radius:5px;
+  background:linear-gradient(135deg,rgba(56,139,253,0.12),rgba(63,185,80,0.08));
+  border:1px solid var(--border);
+}}
+.engagement-strip .es-stage{{font-size:0.7rem;font-weight:700;color:var(--accent-glow)}}
+.engagement-strip .es-meta{{font-size:0.62rem;color:var(--text-dim);margin-top:0.15rem;line-height:1.35}}
+.engagement-strip .es-hint{{font-size:0.6rem;color:var(--text-muted);margin-top:0.2rem}}
+.pivot-card .pivot-note{{font-size:0.6rem;color:var(--yellow);margin-top:0.2rem}}
+.pivot-card .pivot-method{{font-size:0.58rem;color:var(--text-dim);margin-top:0.1rem}}
 .syntax-code-block{{
   background:#0d1117;border:1px solid var(--border);border-radius:4px;
   padding:0.4rem 0.5rem;font-family:var(--mono);font-size:0.68rem;
@@ -222,6 +315,62 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .syntax-code-block span{{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:0.35rem}}
 .syntax-code-block .copy-icon{{color:var(--text-muted)}}
 .syntax-code-block:hover .copy-icon{{color:var(--text-dim)}}
+
+/* Post-ex run modal */
+.postex-modal-overlay{{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9000;
+  align-items:center;justify-content:center;padding:1rem;
+}}
+.postex-modal-overlay.open{{display:flex}}
+.postex-modal{{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:8px;
+  width:min(420px,100%);padding:0.85rem 1rem;box-shadow:0 8px 32px rgba(0,0,0,0.45);
+}}
+.postex-modal h3{{margin:0 0 0.65rem;font-size:0.82rem;color:var(--accent-glow)}}
+.postex-field{{margin-bottom:0.55rem}}
+.postex-field label{{
+  display:block;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--text-muted);margin-bottom:0.2rem;
+}}
+.postex-field select,.postex-field input{{
+  width:100%;background:#0d1117;border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-size:0.72rem;padding:0.35rem 0.45rem;font-family:var(--mono);
+}}
+.postex-arch-toggle{{display:flex;gap:0.4rem}}
+.postex-arch-toggle label{{
+  flex:1;text-align:center;padding:0.35rem;border:1px solid var(--border);border-radius:4px;
+  font-size:0.68rem;cursor:pointer;color:var(--text-dim);
+}}
+.postex-arch-toggle input{{display:none}}
+.postex-arch-toggle input:checked + span{{
+  display:block;
+}}
+.postex-arch-toggle label:has(input:checked){{
+  border-color:var(--accent);color:var(--accent);background:rgba(56,139,253,0.1);
+}}
+.postex-modal-actions{{display:flex;gap:0.45rem;margin-top:0.75rem;justify-content:flex-end}}
+.postex-run-btn{{
+  margin-top:0.5rem;width:100%;padding:0.4rem 0.55rem;border-radius:4px;border:none;
+  background:linear-gradient(135deg,var(--orange),#c45a00);color:#0d1117;
+  font-size:0.68rem;font-weight:700;cursor:pointer;position:relative;z-index:2;
+}}
+.postex-run-btn:hover{{filter:brightness(1.08)}}
+.postex-run-btn:disabled{{opacity:0.45;cursor:not-allowed}}
+
+.shell-input-bar{{display:none !important;background:#0d1117;border-top:1px solid var(--green)}}
+.shell-input-bar.active{{display:flex !important}}
+.shell-input-bar .shell-prompt{{color:var(--green);font-family:var(--mono);font-size:0.72rem;padding:0 0.35rem}}
+.shell-raw-line{{font-family:var(--mono);font-size:0.68rem;color:#c9d1d9;white-space:pre-wrap;margin:0;padding:0;line-height:1.35}}
+.term-shell-banner{{
+  padding:0.35rem 0.55rem;font-size:0.68rem;color:var(--green);
+  border-bottom:1px solid rgba(63,185,80,0.35);background:rgba(63,185,80,0.12);
+  font-weight:600;
+}}
+.terminal-bar.shell-mode .terminal-header .dot{{background:var(--green)!important}}
+.terminal-bar.shell-mode #term-header-title{{color:var(--green)}}
+.terminal-bar.shell-mode .terminal-output{{
+  background:#05080c;border-top:1px solid rgba(63,185,80,0.2);
+}}
 
 /* Operational Pipeline progress bar */
 .pipeline-track{{
@@ -317,8 +466,13 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
 .terminal-bar{{
   background:var(--bg-panel);border-top:1px solid var(--border);
   display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
-  transition:height 0.2s;
+  transition:height 0.15s;position:relative;min-height:120px;max-height:70vh;
 }}
+.terminal-bar.maximized{{height:55vh!important}}
+.terminal-resize-handle{{
+  position:absolute;top:0;left:0;right:0;height:6px;cursor:ns-resize;z-index:3;
+}}
+.terminal-resize-handle:hover{{background:rgba(88,166,255,0.15)}}
 .terminal-bar.collapsed{{height:28px!important}}
 .terminal-bar.collapsed .terminal-output,
 .terminal-bar.collapsed .input-bar{{display:none}}
@@ -348,7 +502,9 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   display:flex;align-items:center;justify-content:space-between;cursor:pointer;
   width:100%;
 }}
+.term-line.term-warn .kind-icon{{color:var(--yellow)}}
 .term-time{{color:var(--text-muted);font-size:0.6rem;margin-right:0.45rem;flex-shrink:0}}
+.term-status-running{{color:var(--yellow);display:inline-flex;align-items:center;gap:0.35rem}}
 .kind-icon{{font-size:0.65rem;flex-shrink:0}}
 .pivot-badge-terminal{{
   background:rgba(240,136,62,0.12);color:var(--orange);border:1px solid rgba(240,136,62,0.25);
@@ -409,6 +565,12 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   font-family:var(--mono)!important;max-width:350px!important;
   box-shadow:0 6px 16px rgba(0,0,0,0.5)!important;
 }}
+{SHARPHOUND_CSS}
+{BLOODHOUND_OVERLAY_CSS}
+{PATH_PLAYBOOK_CSS}
+{OUTPUT_PARSER_CSS}
+{CHEATSHEET_CSS}
+{WORKSPACE_UI_CSS}
 </style>
 </head>
 <body>
@@ -418,39 +580,57 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
   <div class="header">
     <span class="logo"><i class="fa-solid fa-network-wired"></i> ADMapper</span>
     <div class="meta">
+      <span>Workspace: <strong id="h-workspace" class="inline-edit" data-field="workspace" title="Click to rename">{workspace_s or "…"}</strong></span>
       <span>Domain: <strong id="h-domain">{domain_s or "..."}</strong></span>
-      <span>DC: <strong id="h-dc">...</strong></span>
+      <span>DC: <strong id="h-dc" class="inline-edit" data-field="dc" title="Click to edit target IP">...</strong></span>
       <span>Active Pivot: <strong id="h-pivot" style="color:var(--orange)">{pivot_s or "none"}</strong></span>
     </div>
+    {CHEATSHEET_VIEW_TOGGLE}
     <div class="status" id="h-status">
       <span class="dot" style="background:var(--green)"></span> Ready
     </div>
   </div>
 
   <!-- ── Main Area (Graph Canvas + Panels) ──────────────── -->
-  <div class="main">
+  <div id="view-ops" class="main">
     <div class="graph-area">
       <!-- Graph header controls and filter bar -->
       <div class="graph-header-controls">
-        <div class="filter-group">
-          <button class="btn-graph-ctl filter-btn active" data-filter="all" onclick="setGraphFilter('all')" title="Show all discovered nodes"><i class="fa-solid fa-border-all"></i> All</button>
-          <button class="btn-graph-ctl filter-btn" data-filter="highvalue" onclick="setGraphFilter('highvalue')" title="Filter: High-Value Targets / Domain Admins"><i class="fa-solid fa-crown"></i> High Value</button>
-          <button class="btn-graph-ctl filter-btn" data-filter="compromised" onclick="setGraphFilter('compromised')" title="Filter: Compromised Accounts Only"><i class="fa-solid fa-skull"></i> Compromised</button>
-          <button class="btn-graph-ctl filter-btn" data-filter="path" onclick="setGraphFilter('path')" title="Filter: Active Attack Paths Only"><i class="fa-solid fa-road"></i> Attack Path</button>
-        </div>
         <div class="graph-controls-group">
+          <button class="btn-graph-ctl active" data-graph-filter="highvalue" onclick="setGraphFilter('highvalue')" title="Pivot, owned, DC, high-value only"><i class="fa-solid fa-bullseye"></i> Focus</button>
+          <button class="btn-graph-ctl" data-graph-filter="compromised" onclick="setGraphFilter('compromised')" title="Owned identities and creds"><i class="fa-solid fa-user-check"></i> Owned</button>
+          <button class="btn-graph-ctl" data-graph-filter="all" onclick="setGraphFilter('all')" title="Full graph + BloodHound layers"><i class="fa-solid fa-diagram-project"></i> All</button>
+          <button class="btn-graph-ctl" onclick="relayoutNetwork()" title="Re-run force layout"><i class="fa-solid fa-sitemap"></i> Layout</button>
           <button class="btn-graph-ctl" onclick="graphFit()" title="Fit all elements in view"><i class="fa-solid fa-expand"></i> Fit</button>
-          <button class="btn-graph-ctl" onclick="graphPhysics()" id="btn-physics" title="Toggle force-directed physics layout"><i class="fa-solid fa-wind"></i> Physics: On</button>
-          <button class="btn-graph-ctl" onclick="centerOnPivot()" title="Focus view on current pivot identity"><i class="fa-solid fa-crosshairs"></i> Center Pivot</button>
+          <button class="btn-graph-ctl" onclick="graphZoom(1.25)" title="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+          <button class="btn-graph-ctl" onclick="graphZoom(0.8)" title="Zoom out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
           <button class="btn-graph-ctl" onclick="refreshState()" title="Reload data state"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+          {SHARPHOUND_CONTROLS}
         </div>
       </div>
 
       <!-- network canvas -->
       <div id="graph-canvas"></div>
 
+      <div class="graph-empty" id="graph-empty" style="display:none">
+        <div class="graph-empty-inner">
+          <i class="fa-solid fa-crosshairs"></i>
+          <p id="graph-empty-msg">Set target IP to begin</p>
+        </div>
+      </div>
+
+      <!-- SharpHound import drop zone (Feature 1) -->
+      {SHARPHOUND_DROPZONE}
+
+      <!-- Per-hop path playbook (Feature 3) -->
+      {PATH_PLAYBOOK_PANEL}
+
       <!-- network legend -->
-      <div class="legend">
+      <div class="legend collapsed" id="graph-legend">
+        <button type="button" class="legend-toggle" onclick="toggleGraphLegend()" title="Toggle legend">
+          <i class="fa-solid fa-chevron-down"></i> Legend
+        </button>
+        <div class="legend-body" id="legend-body">
         <div class="legend-item" style="color:var(--orange)"><i class="fa-solid fa-star"></i> Pivot</div>
         <div class="legend-item" style="color:var(--green)"><i class="fa-solid fa-circle-check"></i> Compromised</div>
         <div class="legend-item" style="color:var(--red)"><i class="fa-solid fa-crown"></i> High Value/DC</div>
@@ -460,11 +640,20 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         <div class="legend-item" style="color:var(--indigo)"><i class="fa-solid fa-desktop"></i> Host/Computer</div>
         <div class="legend-item" style="color:var(--cyan)"><i class="fa-solid fa-user-gear"></i> gMSA</div>
         <div class="legend-item" style="color:#94a3b8"><i class="fa-solid fa-user"></i> Standard User</div>
+        {SHARPHOUND_LEGEND}
+        {BLOODHOUND_LEGEND}
+        </div>
       </div>
     </div>
 
     <!-- Right Sidebar Panel -->
     <div class="sidebar">
+      <div class="sb-pane active" id="sb-pane-ops">
+      <!-- Engagement context (workspace-aware) -->
+      <div class="engagement-strip" id="engagement-strip">
+        <div class="es-stage">Loading engagement…</div>
+      </div>
+
       <!-- Pivot Identity -->
       <div class="panel" style="border-left:3px solid var(--orange);">
         <div class="panel-header">Pivot Identity</div>
@@ -484,6 +673,7 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
       <!-- Credential State (Click to Pivot) -->
       <div class="panel">
         <div class="panel-header">Credential State <span class="panel-count" id="cred-count">0</span></div>
+        <div id="escalation-target-hint" style="display:none;font-size:0.65rem;color:var(--accent);padding:0.15rem 0.35rem 0.35rem;border-bottom:1px solid rgba(255,255,255,0.04);"></div>
         <div id="cred-list" style="max-height:160px;overflow-y:auto;padding-right:2px;">
           <div class="nd-empty">No domain accounts compromised</div>
         </div>
@@ -517,37 +707,84 @@ html,body{{height:100%;overflow:hidden;font-family:var(--font);background:var(--
         </div>
       </div>
 
+      <!-- Attack paths (Feature 3) -->
+      {PATHS_PANEL}
+
       <!-- Node detail inspector -->
       <div class="panel" id="panel-node-detail" style="display:none;background:var(--bg-card);">
         <div class="panel-header">Selected Object Info</div>
         <div id="node-detail-content"></div>
       </div>
+      </div><!-- /sb-pane-ops -->
     </div>
   </div>
 
+  <!-- ── Cheatsheet Workspace View ──────────────────────── -->
+  {CHEATSHEET_HTML}
+
   <!-- ── Bottom Terminal Area ───────────────────────────── -->
   <div class="terminal-bar" id="terminal-bar" style="height:170px">
+    <div class="terminal-resize-handle" id="terminal-resize-handle" title="Drag to resize"></div>
     <div class="terminal-header" onclick="toggleTerminal()">
-      <span><span class="dot" style="background:var(--green)"></span> Terminal logs</span>
+      <span id="term-header-title"><span class="dot" style="background:var(--green)"></span> Terminal logs</span>
       <span style="display:flex;align-items:center;gap:0.6rem">
-        <span id="term-status" style="font-size:0.65rem">waiting for updates...</span>
+        <span id="term-status" class="term-status-running" style="font-size:0.65rem">ready</span>
         <span class="term-actions">
-          <button onclick="event.stopPropagation();clearTerminal()" title="Clear Output Log">Clear</button>
+          <button onclick="event.stopPropagation();clearTerminal()" title="Clear log display">Clear</button>
+          <button onclick="event.stopPropagation();toggleTerminalMax()" title="Maximize terminal" id="btn-term-max">⤢</button>
           <button id="btn-collapse" onclick="event.stopPropagation();toggleTerminal()">_</button>
         </span>
       </span>
     </div>
     <div class="terminal-output" id="terminal"></div>
-    <div class="input-bar">
+    <div class="input-bar" id="ops-input-bar">
       <input id="input-ip" placeholder="target subnet / host IP" style="flex:1;max-width:160px"/>
       <button class="btn-graph-ctl" onclick="doDiscovery()" id="btn-scan" style="margin-right:0.6rem;"><i class="fa-solid fa-magnifying-glass"></i> Discovery</button>
+      <button class="btn-graph-ctl" onclick="OutputParser.open()" id="btn-parse-output" title="Parse secretsdump / roast / CME output"><i class="fa-solid fa-file-import"></i> Parse output</button>
       <input id="input-user" placeholder="domain user" style="flex:1;max-width:130px"/>
       <input id="input-pass" placeholder="password" type="password" style="flex:1;max-width:130px"/>
       <button class="btn-graph-ctl btn-primary" onclick="doAuth()" id="btn-auth"><i class="fa-solid fa-key"></i> Authenticate</button>
     </div>
+    <div class="input-bar shell-input-bar" id="shell-input-bar">
+      <span class="shell-prompt">shell&gt;</span>
+      <input id="shell-cmd" placeholder="remote command (Enter)" style="flex:1;font-family:var(--mono);font-size:0.72rem" autocomplete="off" spellcheck="false"/>
+      <button class="btn-graph-ctl btn-primary" onclick="sendShellLine()" id="btn-shell-send">Send</button>
+      <button class="btn-graph-ctl" onclick="detachShell()" id="btn-shell-detach">Detach</button>
+    </div>
   </div>
 
 </div>
+
+<div class="postex-modal-overlay" id="postex-modal-overlay" onclick="if(event.target===this)closePostexModal()">
+  <div class="postex-modal" role="dialog" aria-labelledby="postex-modal-title">
+    <h3 id="postex-modal-title">Establish Reverse Shell</h3>
+    <div class="postex-field">
+      <label for="postex-op-select">Post-ex op</label>
+      <select id="postex-op-select"></select>
+    </div>
+    <div class="postex-field">
+      <label>Payload arch</label>
+      <div class="postex-arch-toggle">
+        <label><input type="radio" name="postex-arch" value="x86" checked><span>x86</span></label>
+        <label><input type="radio" name="postex-arch" value="x64"><span>x64</span></label>
+      </div>
+    </div>
+    <div class="postex-field">
+      <label for="postex-lport">Callback port (--lport)</label>
+      <input id="postex-lport" type="number" min="1" max="65535" value="443"/>
+    </div>
+    <div class="postex-field">
+      <label for="postex-lhost">Callback IP (--lhost / VPN)</label>
+      <input id="postex-lhost" type="text" placeholder="auto-detect from ATTACKER_IP"/>
+    </div>
+    <div class="postex-modal-actions">
+      <button type="button" class="btn-graph-ctl" onclick="closePostexModal()">Cancel</button>
+      <button type="button" class="btn-graph-ctl btn-primary" onclick="submitPostexRun()">Deploy &amp; Listen</button>
+    </div>
+  </div>
+</div>
+
+{OUTPUT_PARSER_DRAWER}
 
 <script>
 /* ── Global State ─────────────────────────────────────────── */
@@ -560,11 +797,193 @@ let opRunning = false;
 let selectedNodeId = null;
 let graphNodes = [];
 let graphEdges = [];
-let currentGraphFilter = 'all';
+let currentGraphFilter = 'highvalue';
+let graphFilterUserSet = false;
+let graphStructureKey = '';
+let graphDataKey = '';
 let currentSessionPivot = '';
+let termLastOutput = '';
+let termRunningLabel = '';
+let shellMode = false;
+let shellLport = 0;
+let shellAutoAttachAttempted = false;
+let staleShellWarned = false;
 
 /* ── Terminal Output Logging ──────────────────────────────── */
 const term = document.getElementById('terminal');
+
+function termScrollBottom() {{
+  term.scrollTop = term.scrollHeight;
+}}
+
+function termSetRunning(label) {{
+  termRunningLabel = label || '';
+  opRunning = true;
+  setButtonsDisabled(true);
+  const status = document.getElementById('term-status');
+  if (status) {{
+    status.className = 'term-status-running';
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + escHtml(label || 'running');
+  }}
+  const hdr = document.getElementById('h-status');
+  if (hdr) {{
+    hdr.innerHTML = '<span class="dot" style="background:var(--yellow)"></span> Running';
+  }}
+}}
+
+function termClearRunning(kind) {{
+  if (!opRunning && !termRunningLabel) return;
+  opRunning = false;
+  termRunningLabel = '';
+  setButtonsDisabled(false);
+  const status = document.getElementById('term-status');
+  if (status) {{
+    status.className = '';
+    status.textContent = kind === 'error' ? 'error' : 'ready';
+  }}
+  const hdr = document.getElementById('h-status');
+  if (hdr) {{
+    hdr.innerHTML = '<span class="dot" style="background:' + (kind === 'error' ? 'var(--red)' : 'var(--green)') + '"></span> ' +
+      (kind === 'error' ? 'Error' : 'Ready');
+  }}
+  if (kind !== 'error') setTimeout(refreshState, 400);
+}}
+
+function termLogRaw(text) {{
+  if (!text) return;
+  const el = document.createElement('pre');
+  el.className = 'shell-raw-line';
+  el.textContent = text;
+  term.appendChild(el);
+  termLastOutput += text;
+  if (termLastOutput.length > 200000) termLastOutput = termLastOutput.slice(-120000);
+  termScrollBottom();
+  document.getElementById('terminal-bar').classList.remove('collapsed');
+}}
+
+function enableShellMode(lport) {{
+  shellMode = true;
+  shellLport = lport || shellLport || 443;
+  // #region agent log
+  fetch('http://127.0.0.1:7915/ingest/8066e3f6-99a9-499c-81b7-48c042eebe7c',{{method:'POST',headers:{{'Content-Type':'application/json','X-Debug-Session-Id':'311366'}},body:JSON.stringify({{sessionId:'311366',hypothesisId:'H3',location:'dashboard_html.py:enableShellMode',message:'shell_mode_enabled',data:{{lport:shellLport}},timestamp:Date.now()}})}}).catch(()=>{{}});
+  // #endregion
+  const opsBar = document.getElementById('ops-input-bar');
+  const shellBar = document.getElementById('shell-input-bar');
+  const tbar = document.getElementById('terminal-bar');
+  if (opsBar) opsBar.style.display = 'none';
+  if (shellBar) shellBar.classList.add('active');
+  if (tbar) {{
+    tbar.classList.add('shell-mode');
+    tbar.classList.remove('collapsed');
+    if (!tbar.classList.contains('maximized')) toggleTerminalMax();
+  }}
+  const title = document.getElementById('term-header-title');
+  if (title) {{
+    title.innerHTML = '<span class="dot" style="background:var(--green)"></span> Interactive reverse shell';
+  }}
+  const hdr = document.getElementById('term-status');
+  if (hdr) {{
+    hdr.className = 'term-status-running';
+    hdr.innerHTML = '<i class="fa-solid fa-terminal"></i> shell :' + shellLport;
+  }}
+  let banner = document.getElementById('term-shell-banner');
+  if (!banner) {{
+    banner = document.createElement('div');
+    banner.id = 'term-shell-banner';
+    banner.className = 'term-shell-banner';
+    term.parentNode.insertBefore(banner, term);
+  }}
+  banner.textContent = 'Reverse shell active on port ' + shellLport + ' — output above, type commands in the green bar below';
+  const inp = document.getElementById('shell-cmd');
+  if (inp) inp.focus();
+}}
+
+function disableShellMode() {{
+  shellMode = false;
+  shellAutoAttachAttempted = false;
+  const opsBar = document.getElementById('ops-input-bar');
+  const shellBar = document.getElementById('shell-input-bar');
+  const tbar = document.getElementById('terminal-bar');
+  if (opsBar) opsBar.style.display = '';
+  if (shellBar) shellBar.classList.remove('active');
+  if (tbar) tbar.classList.remove('shell-mode');
+  const title = document.getElementById('term-header-title');
+  if (title) {{
+    title.innerHTML = '<span class="dot" style="background:var(--green)"></span> Terminal logs';
+  }}
+  const banner = document.getElementById('term-shell-banner');
+  if (banner) banner.remove();
+  termClearRunning('done');
+}}
+
+function attachShell(lport) {{
+  lport = lport || shellLport || 443;
+  shellLport = lport;
+  termLogSemantic('[*] Attaching interactive shell on port ' + lport + ' …', 'log');
+  return apiPost('/api/postex/shell/start', {{ lport: lport }}).then(function (r) {{
+    return r.json().then(function (data) {{
+      if (!r.ok) {{
+        termLogSemantic('[!] ' + (data.error || 'shell attach failed'), 'error');
+        termClearRunning('error');
+        return false;
+      }}
+      enableShellMode(lport);
+      termLogSemantic('[+] Interactive shell attached — type commands below', 'done');
+      termClearRunning('done');
+      return true;
+    }});
+  }}).catch(function () {{
+    termLogSemantic('[!] shell attach request failed', 'error');
+    termClearRunning('error');
+    return false;
+  }});
+}}
+
+function sendShellLine() {{
+  const inp = document.getElementById('shell-cmd');
+  if (!inp) return;
+  const line = inp.value;
+  if (!line.trim()) return;
+  inp.value = '';
+  termLogRaw(line + '\\n');
+  apiPost('/api/postex/shell/send', {{ line: line }});
+}}
+
+function detachShell() {{
+  apiPost('/api/postex/shell/stop', {{}}).then(function () {{
+    disableShellMode();
+    termLogSemantic('[*] Shell detached', 'phase');
+  }});
+}}
+
+window.attachShell = attachShell;
+window.sendShellLine = sendShellLine;
+window.detachShell = detachShell;
+
+function syncShellFromState(s) {{
+  const sh = (s || state || {{}}).shell;
+  if (!sh || !sh.connected) {{
+    if (sh && sh.stale_marker && !opRunning && !staleShellWarned) {{
+      staleShellWarned = true;
+      termLogSemantic(
+        '[!] Previous shell session ended — re-run Establish Reverse Shell to get a new callback',
+        'warn'
+      );
+    }}
+    if (!opRunning && shellMode) disableShellMode();
+    return;
+  }}
+  staleShellWarned = false;
+  shellLport = sh.lport || shellLport || 443;
+  if (sh.attached || shellMode) {{
+    if (!shellMode) enableShellMode(shellLport);
+    return;
+  }}
+  if (!opRunning && !shellAutoAttachAttempted) {{
+    shellAutoAttachAttempted = true;
+    attachShell(shellLport);
+  }}
+}}
 
 function termLogSemantic(text, kind) {{
   if (!text) return;
@@ -580,14 +999,12 @@ function termLogSemantic(text, kind) {{
   let outputText = text;
   let pivotTag = '';
   
-  // Extract pivot user tag if present
   const pivotMatch = text.match(/\\[pivot:([^\\]]+)\\]/);
   if (pivotMatch) {{
     const pUser = pivotMatch[1];
     pivotTag = `<span class="pivot-badge-terminal">${{escHtml(pUser)}}</span> `;
     outputText = text.replace(/\\[pivot:[^\\]]+\\]/, '').trim();
     
-    // Add visually distinct pivot transition divider
     if (pUser !== currentSessionPivot) {{
       const div = document.createElement('div');
       div.className = 'session-divider';
@@ -599,7 +1016,7 @@ function termLogSemantic(text, kind) {{
   
   let icon = 'fa-circle-notch';
   if (kind === 'done') icon = 'fa-circle-check';
-  else if (kind === 'error') icon = 'fa-circle-xmark';
+  else if (kind === 'error' || kind === 'warn') icon = 'fa-circle-xmark';
   else if (kind === 'phase') icon = 'fa-flag';
   else if (kind === 'cmd') icon = 'fa-terminal';
   
@@ -619,16 +1036,12 @@ function termLogSemantic(text, kind) {{
   `;
   
   term.appendChild(el);
-  term.scrollTop = term.scrollHeight;
+  termLastOutput += (termLastOutput ? '\\n' : '') + outputText;
+  if (termLastOutput.length > 120000) termLastOutput = termLastOutput.slice(-80000);
+  termScrollBottom();
   
-  // Uncollapse terminal on event stream activity
   document.getElementById('terminal-bar').classList.remove('collapsed');
-  const status = document.getElementById('term-status');
-  if (status && kind === 'phase') {{
-    status.textContent = outputText;
-  }} else if (status && (kind === 'done' || kind === 'error')) {{
-    status.textContent = kind === 'done' ? 'ready' : 'error';
-  }}
+  updateStatus(kind);
 }}
 
 function toggleRawLog(summaryEl) {{
@@ -644,7 +1057,40 @@ function escHtml(s) {{
 
 function clearTerminal() {{
   term.innerHTML = '';
-  termLogSemantic('Terminal output cleared', 'log');
+}}
+
+function toggleTerminalMax() {{
+  const tb = document.getElementById('terminal-bar');
+  if (!tb) return;
+  tb.classList.toggle('maximized');
+  const btn = document.getElementById('btn-term-max');
+  if (btn) btn.textContent = tb.classList.contains('maximized') ? '⤡' : '⤢';
+}}
+
+function initTerminalResize() {{
+  const bar = document.getElementById('terminal-bar');
+  const handle = document.getElementById('terminal-resize-handle');
+  if (!bar || !handle || handle.dataset.bound === '1') return;
+  handle.dataset.bound = '1';
+  let startY = 0;
+  let startH = 0;
+  handle.addEventListener('mousedown', function (e) {{
+    e.preventDefault();
+    startY = e.clientY;
+    startH = bar.offsetHeight;
+    function onMove(ev) {{
+      const next = Math.min(window.innerHeight * 0.7, Math.max(120, startH + (startY - ev.clientY)));
+      bar.style.height = next + 'px';
+      bar.classList.remove('maximized');
+    }}
+    function onUp() {{
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (network) network.redraw();
+    }}
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }});
 }}
 
 function toggleTerminal() {{
@@ -673,6 +1119,28 @@ function connectSSE() {{
         try {{ const inner = JSON.parse(d.line); if (inner.refresh) refreshState(); }} catch {{}}
         return;
       }}
+      if (d.type === 'shell_ready') {{
+        let meta = {{}};
+        try {{ meta = JSON.parse(d.line || '{{}}'); }} catch {{}}
+        const lp = meta.lport || 443;
+        shellLport = lp;
+        if (meta.attached) {{
+          enableShellMode(lp);
+          termLogSemantic('[+] Interactive shell attached — type commands below', 'done');
+          termClearRunning('done');
+        }} else if (!opRunning) {{
+          attachShell(lp);
+        }}
+        return;
+      }}
+      if (d.type === 'shell_stopped') {{
+        disableShellMode();
+        return;
+      }}
+      if (d.type === 'shell') {{
+        termLogRaw(d.line || '');
+        return;
+      }}
       termLogSemantic(d.line || '', d.type || 'log');
       updateStatus(d.type);
     }} catch {{}}
@@ -683,27 +1151,23 @@ function connectSSE() {{
 }}
 
 function updateStatus(kind) {{
-  const el = document.getElementById('h-status');
-  if (kind === 'phase') {{
-    opRunning = true;
-    el.className = 'status';
-    el.innerHTML = '<span class="dot" style="background:var(--yellow)"></span> Running';
-    setButtonsDisabled(true);
-    const status = document.getElementById('term-status');
-    if (status) status.textContent = 'running...';
-  }} else if (kind === 'done' || kind === 'error') {{
-    opRunning = false;
-    el.className = 'status';
-    el.innerHTML = '<span class="dot" style="background:var(--green)"></span> Ready';
-    setButtonsDisabled(false);
-    const status = document.getElementById('term-status');
-    if (status) status.textContent = kind === 'done' ? 'ready' : 'error';
-    setTimeout(refreshState, 600);
+  if (kind === 'phase' || kind === 'cmd') {{
+    if (!opRunning) termSetRunning(termRunningLabel || 'operation');
+    return;
+  }}
+  if (kind === 'done' || kind === 'error' || kind === 'warn') {{
+    if (kind === 'done' || kind === 'error') termClearRunning(kind === 'error' ? 'error' : 'done');
+    else if (opRunning) {{
+      const status = document.getElementById('term-status');
+      if (status && termRunningLabel) {{
+        status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + escHtml(termRunningLabel);
+      }}
+    }}
   }}
 }}
 
 function setButtonsDisabled(disabled) {{
-  document.querySelectorAll('#action-buttons-redesign .btn, #btn-auth, #btn-scan').forEach(b => {{
+  document.querySelectorAll('#action-buttons-redesign .btn, #btn-auth, #btn-scan, #btn-parse-output').forEach(b => {{
     b.disabled = disabled;
   }});
 }}
@@ -717,16 +1181,141 @@ function apiPost(path, body) {{
   }});
 }}
 
-function doDiscovery() {{
-  const ip = document.getElementById('input-ip').value.trim();
-  if (!ip) {{
-    termLogSemantic('Please enter a target IP address', 'error');
+function runOp(label, path, body) {{
+  termSetRunning(label);
+  termLogSemantic('[*] Running: ' + label, 'phase');
+  return apiPost(path, body || {{}}).then(function (r) {{
+    return r.json().then(function (data) {{
+      if (!r.ok) {{
+        const msg = data.error || ('HTTP ' + r.status);
+        termLogSemantic('[!] ' + msg, r.status === 409 ? 'warn' : 'error');
+        termClearRunning(r.status === 409 ? 'warn' : 'error');
+        return data;
+      }}
+      if (r.status !== 202) termClearRunning('done');
+      return data;
+    }}).catch(function () {{
+      if (!r.ok) {{
+        termLogSemantic('[!] HTTP ' + r.status, 'error');
+        termClearRunning('error');
+      }}
+      return {{}};
+    }});
+  }}).catch(function (e) {{
+    termLogSemantic('[!] Request failed: ' + e, 'error');
+    termClearRunning('error');
+    return {{}};
+  }});
+}}
+
+window.runOp = runOp;
+window.termLastOutput = function () {{ return termLastOutput; }};
+
+function hijackPostexOps(s) {{
+  const ops = (s && s.postex_ops) || [];
+  return ops.filter(function (o) {{ return o.runnable; }});
+}}
+
+function openPostexModal(opts) {{
+  opts = opts || {{}};
+  const overlay = document.getElementById('postex-modal-overlay');
+  if (!overlay) return;
+  const ops = hijackPostexOps(state);
+  const sel = document.getElementById('postex-op-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (!ops.length) {{
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No DLL hijack ops — run: admapper postex scan';
+    sel.appendChild(opt);
+  }} else {{
+    ops.forEach(function (o) {{
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = o.id + ' — ' + (o.title || o.technique || 'hijack');
+      sel.appendChild(opt);
+    }});
+  }}
+  const prefOp = opts.op || (state.next_action || {{}}).op_id || (ops[0] && ops[0].id) || '';
+  if (prefOp) sel.value = prefOp;
+  const lhost = document.getElementById('postex-lhost');
+  const cv = state.cheatsheet_vars || {{}};
+  if (lhost) lhost.value = opts.lhost || cv.LHOST || cv.ATTACKER_IP || '';
+  const lport = document.getElementById('postex-lport');
+  if (lport) lport.value = String(opts.lport || 443);
+  const arch = String(opts.arch || 'x86').toLowerCase();
+  const archInput = document.querySelector('input[name="postex-arch"][value="' + arch + '"]');
+  if (archInput) archInput.checked = true;
+  overlay.classList.add('open');
+}}
+
+function closePostexModal() {{
+  const overlay = document.getElementById('postex-modal-overlay');
+  if (overlay) overlay.classList.remove('open');
+}}
+
+function submitPostexRun() {{
+  const sel = document.getElementById('postex-op-select');
+  const op = sel ? sel.value.trim() : '';
+  if (!op) {{
+    termLogSemantic('[!] Select a post-ex op (run postex scan first)', 'error');
     return;
   }}
-  apiPost('/api/scan', {{ip}});
+  disableShellMode();
+  const archEl = document.querySelector('input[name="postex-arch"]:checked');
+  const arch = archEl ? archEl.value : 'x86';
+  const lport = parseInt(document.getElementById('postex-lport').value, 10) || 443;
+  const lhost = (document.getElementById('postex-lhost') || {{}}).value.trim();
+  closePostexModal();
+  const ws = (state.meta && state.meta.workspace) ? state.meta.workspace : '';
+  runOp('Postex ' + op, '/api/postex/run', {{
+    op: op,
+    arch: arch,
+    lport: lport,
+    lhost: lhost || undefined,
+    workspace: ws || undefined,
+  }});
+}}
+
+window.openPostexModal = openPostexModal;
+window.closePostexModal = closePostexModal;
+window.submitPostexRun = submitPostexRun;
+
+function doDiscovery() {{
+  if (typeof WorkspaceVars !== 'undefined') WorkspaceVars.applyTerminalToVars();
+  const ip = (typeof WorkspaceVars !== 'undefined' ? WorkspaceVars.get().DC_IP : '') ||
+    document.getElementById('input-ip').value.trim();
+  if (!ip) {{
+    termLogSemantic('[!] Enter DC / target IP in the terminal bar or header', 'error');
+    return;
+  }}
+  if (state.workspace_required) {{
+    termLogSemantic('[!] Create or open a workspace first', 'error');
+    return;
+  }}
+  runOp('Discovery ' + ip, '/api/scan', {{ip, DC_IP: ip, host: ip}});
 }}
 
 function doAuth() {{
+  if (typeof WorkspaceVars !== 'undefined') {{
+    WorkspaceVars.applyTerminalToVars();
+    const v = WorkspaceVars.get();
+    const r = WorkspaceVars.readiness();
+    if (!r.auth_ready) {{
+      termLogSemantic('[!] Need DC IP, username, and password (or hash in vars)', 'error');
+      return;
+    }}
+    termSetRunning('Authenticate ' + (v.USERNAME || ''));
+    termLogSemantic('[*] Running: Authenticate ' + (v.USERNAME || ''), 'phase');
+    WorkspaceVars.connectFromTerminal().then(function (data) {{
+      if (data && data.error) {{
+        termLogSemantic('[!] ' + data.error, 'error');
+        termClearRunning('error');
+      }}
+    }}).catch(function () {{ termClearRunning('error'); }});
+    return;
+  }}
   const username = document.getElementById('input-user').value.trim();
   const password = document.getElementById('input-pass').value;
   const ip = document.getElementById('input-ip').value.trim();
@@ -734,21 +1323,19 @@ function doAuth() {{
     termLogSemantic('Please enter username and password credentials', 'error');
     return;
   }}
-  const body = {{username, password}};
+  const body = {{username, password, workspace_vars: {{USERNAME: username, PASSWORD: password, DC_IP: ip}}}};
   if (ip) body.ip = ip;
-  apiPost('/api/run', body);
+  apiPost('/api/workspace/connect', body);
 }}
 
-function doExploit() {{ apiPost('/api/exploit'); }}
-defAcls = () => apiPost('/api/acls');
-function doAcls() {{ apiPost('/api/acls'); }}
+function doExploit() {{ runOp('Exploit chain', '/api/exploit'); }}
+function doAcls() {{ runOp('ACL analysis', '/api/acls'); }}
 function doEnum() {{
-  const hasValidCred = (state.creds || []).some(c => String(c.status || '').toLowerCase() === 'valid');
-  apiPost('/api/enum', hasValidCred ? {{mode: 'auth'}} : {{}});
+  runOp('Enumerate users', '/api/enum', {{}});
 }}
-function doAsrep() {{ apiPost('/api/asreproast'); }}
-function doKerb() {{ apiPost('/api/kerberoast'); }}
-function doBrief() {{ apiPost('/api/brief', {{auto: true}}); }}
+function doAsrep() {{ runOp('AS-REP roast', '/api/asreproast'); }}
+function doKerb() {{ runOp('Kerberoast', '/api/kerberoast'); }}
+function doBrief() {{ runOp('Engagement brief', '/api/brief', {{auto: true}}); }}
 
 function triggerDiscoveryPrompt() {{
   const ip = document.getElementById('input-ip');
@@ -783,11 +1370,27 @@ async function refreshState() {{
 function renderState(s) {{
   state = s;
   const meta = s.meta || {{}};
+  const wsEl = document.getElementById('h-workspace');
+  if (wsEl && !wsEl.querySelector('input')) {{
+    wsEl.textContent = meta.workspace || (s.workspace_required ? '…' : '…');
+  }}
   document.getElementById('h-domain').textContent = meta.domain && meta.domain !== '???' ? meta.domain : '...';
-  document.getElementById('h-dc').textContent = meta.dc_host || meta.dc_ip || '...';
+  const dcEl = document.getElementById('h-dc');
+  if (dcEl && !dcEl.querySelector('input')) {{
+    dcEl.textContent = meta.dc_host || meta.dc_ip || '...';
+  }}
   document.getElementById('h-pivot').textContent = (s.player||{{}}).pivot || 'none';
 
+  if (s.workspace_required) {{
+    showWorkspaceModal(true);
+  }} else {{
+    showWorkspaceModal(false);
+  }}
+  bindWorkspaceModal();
+  bindHeaderInlineEdit();
+
   renderPivotCard(s);
+  renderEngagementStrip(s);
   renderLootPanel(s);
   renderCredentialState(s);
   renderNextBestAction(s);
@@ -795,6 +1398,12 @@ function renderState(s) {{
   renderActionsRedesign(s);
   renderFindingsFeed(s);
   renderGraph(s.graph || {{}});
+  if (typeof WorkspaceVars !== 'undefined') WorkspaceVars.syncFromState(s);
+  if (typeof PathPlaybook !== 'undefined') PathPlaybook.syncFromState(s);
+  if (typeof BloodHoundOverlay !== 'undefined') BloodHoundOverlay.syncFromState(s);
+  if (typeof CheatsheetView !== 'undefined') CheatsheetView.syncFromState(s);
+  if (typeof WorkspaceVars !== 'undefined') WorkspaceVars.updateReadinessUI();
+  syncShellFromState(s);
 }}
 
 /* ── Unified Loot Section ─────────────────────────────────── */
@@ -892,9 +1501,22 @@ function renderLootPanel(s) {{
 /* ── Expanded Credential State ────────────────────────────── */
 function renderCredentialState(s) {{
   const el = document.getElementById('cred-list');
+  const escHint = document.getElementById('escalation-target-hint');
   el.innerHTML = '';
   const creds = s.creds || [];
   const pth = s.pth_sessions || [];
+  
+  const escTarget = String(s.escalation_target || '').trim();
+  const ownedSet = new Set(((s.player || {{}}).owned || []).map(u => String(u).toLowerCase().replace(/\\$/g, '')));
+  if (escHint) {{
+    if (escTarget && !ownedSet.has(escTarget.toLowerCase().replace(/\\$/g, ''))) {{
+      escHint.style.display = 'block';
+      escHint.innerHTML = `Escalation target: <strong>${{escHtml(escTarget)}}</strong> <span style="color:var(--text-muted)">(scheduled task run-as)</span>`;
+    }} else {{
+      escHint.style.display = 'none';
+      escHint.innerHTML = '';
+    }}
+  }}
   
   const allCreds = [];
   
@@ -983,45 +1605,120 @@ function renderCredentialState(s) {{
   }});
 }}
 
+/* ── Engagement context strip ─────────────────────────────── */
+function renderEngagementStrip(s) {{
+  const el = document.getElementById('engagement-strip');
+  if (!el) return;
+  const dash = s.dashboard || {{}};
+  const owned = (s.player?.owned || []).length;
+  const pivot = (s.player || {{}}).pivot || 'none';
+  const eff = s.effective_progress || s.progress || {{}};
+  const wr = s.workspace_readiness || (typeof WorkspaceVars !== 'undefined' ? WorkspaceVars.readiness() : {{}});
+  const phases = [];
+  if (eff.scan) phases.push('recon');
+  if (eff.enum_users) phases.push('enum');
+  if (eff.loot) phases.push('loot');
+  if (eff.acls) phases.push('acls');
+  if (eff.exploit) phases.push('exploit');
+  let stage = dash.stage_label || (phases.length ? phases.join(' → ') : 'Starting');
+  let hint = '';
+  if (s.workspace_required) {{
+    stage = 'Create or open workspace';
+    hint = 'Name this engagement (e.g. corp-internal, prod-forest) — not the target IP.';
+  }} else if (!wr.scan_ready) {{
+    stage = '① Set target';
+    hint = 'Enter DC IP in the terminal bar (bottom) or Commands / Cheatsheet vars → Discovery.';
+  }} else if (!wr.auth_ready) {{
+    stage = '② Authenticate';
+    hint = 'Fill username + password (or NTLM hash in vars) → Authenticate.';
+  }} else if (!eff.scan) {{
+    stage = 'Ready — run Discovery';
+    hint = 'Vars are set. Click Discovery to enumerate the domain.';
+  }} else if (!pivot || pivot === 'none') {{
+    stage = '③ Establish pivot';
+    hint = 'Click Authenticate to verify credentials and set your pivot.';
+  }} else if (eff.exploit && s.next_action?.source === 'postex') {{
+    hint = 'Shell access likely via machine account — pivot may be Kerberos-only.';
+  }} else {{
+    hint = 'Orange star = pivot · green/diamond = BloodHound overlay (inventory, not compromise).';
+  }}
+  el.innerHTML =
+    '<div class="es-stage">' + escHtml(stage) + '</div>' +
+    '<div class="es-meta">' + owned + ' owned · pivot <strong>' + escHtml(pivot) + '</strong>' +
+      (phases.length ? ' · ' + escHtml(phases.join(' · ')) : '') + '</div>' +
+    (hint ? '<div class="es-hint">' + escHtml(hint) + '</div>' : '');
+}}
+
 /* ── Next Best Action (Syntax Highlighted Command) ────────── */
 function renderNextBestAction(s) {{
   const el = document.getElementById('next-action-container');
   el.innerHTML = '';
+  const na = s.next_action || {{}};
   const obj = s.objective || {{}};
-  const progress = s.progress || {{}};
+  const progress = s.effective_progress || s.progress || {{}};
   const creds = s.creds || [];
   const pivot = s.player?.pivot;
-  
-  let command = 'admapper scan -H <Target_IP>';
-  let reason = 'Perform target discovery and unauthenticated service mapping.';
-  let impact = 'Discovers domain controllers, SMB signing policies, and LDAP namespaces.';
-  
-  if (!progress.scan) {{
-    command = 'admapper scan -H <Target_IP>';
-    reason = 'Perform initial reconnaissance and domain naming context mapping.';
-    impact = 'Establishes domain connectivity, checks open AD ports (88, 389, 445), and cache configuration.';
-  }} else if (!progress.enum_users) {{
-    command = 'admapper enum -w ' + (s.meta?.workspace || 'default');
-    reason = 'Perform unauthenticated SAMR/RID user enumeration to extract active domain accounts.';
-    impact = 'Maps the domain user account list which serves as the basis for roasting and spray attacks.';
-  }} else if (!creds.length) {{
-    command = 'admapper asreproast -w ' + (s.meta?.workspace || 'default');
-    reason = 'Roast accounts with pre-authentication disabled to obtain crackable hashes.';
-    impact = 'Potential cleartext credentials recovery via offline password cracking.';
-  }} else if (!pivot) {{
-    const firstUser = creds[0]?.user || 'user';
-    command = 'admapper run -w ' + (s.meta?.workspace || 'default') + ' -u ' + firstUser + ' -p \\'<password>\\'';
-    reason = 'Authenticate with a valid user credential to promote a pivot and unlock LDAP collection.';
-    impact = 'Establishes authenticated foothold in the domain to start path auditing.';
-  }} else if (obj.command) {{
-    command = obj.command;
-    reason = obj.headline || 'Execute Active Directory exploitation path.';
-    impact = 'Privilege escalation or credential access via Active Directory vulnerability abuse.';
+
+  let command = na.command || '';
+  let reason = na.reason || '';
+  let impact = na.impact || '';
+  let headline = na.headline || '';
+  let source = na.source || 'phase';
+
+  if (!command) {{
+    if (!progress.scan) {{
+      command = 'admapper scan -H ' + (s.meta?.workspace || s.meta?.dc_ip || '<Target_IP>');
+      reason = 'Perform initial reconnaissance and domain naming context mapping.';
+      impact = 'Establishes domain connectivity and caches DC endpoints.';
+      headline = 'Unauthenticated discovery';
+    }} else if (!progress.enum_users) {{
+      command = 'admapper enum users -w ' + (s.meta?.workspace || 'default');
+      reason = 'Enumerate domain accounts from cached recon.';
+      impact = 'Builds roast/spray target inventory.';
+      headline = 'User enumeration';
+    }} else if (!creds.length) {{
+      command = 'admapper asreproast -w ' + (s.meta?.workspace || 'default');
+      reason = 'No verified credentials in dashboard view yet.';
+      impact = 'Recover crackable AS-REP hashes.';
+      headline = 'Credential access';
+    }} else if (!pivot) {{
+      const firstUser = creds[0]?.user || 'user';
+      command = 'admapper run -w ' + (s.meta?.workspace || 'default') + ' -u ' + firstUser + " -p '<password>'";
+      reason = 'Promote a pivot to unlock authenticated graph analysis.';
+      impact = 'Runs authenticated LDAP/SMB enum as the chosen user.';
+      headline = 'Establish pivot';
+    }} else if (obj.command) {{
+      command = obj.command;
+      reason = obj.headline || 'Execute mapped attack path.';
+      impact = 'Privilege escalation via graph edge.';
+      headline = obj.headline || 'Attack path';
+    }}
   }}
-  
+
+  const sourceLabel = {{
+    postex: 'Post-ex playbook',
+    objective: 'Attack graph',
+    mission: 'ACL mission',
+    phase: 'Pipeline phase',
+    fallback: 'Review',
+  }}[source] || 'Suggested';
+
+  const hijackOps = hijackPostexOps(s);
+  const showPostexBtn = hijackOps.length > 0 && (
+    na.postex_runnable || na.source === 'postex' ||
+    (progress.exploit || (s.effective_progress || {{}}).exploit)
+  );
+  const prefPostexOp = na.op_id || (hijackOps[0] && hijackOps[0].id) || '';
+  const postexBtnHtml = showPostexBtn
+    ? '<button type="button" class="postex-run-btn" data-postex-op="' + escHtml(prefPostexOp) + '">' +
+      '<i class="fa-solid fa-terminal"></i> Establish Reverse Shell</button>'
+    : '';
+
   el.innerHTML = `
     <div class="next-action-card">
-      <div style="font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.3rem;">Active Command Suggestion</div>
+      <div class="next-action-source">${{escHtml(sourceLabel)}}</div>
+      ${{headline ? '<div class="next-action-headline">' + escHtml(headline) + '</div>' : ''}}
+      <div style="font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.3rem;">Active Command</div>
       <div class="syntax-code-block" data-copy-val="${{escHtml(command)}}" data-copy-label="Suggested Command" title="Click to copy command">
         <span class="mono">${{highlightCommand(command)}}</span>
         <i class="fa-regular fa-copy copy-icon"></i>
@@ -1030,6 +1727,7 @@ function renderNextBestAction(s) {{
         <div style="color:var(--text);margin-bottom:0.15rem;"><strong>Reason:</strong> ${{escHtml(reason)}}</div>
         <div style="color:var(--text-dim);"><strong>Impact:</strong> ${{escHtml(impact)}}</div>
       </div>
+      ${{postexBtnHtml}}
     </div>
   `;
 }}
@@ -1044,7 +1742,7 @@ function highlightCommand(cmd) {{
 function renderOperationalPipeline(s) {{
   const el = document.getElementById('pipeline-track');
   el.innerHTML = '';
-  const progress = s.progress || {{}};
+  const progress = s.effective_progress || s.progress || {{}};
   const creds = s.creds || [];
   const pivot = s.player?.pivot;
   const isExploited = progress.exploit;
@@ -1080,8 +1778,42 @@ function renderOperationalPipeline(s) {{
 function renderActionsRedesign(s) {{
   const container = document.getElementById('action-buttons-redesign');
   container.innerHTML = '';
-  
-  const progress = s.progress || {{}};
+  const progress = s.effective_progress || s.progress || {{}};
+  const serverActions = s.actions || [];
+
+  if (serverActions.length) {{
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'action-group-redesign';
+    groupDiv.innerHTML = '<div class="group-title">Workspace actions</div>';
+    const btnsDiv = document.createElement('div');
+    btnsDiv.className = 'group-buttons';
+    serverActions.forEach(function (act) {{
+      const btn = document.createElement('button');
+      btn.className = 'btn' + (act.required ? ' btn-primary' : '');
+      btn.title = act.reason || '';
+      btn.disabled = !act.enabled;
+      if (!act.enabled) btn.style.opacity = '0.35';
+      const fnMap = {{
+        scan: 'doDiscovery()',
+        enum: 'doEnum()',
+        asreproast: 'doAsrep()',
+        kerberoast: 'doKerb()',
+        spray: 'triggerSprayPrompt()',
+        run: 'doAuth()',
+        acls: 'doAcls()',
+        exploit: 'doExploit()',
+      }};
+      const actionKey = String(act.action || '');
+      if (act.enabled && fnMap[actionKey]) btn.setAttribute('onclick', fnMap[actionKey]);
+      btn.textContent = act.button || act.action || 'Action';
+      btnsDiv.appendChild(btn);
+    }});
+    groupDiv.appendChild(btnsDiv);
+    container.appendChild(groupDiv);
+    if (opRunning) setButtonsDisabled(true);
+    return;
+  }}
+
   const hasCreds = (s.creds || []).length > 0;
   const pivot = s.player?.pivot;
   
@@ -1307,30 +2039,184 @@ function renderPivotCard(s) {{
   const el = document.getElementById('pivot-display');
   const pivot = (s.player || {{}}).pivot;
   const meta = s.meta || {{}};
+  const methods = (s.player || {{}}).owned_methods || {{}};
   if (!pivot) {{
     el.innerHTML = '<div class="nd-empty">No active pivot established</div>';
     return;
   }}
   const initial = pivot.charAt(0).toUpperCase();
   const domain = meta.domain && meta.domain !== '???' ? meta.domain : '';
+  const method = methods[pivot.toLowerCase()] || methods[pivot.toLowerCase() + '$'] || '';
+  let note = '';
+  if (s.player?.pivot_protected) {{
+    note = 'Protected Users — Kerberos only (no SMB/NTLM to DC)';
+  }} else if (pivot.endsWith('$')) {{
+    note = 'Machine account — use for WinRM/shell, not LDAP pivot analysis';
+  }}
   el.innerHTML = `
     <div class="pivot-card">
       <div class="avatar">${{escHtml(initial)}}</div>
       <div class="info">
         <div class="name">${{escHtml(pivot)}}</div>
-        <div class="detail">${{domain ? escHtml(domain) + ' &middot; ' : ''}}Pivot Foothold</div>
+        <div class="detail">${{domain ? escHtml(domain) + ' · ' : ''}}Active pivot</div>
+        ${{method ? '<div class="pivot-method">via ' + escHtml(method) + '</div>' : ''}}
+        ${{note ? '<div class="pivot-note">' + escHtml(note) + '</div>' : ''}}
       </div>
     </div>
   `;
 }}
 
+/* ── Header inline edit (workspace name + DC IP) ─────────── */
+function bindHeaderInlineEdit() {{
+  document.querySelectorAll('.inline-edit').forEach(function (el) {{
+    if (el.dataset.inlineBound === '1') return;
+    el.dataset.inlineBound = '1';
+    el.addEventListener('click', function () {{ startHeaderInlineEdit(el); }});
+  }});
+}}
+
+function startHeaderInlineEdit(el) {{
+  if (!el || el.querySelector('input')) return;
+  const field = el.dataset.field || '';
+  const current = el.textContent.trim();
+  const val = (current === '…' || current === '...') ? '' : current;
+  if (field === 'workspace' && state && state.workspace_required) return;
+
+  const inp = document.createElement('input');
+  inp.className = 'header-inline-input';
+  inp.value = val;
+  inp.type = field === 'dc' ? 'text' : 'text';
+  inp.placeholder = field === 'dc' ? '192.168.10.10' : 'corp-internal';
+  el.textContent = '';
+  el.appendChild(inp);
+  inp.focus();
+  inp.select();
+
+  function restore(display) {{
+    el.textContent = display;
+  }}
+
+  function commit() {{
+    const next = inp.value.trim();
+    if (field === 'workspace') {{
+      if (!next || next === (state.meta && state.meta.workspace)) {{
+        restore(state.meta && state.meta.workspace ? state.meta.workspace : '…');
+        return;
+      }}
+      fetch('/api/workspace/rename', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ name: next }})
+      }}).then(function (r) {{ return r.json(); }}).then(function (data) {{
+        if (data.error) {{
+          termLogSemantic(data.error, 'error');
+          restore(state.meta && state.meta.workspace ? state.meta.workspace : '…');
+          return;
+        }}
+        if (data.state && typeof renderState === 'function') renderState(data.state);
+        else restore(next);
+      }}).catch(function () {{
+        restore(state.meta && state.meta.workspace ? state.meta.workspace : '…');
+      }});
+      return;
+    }}
+    if (field === 'dc') {{
+      if (!next) {{
+        restore((state.meta && (state.meta.dc_host || state.meta.dc_ip)) || '...');
+        return;
+      }}
+      if (typeof WorkspaceVars !== 'undefined') {{
+        WorkspaceVars.set({{ DC_IP: next }});
+        WorkspaceVars.persistNow();
+      }}
+      restore(next);
+      const termIp = document.getElementById('input-ip');
+      if (termIp) termIp.value = next;
+      return;
+    }}
+    restore(next || current);
+  }}
+
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', function (e) {{
+    if (e.key === 'Enter') {{ e.preventDefault(); inp.blur(); }}
+    if (e.key === 'Escape') {{ inp.value = val; inp.blur(); }}
+  }});
+}}
+
+function toggleGraphLegend() {{
+  const legend = document.getElementById('graph-legend');
+  if (legend) legend.classList.toggle('collapsed');
+}}
+
+function isPlaceholderNode(n) {{
+  if (!n) return true;
+  if (n.id === 'operator' || n.group === 'operator') return true;
+  const lbl = String(n.label || '').trim().toUpperCase();
+  return lbl === 'OPERATOR';
+}}
+
+function graphEmptyInfo() {{
+  if (state.workspace_required) {{
+    return {{ empty: true, msg: 'Create or open a workspace to begin mapping the domain.' }};
+  }}
+  const nodes = ((state.graph || {{}}).nodes) || [];
+  const real = nodes.filter(function (n) {{ return !isPlaceholderNode(n); }});
+  if (!real.length) {{
+    const wr = state.workspace_readiness || (typeof WorkspaceVars !== 'undefined' ? WorkspaceVars.readiness() : {{}});
+    if (!wr.scan_ready) {{
+      return {{ empty: true, msg: 'Click DC in the header or terminal bar to set target IP, then run Discovery.' }};
+    }}
+    return {{ empty: true, msg: 'Run Discovery to populate the attack graph.' }};
+  }}
+  return {{ empty: false }};
+}}
+
+function showGraphEmpty(msg) {{
+  const overlay = document.getElementById('graph-empty');
+  const msgEl = document.getElementById('graph-empty-msg');
+  if (overlay) overlay.style.display = 'flex';
+  if (msgEl) msgEl.textContent = msg;
+  if (network) {{
+    network.setData({{ nodes: new vis.DataSet([]), edges: new vis.DataSet([]) }});
+  }}
+  graphNodes = [];
+  graphEdges = [];
+}}
+
+function hideGraphEmpty() {{
+  const overlay = document.getElementById('graph-empty');
+  if (overlay) overlay.style.display = 'none';
+}}
+
 /* ── vis-network Graph Redesign & Controls ────────────────── */
 function renderGraph(graphData) {{
-  if (!graphData.nodes || !graphData.nodes.length) return;
+  const empty = graphEmptyInfo();
+  if (empty.empty) {{
+    showGraphEmpty(empty.msg);
+    return;
+  }}
+  hideGraphEmpty();
+
+  const nodes = (graphData.nodes || []).filter(function (n) {{ return !isPlaceholderNode(n); }});
+  if (!nodes.length) {{
+    showGraphEmpty(graphEmptyInfo().msg || 'Run Discovery to populate the attack graph.');
+    return;
+  }}
 
   const pivotUser = (state.player || {{}}).pivot || '';
+  const nodeIds = new Set(nodes.map(function (n) {{ return n.id; }}));
+  const edges = (graphData.edges || []).filter(function (e) {{
+    return nodeIds.has(e.from) && nodeIds.has(e.to);
+  }});
 
-  graphNodes = graphData.nodes.map(n => {{
+  const nextDataKey = nodes.map(function (n) {{ return n.id; }}).sort().join('|');
+  if (nextDataKey !== graphDataKey) {{
+    graphDataKey = nextDataKey;
+    graphStructureKey = '';
+  }}
+
+  graphNodes = nodes.map(n => {{
     const isPivot = n.username && n.username.toLowerCase() === pivotUser.toLowerCase();
     const isOwned = n.group === 'operator' || n.identity_role === 'owned' || 
                   (state.player && state.player.owned && n.username && 
@@ -1401,6 +2287,9 @@ function renderGraph(graphData) {{
     label = label.replace(/^[\\u2605\\u2606\\u2726]\\s*/g, '');
     if (label.length > 20) label = label.substring(0, 18) + '...';
 
+    const showLabel = isPivot || isOwned || isDC || isDomain || isHV || isKerberoastable || isAsrep
+      || (isUser && !isGroup);
+
     return {{
       ...n,
       label,
@@ -1413,11 +2302,11 @@ function renderGraph(graphData) {{
         color: iconColor
       }},
       shadow: {{ enabled: true, size: shadowSize, color: shadowColor, x: 0, y: 0 }},
-      font: {{ color: '#c9d1d9', size: isPivot ? 12 : (isDC ? 11 : 9), strokeWidth: 2, strokeColor: '#0d1117' }},
+      font: {{ color: '#c9d1d9', size: showLabel ? (isPivot ? 12 : (isDC || isDomain ? 11 : 9)) : 0, strokeWidth: 2, strokeColor: '#0d1117' }},
     }};
   }});
 
-  graphEdges = graphData.edges.map(e => {{
+  graphEdges = edges.map(e => {{
     const lbl = String(e.label || '').trim();
     const lowerLbl = lbl.toLowerCase();
     let edgeColor = '#30363d';
@@ -1442,7 +2331,7 @@ function renderGraph(graphData) {{
     return {{
       ...e,
       label: lbl,
-      smooth: {{ type: 'dynamic' }},
+      smooth: {{ type: 'continuous' }},
       font: {{
         color: '#8b949e',
         size: 8,
@@ -1462,16 +2351,139 @@ function renderGraph(graphData) {{
     }};
   }});
 
+  if (!graphFilterUserSet && nodes.length > 30) {{
+    currentGraphFilter = 'highvalue';
+  }}
+
   setGraphFilter(currentGraphFilter);
 }}
 
-function setGraphFilter(filter) {{
-  currentGraphFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(btn => {{
-    btn.classList.toggle('active', btn.dataset.filter === filter);
+function updateGraphFilterButtons() {{
+  document.querySelectorAll('[data-graph-filter]').forEach(function (btn) {{
+    btn.classList.toggle('active', btn.dataset.graphFilter === currentGraphFilter);
   }});
+}}
+
+function applyRadialLayout(nodes, edges) {{
+  if (!nodes.length) return nodes;
+  const out = nodes.map(function (n) {{ return Object.assign({{}}, n); }});
+  let hubId = null;
+  for (let i = 0; i < out.length; i++) {{
+    if (out[i].group === 'domain') {{ hubId = out[i].id; break; }}
+  }}
+  if (!hubId) {{
+    const deg = {{}};
+    (edges || []).forEach(function (e) {{
+      deg[e.from] = (deg[e.from] || 0) + 1;
+      deg[e.to] = (deg[e.to] || 0) + 1;
+    }});
+    const ranked = Object.keys(deg).sort(function (a, b) {{ return deg[b] - deg[a]; }});
+    hubId = ranked[0] || out[0].id;
+  }}
+  const spokes = out.filter(function (n) {{ return n.id !== hubId; }});
+  const radius = Math.min(400, 90 + spokes.length * 16);
+  spokes.forEach(function (n, i) {{
+    const angle = (2 * Math.PI * i) / Math.max(spokes.length, 1) - Math.PI / 2;
+    n.x = radius * Math.cos(angle);
+    n.y = radius * Math.sin(angle);
+  }});
+  const hub = out.find(function (n) {{ return n.id === hubId; }});
+  if (hub) {{ hub.x = 0; hub.y = 0; }}
+  return out;
+}}
+
+function preserveNodePositions(nodes, edges, forceLayout) {{
+  if (!nodes.length) return nodes;
+  const positioned = nodes.map(function (n) {{ return Object.assign({{}}, n); }});
+  let saved = {{}};
+  if (network) {{
+    try {{ saved = network.getPositions(); }} catch (e) {{}}
+  }}
+  let missing = 0;
+  positioned.forEach(function (n) {{
+    const p = saved[n.id];
+    if (p && p.x != null && p.y != null) {{
+      n.x = p.x;
+      n.y = p.y;
+      return;
+    }}
+    if (nodeData) {{
+      try {{
+        const old = nodeData.get(n.id);
+        if (old && old.x != null && old.y != null) {{
+          n.x = old.x;
+          n.y = old.y;
+          return;
+        }}
+      }} catch (e) {{}}
+    }}
+    missing += 1;
+  }});
+  if (forceLayout || missing === positioned.length) {{
+    return applyRadialLayout(positioned, edges);
+  }}
+  if (missing > 0) {{
+    const placed = applyRadialLayout(
+      positioned.filter(function (n) {{ return n.x == null || n.y == null; }}),
+      edges
+    );
+    const byId = {{}};
+    placed.forEach(function (n) {{ byId[n.id] = n; }});
+    return positioned.map(function (n) {{ return byId[n.id] || n; }});
+  }}
+  return positioned;
+}}
+
+function graphPhysicsOptions() {{
+  return {{
+    enabled: true,
+    stabilization: {{ iterations: 120, updateInterval: 25 }},
+    barnesHut: {{
+      gravitationalConstant: -8000,
+      centralGravity: 0.08,
+      springLength: 200,
+      springConstant: 0.03,
+      damping: 0.15,
+      avoidOverlap: 0.35,
+    }},
+  }};
+}}
+
+function graphInteractionOptions() {{
+  return {{
+    hover: true,
+    tooltipDelay: 120,
+    zoomView: true,
+    dragView: true,
+    dragNodes: true,
+    multiselect: false,
+    navigationButtons: false,
+    keyboard: {{ enabled: true, bindToWindow: false }},
+  }};
+}}
+
+function relayoutNetwork() {{
+  if (!network || !nodeData) return;
+  const nodes = nodeData.get();
+  const edges = edgeData ? edgeData.get() : [];
+  const laid = applyRadialLayout(nodes, edges);
+  nodeData.update(laid);
+  network.setOptions({{ physics: graphPhysicsOptions() }});
+  network.once('stabilizationIterationsDone', function () {{
+    network.setOptions({{ physics: {{ enabled: false }} }});
+    physicsOn = false;
+    network.fit({{ animation: {{ duration: 350 }} }});
+  }});
+}}
+
+function setGraphFilter(filter) {{
+  if (filter) {{
+    currentGraphFilter = filter;
+    graphFilterUserSet = true;
+  }}
+  updateGraphFilterButtons();
   
-  if (!network && !graphNodes.length) return;
+  if (!graphNodes.length) return;
   
   const container = document.getElementById('graph-canvas');
   if (!container) return;
@@ -1511,15 +2523,41 @@ function setGraphFilter(filter) {{
   const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
   const filteredEdges = graphEdges.filter(e => visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to));
 
+  // SharpHound overlay (Feature 1): merge imported layer, kept separate from graph.json
+  let mergedNodes = filteredNodes;
+  let mergedEdges = filteredEdges;
+  if (typeof BloodHoundOverlay !== 'undefined') {{
+    const bh = BloodHoundOverlay.overlayFor(filter);
+    if (bh) {{
+      mergedNodes = mergedNodes.concat(bh.nodes);
+      mergedEdges = mergedEdges.concat(bh.edges);
+    }}
+  }}
+  if (typeof SharpHoundImport !== 'undefined') {{
+    const ov = SharpHoundImport.overlayFor(filter);
+    if (ov) {{
+      mergedNodes = mergedNodes.concat(ov.nodes);
+      mergedEdges = mergedEdges.concat(ov.edges);
+    }}
+  }}
+
+  const structureKey = mergedNodes.length + ':' + mergedEdges.length + ':' + currentGraphFilter;
+  const forceLayout = structureKey !== graphStructureKey;
+  graphStructureKey = structureKey;
+  mergedNodes = preserveNodePositions(mergedNodes, mergedEdges, forceLayout && !network);
+
   const networkData = {{
-    nodes: new vis.DataSet(filteredNodes),
-    edges: new vis.DataSet(filteredEdges)
+    nodes: new vis.DataSet(mergedNodes),
+    edges: new vis.DataSet(mergedEdges)
   }};
 
   if (network) {{
     network.setData(networkData);
     nodeData = networkData.nodes;
     edgeData = networkData.edges;
+    if (forceLayout) {{
+      network.fit({{ animation: {{ duration: 250 }} }});
+    }}
     return;
   }}
 
@@ -1531,64 +2569,53 @@ function setGraphFilter(filter) {{
     width: '100%',
     height: '100%',
     autoResize: true,
-    physics: {{
-      stabilization: {{ iterations: 200, updateInterval: 25 }},
-      barnesHut: {{ gravitationalConstant: -5000, springLength: 150, springConstant: 0.04 }},
-    }},
-    interaction: {{
-      hover: true,
-      tooltipDelay: 200,
-      zoomView: true,
-      dragView: true,
-    }},
+    physics: {{ enabled: false }},
+    interaction: graphInteractionOptions(),
     edges: {{
       arrows: {{ to: {{ enabled: true, scaleFactor: 0.6 }} }},
-      smooth: {{ type: 'dynamic' }},
+      smooth: {{ type: 'continuous' }},
     }},
   }});
   
   nodeData = networkData.nodes;
   edgeData = networkData.edges;
 
-  network.once('stabilizationIterationsDone', () => {{
-    network.setOptions({{ physics: false }});
-    physicsOn = false;
-    document.getElementById('btn-physics').innerHTML = '<i class="fa-solid fa-wind"></i> Physics: Off';
-    centerOnPivot() || network.fit();
-  }});
+  network.fit({{ animation: false }});
+  physicsOn = false;
 
-  const ro = new ResizeObserver(() => {{
+  const ro = new ResizeObserver(function () {{
     if (network) {{ network.redraw(); }}
   }});
   ro.observe(graphArea);
 
-  network.on('click', (params) => {{
+  network.on('click', function (params) {{
     if (params.nodes.length) {{
       const nodeId = params.nodes[0];
       showNodeDetail(nodeId);
-      const node = graphNodes.find(n => n.id === nodeId);
-      if (node && node.username) {{
-        const isOwned = node.identity_role === 'owned' || node.identity_role === 'pivot' || 
-                        (state.player && state.player.owned && state.player.owned.map(u => u.toLowerCase()).includes(node.username.toLowerCase()));
-        if (isOwned && node.username.toLowerCase() !== ((state.player || {{}}).pivot || '').toLowerCase()) {{
-          doPivot(node.username);
-        }}
-      }}
     }} else {{
       document.getElementById('panel-node-detail').style.display = 'none';
       selectedNodeId = null;
     }}
   }});
 
-  network.on('doubleClick', (params) => {{
-    if (params.nodes.length) {{
-      const nodeId = params.nodes[0];
-      const node = graphNodes.find(n => n.id === nodeId);
-      if (node && node.username) {{
-        doPivot(node.username);
-        termLogSemantic('Pivoted identity to: ' + node.username, 'cmd');
-      }}
+  network.on('doubleClick', function (params) {{
+    if (!params.nodes.length) return;
+    const nodeId = params.nodes[0];
+    const node = graphNodes.find(function (n) {{ return n.id === nodeId; }});
+    if (node && node.username) {{
+      doPivot(node.username);
+      termLogSemantic('Pivoted identity to: ' + node.username, 'cmd');
     }}
+  }});
+
+  network.on('dragEnd', function (params) {{
+    if (!params.nodes.length || !nodeData || !network) return;
+    try {{
+      const pos = network.getPositions(params.nodes);
+      params.nodes.forEach(function (id) {{
+        if (pos[id]) nodeData.update({{ id: id, x: pos[id].x, y: pos[id].y }});
+      }});
+    }} catch (e) {{}}
   }});
 }}
 
@@ -1602,16 +2629,26 @@ function centerOnPivot() {{
   return true;
 }}
 
-function graphFit() {{ if (network) network.fit({{ animation: true }}); }}
-
-function graphPhysics() {{
-  physicsOn = !physicsOn;
-  if (network) network.setOptions({{ physics: physicsOn }});
-  document.getElementById('btn-physics').innerHTML = '<i class="fa-solid fa-wind"></i> Physics: ' + (physicsOn ? 'On' : 'Off');
+function graphFit() {{
+  if (!network) return;
+  network.fit({{ animation: {{ duration: 300 }}, nodes: nodeData ? nodeData.getIds() : undefined }});
 }}
 
-/* ── Delegate click-to-copy handler ───────────────────────── */
+function graphZoom(factor) {{
+  if (!network) return;
+  const next = Math.max(0.12, Math.min(network.getScale() * factor, 4));
+  network.moveTo({{ scale: next, animation: {{ duration: 180 }} }});
+}}
+
+/* ── Delegate clicks: postex run + copy-to-clipboard ─────── */
 document.addEventListener('click', function(e) {{
+  const postexBtn = e.target.closest('.postex-run-btn');
+  if (postexBtn) {{
+    e.preventDefault();
+    e.stopPropagation();
+    openPostexModal({{ op: postexBtn.getAttribute('data-postex-op') || '' }});
+    return;
+  }}
   const target = e.target.closest('[data-copy-val]');
   if (target) {{
     const val = target.getAttribute('data-copy-val');
@@ -1620,10 +2657,43 @@ document.addEventListener('click', function(e) {{
   }}
 }});
 
+{SHARPHOUND_JS}
+
+{BLOODHOUND_OVERLAY_JS}
+
+{edge_catalog_js}
+{playbook_maps_js}
+{edge_abuse_js}
+{cheatsheet_catalog_js}
+{WORKSPACE_VARS_JS}
+{WORKSPACE_UI_JS}
+{PATH_PLAYBOOK_JS}
+
+{OUTPUT_PARSER_JS}
+
+{CHEATSHEET_JS}
+
 /* ── Init triggers ────────────────────────────────────────── */
+disableShellMode();
 connectSSE();
 refreshState();
+initTerminalResize();
+document.getElementById('shell-cmd')?.addEventListener('keydown', function (ev) {{
+  if (ev.key === 'Enter') {{
+    ev.preventDefault();
+    sendShellLine();
+  }}
+}});
+if (typeof WorkspaceVars !== 'undefined') {{
+  WorkspaceVars.bindTerminalInputs();
+}}
+if (typeof OutputParser !== 'undefined') OutputParser.init();
+if (typeof CheatsheetView !== 'undefined') CheatsheetView.init();
+if (typeof OutputParser !== 'undefined') OutputParser.init();
+bindWorkspaceModal();
+bindHeaderInlineEdit();
 termLogSemantic('ADMapper dashboard loaded', 'done');
 </script>
+{WORKSPACE_MODAL_HTML}
 </body>
 </html>"""

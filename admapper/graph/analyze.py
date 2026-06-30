@@ -4,7 +4,12 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from admapper.graph.build import enrich_graph_from_inventory, node_display_name
+from admapper.graph.build import (
+    enrich_graph_from_inventory,
+    focus_tactical_graph,
+    load_focus_context,
+    node_display_name,
+)
 from admapper.graph.opportunity_paths import build_opportunity_paths
 from admapper.graph.paths import AttackPath, find_attack_paths
 from admapper.graph.quick_wins import QuickWin, collect_quick_wins
@@ -69,8 +74,7 @@ def run_graph_analysis(session: Session) -> GraphAnalysisResult:
             domain=domain,
             owned_users=session.workspace.owned_users,
         )
-        graph_store.save(graph)
-        print_success(f"graph enriched → {graph_store.path.name}")
+        print_success("graph enriched from auth_inventory (in-memory)")
 
     nodes_by_id = {str(n["id"]): n for n in graph.get("nodes", [])}
     paths = find_attack_paths(graph)
@@ -86,6 +90,17 @@ def run_graph_analysis(session: Session) -> GraphAnalysisResult:
         "quick_wins": [w.to_dict() for w in quick_wins],
     }
     paths_file.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    focus_ctx = load_focus_context(ws_path)
+    graph = focus_tactical_graph(
+        graph,
+        domain=domain,
+        context=focus_ctx,
+        owned_users=session.workspace.owned_users,
+        pivot_user=session.workspace.pivot_user,
+    )
+    graph_store.save(graph)
+    print_success(f"graph focused → {graph['meta'].get('node_count')} nodes (was {graph['meta'].get('full_node_count')})")
 
     result = GraphAnalysisResult(
         paths=paths,

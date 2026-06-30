@@ -26,6 +26,9 @@ class CredentialStore:
         items = data.get("credentials", [])
         return [Credential.from_dict(item) for item in items]
 
+    def get(self, cred_id: str) -> Credential | None:
+        return next((c for c in self.list() if c.id == cred_id), None)
+
     def save_all(self, credentials: list[Credential]) -> Path:
         workspace_dir = self._workspace.path_for(self._workspace_name)
         workspace_dir.mkdir(parents=True, exist_ok=True)

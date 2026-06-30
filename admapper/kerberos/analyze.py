@@ -406,7 +406,7 @@ def _check_krbtgt_password_age(session: Session) -> Finding | None:
         return None
 
     cred = next(
-        (c for c in session.credentials.list() if c.status == CredentialStatus.VERIFIED),
+        (c for c in session.credentials.list() if c.status == CredentialStatus.VALID),
         None,
     )
     if not cred:

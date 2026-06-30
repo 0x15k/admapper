@@ -128,22 +128,36 @@ def build_postex_opportunities(
                     if target_h and target_h not in verified_admin_hosts:
                         verified_admin_hosts.append(target_h)
 
-    # Per Agents.md: local shell techniques mapped only to hosts with confirmed
-    # admin/shell access. Do NOT fall back to `<local_shell>` when no access is confirmed.
-    if not verified_admin_hosts and owned:
-        verified_admin_hosts = dcs or (computers[:1] if computers else [])
-
-    # 14.2–14.4, 14.6, 14.8 — local shell techniques (only mapped to hosts with admin/shell access)
-    for host in verified_admin_hosts:
-        for technique in _LOCAL_SHELL_TECHNIQUES:
-            ops.append(
-                _opportunity(
-                    technique,
-                    target_host=host,
-                    context=cred_context,
-                    detail=f"Requires interactive shell or SYSTEM on {host}",
+    # Per Agents.md: local shell techniques are mapped ONLY to hosts confirmed via
+    # credential resolution (the "$"-suffix path above). We intentionally do NOT fall
+    # back to `dcs`/`computers[:1]`: those are hosts where shell access is merely
+    # *inferred*, so surfacing lsass_dump/sam_dump/etc. there is an operational false
+    # positive (the operator sees a dump as available on a host they cannot reach).
+    if verified_admin_hosts:
+        # 14.2–14.4, 14.6, 14.8 — local shell techniques on confirmed hosts only
+        for host in verified_admin_hosts:
+            for technique in _LOCAL_SHELL_TECHNIQUES:
+                ops.append(
+                    _opportunity(
+                        technique,
+                        target_host=host,
+                        context=cred_context,
+                        detail=f"Requires interactive shell or SYSTEM on {host}",
+                    )
                 )
-            )
+    elif owned:
+        # No confirmed shell access — emit a single info marker instead of assigning
+        # local shell techniques to inferred (unreachable) hosts.
+        blocked = _opportunity(
+            "local_shell_blocked",
+            context=cred_context,
+            detail=(
+                "No confirmed shell access — obtain WinRM/SMB exec first "
+                "(see adminto opportunities)"
+            ),
+        )
+        blocked.severity = "info"
+        ops.append(blocked)
 
     # 14.5 DCSync — from ACL findings
     dcsync_acl_principals: set[str] = set()
@@ -240,7 +254,7 @@ def build_postex_opportunities(
             scan_host = str(scan_data.get("dc_ip") or "")
             if shell_user.endswith("$") and scan_host:
                 target = scan_host
-            hijack = analysis_from_scan_payload(scan_data)
+            hijack = analysis_from_scan_payload(scan_data, ws_path=ws_path)
             if hijack is None:
                 tasks = scan_data.get("tasks") or []
                 com_out = "\n".join(
@@ -461,5 +475,19 @@ def resolve_hijack_op_id(session: Session) -> str | None:
     data = json.loads(path.read_text(encoding="utf-8"))
     for item in data.get("opportunities") or []:
         if str(item.get("technique")) == "dll_hijack_scheduled_task":
+            return str(item.get("id") or "") or None
+    return None
+
+
+def resolve_dcsync_op_id(session: Session) -> str | None:
+    """Find current postex op id for dcsync technique."""
+    if session.workspace is None:
+        return None
+    path = session.workspaces.path_for(session.workspace.name) / "postex_ops.json"
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for item in data.get("opportunities") or []:
+        if str(item.get("technique")) == "dcsync":
             return str(item.get("id") or "") or None
     return None

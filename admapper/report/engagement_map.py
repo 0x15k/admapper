@@ -13,7 +13,12 @@ from admapper.kerberos.skew import load_workspace_clock_skew
 from admapper.models.escalation import EscalationEdge
 from admapper.report.engagement import _load_json
 from admapper.report.methodology import enum_highlights, methodology_lines
-from admapper.report.scenario import _access_matrix_rows, _best_cred_per_user
+from admapper.report.scenario import (
+    _access_matrix_rows,
+    _best_cred_per_user,
+    _normalize_username,
+    cred_password_and_hash,
+)
 from admapper.support.output import print_info, print_success, print_warning
 
 
@@ -62,11 +67,11 @@ def loot_clue_rows(ws_path: Path) -> list[dict[str, str]]:
         user = str(item.get("username", ""))
         if not user:
             continue
-        match = best.get(user.lower())
+        match = best.get(_normalize_username(user))
         password = str(item.get("password", ""))
         if match and str(match.get("status")) == "valid":
             state = "verified"
-            verified_pwd = str(match.get("password", ""))
+            verified_pwd, _ = cred_password_and_hash(match)
             if verified_pwd:
                 password = verified_pwd
         elif match:

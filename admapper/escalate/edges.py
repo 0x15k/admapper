@@ -196,22 +196,39 @@ def collect_edges_from_pivot(
         if ctx != pivot_l and technique != "dll_hijack_scheduled_task":
             continue
         if technique == "dll_hijack_scheduled_task":
-            target = _extract_run_as(str(op.get("detail") or ""))
+            scan = _load(ws_path / "postex_scan.json") or {}
+            findings = scan.get("findings") or []
+            finding = findings[0] if findings else {}
+            from admapper.postex.task_run_as import is_interactive_task_user, resolve_task_run_as
+
+            target = resolve_task_run_as(
+                scan,
+                finding if isinstance(finding, dict) else {},
+                ws_path=ws_path,
+            )
+            if not is_interactive_task_user(target):
+                target = _extract_run_as(str(op.get("detail") or ""))
+            shell_ctx = str(op.get("context") or "")
+            if shell_ctx and target and shell_ctx.lower().rstrip("$") != target.lower().rstrip("$"):
+                summary = f"{shell_ctx} → {target} | {str(op.get('detail') or '')[:160]}"
+                edge_title = f"DLL hijack → {target}"
+            else:
+                summary = str(op.get("detail") or op.get("summary") or "")[:200]
+                edge_title = str(op.get("title") or technique)
             if not target:
-                scan = _load(ws_path / "postex_scan.json") or {}
-                findings = scan.get("findings") or []
-                if findings:
-                    target = str(findings[0].get("run_as_user") or "")
+                target = str(op.get("target_host") or "")
         else:
             target = str(op.get("target_host") or "")
+            summary = str(op.get("detail") or op.get("summary") or "")[:200]
+            edge_title = str(op.get("title") or technique)
         target_owned = _is_owned(target, owned)
         edges.append(
             EscalationEdge(
                 technique=technique,
                 module="postex",
-                title=str(op.get("title") or technique),
+                title=edge_title,
                 severity=str(op.get("severity") or "medium"),
-                summary=str(op.get("detail") or op.get("summary") or "")[:200],
+                summary=summary,
                 target=target,
                 op_id=str(op.get("id") or ""),
                 ready=not target_owned and technique == "dll_hijack_scheduled_task",

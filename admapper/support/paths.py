@@ -29,13 +29,31 @@ def get_cli_workspaces_root() -> Path | None:
 
 
 def default_user_workspaces_root() -> Path:
-    """Operator home — default for engagements (prioritizes repo/workspaces if in a repo clone)."""
+    """Engagement data under the project clone, not ~/.admapper."""
     repo = find_repo_root()
-    if repo:
+    if repo is not None:
         root = repo / "workspaces"
     else:
-        root = user_config_dir() / "workspaces"
+        root = Path.cwd() / "workspaces"
     root.mkdir(parents=True, exist_ok=True)
+    return root.resolve()
+
+
+def hidden_user_workspaces_root() -> Path:
+    """Legacy operator home (no longer used as default output)."""
+    return user_config_dir() / "workspaces"
+
+
+def _coerce_workspaces_root(path: Path | str) -> Path:
+    """Prefer project workspaces/ over a stale ~/.admapper/workspaces config."""
+    root = Path(path).expanduser().resolve()
+    hidden = hidden_user_workspaces_root().resolve()
+    if root == hidden or str(root).startswith(f"{hidden}{os.sep}"):
+        project = find_repo_root()
+        if project is not None:
+            preferred = (project / "workspaces").resolve()
+            preferred.mkdir(parents=True, exist_ok=True)
+            return preferred
     return root
 
 
@@ -65,7 +83,7 @@ def resolve_workspaces_root(
     elif os.environ.get(WORKSPACES_ENV_VAR):
         root = Path(os.environ[WORKSPACES_ENV_VAR]).expanduser().resolve()
     elif config_root:
-        root = Path(config_root).expanduser().resolve()
+        root = _coerce_workspaces_root(config_root)
     else:
         root = default_user_workspaces_root()
     root.mkdir(parents=True, exist_ok=True)

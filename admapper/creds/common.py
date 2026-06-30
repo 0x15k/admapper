@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from admapper.models.credential import CredentialStatus, CredentialType
+from admapper.models.credential import Credential, CredentialStatus, CredentialType
 from admapper.stores.credentials import CredentialStore
 from admapper.stores.hosts import HostsStore
 
@@ -329,3 +329,61 @@ def apply_cracked_credentials(
         creds.mark_status(cred.id, CredentialStatus.UNVERIFIED)
         saved.append((username, password))
     return saved
+
+
+def credential_for_pivot(
+    session: Session,
+    *,
+    cred_id: str | None = None,
+    prefer_password: bool = False,
+) -> Credential | None:
+    """Stored credential for the active pivot (or explicit *cred_id*)."""
+    store = session.credentials
+    if store is None:
+        return None
+    creds = store.list()
+    if cred_id:
+        return next((c for c in creds if c.id == cred_id), None)
+
+    pivot = ""
+    if session.workspace:
+        pivot = str(session.workspace.pivot_user or "").strip()
+    if not pivot:
+        try:
+            from admapper.escalate.analyze import resolve_pivot_user
+
+            pivot = resolve_pivot_user(session)
+        except (RuntimeError, ValueError):
+            pivot = ""
+
+    allowed_types = (
+        (CredentialType.PASSWORD,)
+        if prefer_password
+        else (CredentialType.PASSWORD, CredentialType.NTLM)
+    )
+
+    def matches_pivot(cred: Credential) -> bool:
+        u = cred.username.lower()
+        p = pivot.lower()
+        return u == p or u.rstrip("$") == p.rstrip("$")
+
+    if pivot:
+        for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
+            for cred in creds:
+                if cred.status != preferred or not cred.secret:
+                    continue
+                if cred.cred_type not in allowed_types:
+                    continue
+                if matches_pivot(cred):
+                    return cred
+
+    owned = {u.lower() for u in (session.workspace.owned_users if session.workspace else [])}
+    for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
+        for cred in creds:
+            if cred.status != preferred or not cred.secret:
+                continue
+            if cred.cred_type not in allowed_types:
+                continue
+            if cred.username.lower() in owned or not owned:
+                return cred
+    return None

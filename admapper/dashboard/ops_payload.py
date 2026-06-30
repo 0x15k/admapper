@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from admapper.creds.common import format_admapper_winrm_pth
-from admapper.dashboard.ops_progress import OpsProgress, filtered_loot_clues
+from admapper.creds.auth_checks import load_protected_users
+from admapper.dashboard.bloodhound_overlay import load_overlay_for_payload
+from admapper.dashboard.next_action import build_next_action
+from admapper.dashboard.ops_progress import OpsProgress, effective_progress_flags, filtered_loot_clues
 from admapper.dashboard.ops_state import build_objective_ops_state
 from admapper.dashboard.topology import build_network_topology
 from admapper.dashboard.web import build_graph_payload
@@ -31,6 +34,11 @@ from admapper.report.engagement_map import _acl_exploit_blocker
 from admapper.report.methodology import enum_highlights, methodology_lines
 from admapper.report.scenario import _best_cred_per_user
 from admapper.support.operator_setup import build_operator_setup
+from admapper.postex.task_run_as import (
+    is_cred_panel_user,
+    load_enumerated_usernames,
+    resolve_task_run_as,
+)
 
 
 def _esc(text: str) -> str:
@@ -154,63 +162,11 @@ def _tag_graph_paths(graph: dict[str, Any], paths: list[dict[str, Any]]) -> None
 
 
 def _enrich_graph_for_recon(graph: dict[str, Any], unauth: dict[str, Any]) -> None:
-    """Placeholder nodes when graph.json is empty — fixes blank center map."""
+    """Leave graph empty until graph.json has real nodes — Ops view shows an empty-state prompt."""
     if graph.get("nodes"):
         return
-    hosts = unauth.get("hosts") or []
-    dc = next((h for h in hosts if h.get("is_domain_controller")), None)
-    if not dc and hosts:
-        dc = hosts[0]
-    if not dc:
-        graph["nodes"] = [
-            {
-                "id": "operator",
-                "label": "OPERATOR",
-                "group": "operator",
-                "color": "#3dffcf",
-                "title": "Esperando recon…",
-                "font": {"color": "#080b10"},
-                "shape": "box",
-            }
-        ]
-        graph["edges"] = []
-        return
-
-    addr = str(dc.get("address", "?"))
-    hostname = str(dc.get("hostname") or addr)
-    ports = dc.get("open_ports") or [88, 389, 445]
-    port_s = ",".join(str(p) for p in ports[:6])
-    dc_id = f"dc:{addr}"
-    graph["nodes"] = [
-        {
-            "id": "operator",
-            "label": "OPERATOR",
-            "group": "operator",
-            "color": "#3dffcf",
-            "title": "Your position",
-            "font": {"color": "#080b10"},
-            "shape": "box",
-        },
-        {
-            "id": dc_id,
-            "label": f"DC\n{hostname[:18]}",
-            "group": "dc",
-            "color": "#6366f1",
-            "title": f"LDAP/Kerberos/SMB\n{addr}\nports: {port_s}",
-            "font": {"color": "#f8fafc"},
-            "shape": "box",
-        },
-    ]
-    graph["edges"] = [
-        {
-            "from": "operator",
-            "to": dc_id,
-            "label": "RECON",
-            "dashes": True,
-            "color": {"color": "#3dffcf"},
-            "width": 2,
-        }
-    ]
+    graph["nodes"] = []
+    graph["edges"] = []
 
 
 def build_ops_payload(
@@ -223,18 +179,34 @@ def build_ops_payload(
     ops_progress: OpsProgress | None = None,
     target_ip: str | None = None,
 ) -> dict[str, Any]:
+    from admapper.support.owned import normalize_username, sanitize_owned_users
+
     if ops_progress is not None:
-        owned = sorted(set(ops_progress.owned_users) | set(owned_users or []), key=str.lower)
+        merged = sorted(set(ops_progress.owned_users) | set(owned_users or []), key=str.lower)
     else:
-        owned = sorted(set(owned_users or []), key=str.lower)
+        merged = sorted(set(owned_users or []), key=str.lower)
+    owned, _ = sanitize_owned_users(merged)
+    cred_rows = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+    valid_cred_users = {
+        normalize_username(str(c.get("username", ""))).lower()
+        for c in cred_rows
+        if str(c.get("status")) == "valid" and normalize_username(str(c.get("username", "")))
+    }
+    if valid_cred_users:
+        owned = [
+            u
+            for u in owned
+            if normalize_username(u).lower() in valid_cred_users or str(u).endswith("$")
+        ]
     state = _load_json(ws_path / "state.json") or {}
     pivot = pivot_user or state.get("pivot_user") or (owned[-1] if owned else "")
     pivot = str(pivot or "").strip()
 
     unauth = _load_json(ws_path / "unauth_scan.json") or {}
-    has_scan = bool(unauth.get("hosts"))
-    if ops_progress is not None:
-        has_scan = ops_progress.scan
+    state_hosts = str((_load_json(ws_path / "state.json") or {}).get("hosts") or "").strip()
+    has_scan = bool(unauth.get("hosts")) or bool(state_hosts)
+    if ops_progress is not None and ops_progress.scan:
+        has_scan = True
     discovered_domain = str(unauth.get("domain") or "").strip()
     domain_known = bool(discovered_domain and has_scan)
     domain_s = discovered_domain if domain_known else (domain if domain and has_scan else "???")
@@ -263,6 +235,9 @@ def build_ops_payload(
         tactical=True,
         owned_methods=(ops_progress.owned_methods if ops_progress else {}),
     )
+    bh_overlay = load_overlay_for_payload(ws_path)
+    if bh_overlay:
+        graph = {**graph, "bloodhound_overlay": bh_overlay}
     _enrich_graph_for_recon(graph, unauth)
 
     ops_state = build_objective_ops_state(
@@ -293,7 +268,14 @@ def build_ops_payload(
 
     next_edge_data = ops_state.get("next_edge") or {}
     next_hop_cmd = graph.get("next_hop_cmd")
-    if ops_progress is not None and not ops_progress.exploit:
+    exploit_log = _load_json(ws_path / "exploit_log.json") or {}
+    workspace_exploited = bool(exploit_log.get("steps")) or bool(
+        (_load_json(ws_path / "postex_ops.json") or {}).get("opportunity_count")
+    )
+    progress_exploit = (
+        ops_progress is not None and ops_progress.exploit
+    ) or workspace_exploited
+    if ops_progress is not None and not progress_exploit:
         next_hop_cmd = None
         graph = {**graph, "gained_hashes": [], "next_hop_cmd": None}
     objective = {
@@ -306,10 +288,44 @@ def build_ops_payload(
         "blocker": graph.get("acl_blocker") or _acl_exploit_blocker(ws_path),
     }
 
-    cred_inventory: list[dict[str, str]] = []
-    file_creds = _best_cred_per_user(
-        (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+    eff_progress = effective_progress_flags(ws_path, ops_progress)
+    next_action = build_next_action(
+        ws_path,
+        workspace=workspace,
+        objective=objective,
+        mission=mission,
+        dashboard=ops_state,
+        effective_progress=eff_progress,
     )
+
+    postex_raw = _load_json(ws_path / "postex_ops.json") or {}
+    postex_ops = [
+        {
+            "id": str(op.get("id") or ""),
+            "title": str(op.get("title") or op.get("technique") or ""),
+            "technique": str(op.get("technique") or ""),
+            "severity": str(op.get("severity") or ""),
+            "target": str(op.get("target_host") or op.get("context") or ""),
+            "runnable": str(op.get("technique") or "") == "dll_hijack_scheduled_task",
+        }
+        for op in (postex_raw.get("opportunities") or [])
+        if op.get("id")
+    ]
+
+    cred_inventory: list[dict[str, str]] = []
+    enum_users = load_enumerated_usernames(ws_path)
+    from admapper.support.owned import is_valid_owned_username, normalize_username
+
+    raw_creds = (_load_json(ws_path / "credentials.json") or {}).get("credentials") or []
+    normalized_creds = []
+    for cred in raw_creds:
+        user = normalize_username(str(cred.get("username", "")))
+        if not user or not is_valid_owned_username(user):
+            continue
+        row = dict(cred)
+        row["username"] = user
+        normalized_creds.append(row)
+    file_creds = _best_cred_per_user(normalized_creds)
     if ops_progress is None:
         best_creds = dict(file_creds)
     else:
@@ -325,9 +341,6 @@ def build_ops_payload(
             }
         else:
             best_creds = {}
-        for user in verified:
-            if user not in best_creds:
-                best_creds[user] = {"username": user, "status": "valid", "source": "dashboard"}
     for cred in best_creds.values():
         cred_inventory.append(
             {
@@ -336,6 +349,24 @@ def build_ops_payload(
                 "source": str(cred.get("source", ""))[:32],
             }
         )
+    seen_cred_bases: set[str] = set()
+    deduped_inventory: list[dict[str, str]] = []
+    for c in cred_inventory:
+        base = _account_base(c.get("user", ""))
+        if not base or base in seen_cred_bases:
+            continue
+        seen_cred_bases.add(base)
+        deduped_inventory.append(c)
+    cred_inventory = deduped_inventory
+    cred_inventory = [
+        c
+        for c in cred_inventory
+        if is_cred_panel_user(
+            c.get("user", ""),
+            enum_users=enum_users,
+            has_stored_secret=str(c.get("user", "")).lower() in file_creds,
+        )
+    ]
 
     clues = filtered_loot_clues(ws_path, ops_progress)
     topology = build_network_topology(
@@ -413,11 +444,11 @@ def build_ops_payload(
 
     if ops_progress is not None:
         progress_flags = {
-            "scan": ops_progress.scan,
-            "enum_users": ops_progress.enum_users,
-            "loot": ops_progress.loot,
-            "acls": ops_progress.acls,
-            "exploit": ops_progress.exploit,
+            "scan": eff_progress["scan"],
+            "enum_users": eff_progress["enum_users"],
+            "loot": eff_progress["loot"],
+            "acls": eff_progress["acls"],
+            "exploit": eff_progress["exploit"],
         }
     else:
         progress_flags = {
@@ -429,7 +460,7 @@ def build_ops_payload(
         }
 
     hashes = graph.get("gained_hashes") or []
-    if ops_progress is not None and not ops_progress.exploit:
+    if ops_progress is not None and not progress_exploit:
         hashes = []
 
     pth_accounts = {_account_base(h.get("account", "")) for h in hashes}
@@ -458,6 +489,24 @@ def build_ops_payload(
         c for c in cred_inventory if _account_base(c.get("user", "")) not in pth_accounts
     ]
 
+    postex_scan = _load_json(ws_path / "postex_scan.json") or {}
+    scan_finding = (postex_scan.get("findings") or [{}])[0]
+    escalation_target = resolve_task_run_as(postex_scan, scan_finding, ws_path=ws_path)
+    if escalation_target == "unknown":
+        escalation_target = ""
+
+    from admapper.dashboard.cli_launch import workspace_readiness
+    from admapper.dashboard.exec_bridge import build_cheatsheet_vars, load_findings_notes
+
+    cheatsheet_vars = build_cheatsheet_vars(
+        ws_path,
+        workspace=workspace,
+        domain=domain_s if domain_s != "???" else (domain or ""),
+        pivot=pivot,
+        owned_users=owned,
+        dc_ip=dc_ip,
+    )
+
     return {
         "meta": {
             "workspace": workspace,
@@ -474,6 +523,7 @@ def build_ops_payload(
             "pivot": pivot,
             "owned": owned,
             "owned_methods": (ops_progress.owned_methods if ops_progress else {}),
+            "pivot_protected": pivot.lower() in load_protected_users(str(ws_path)) if pivot else False,
         },
         "selectable_identities": selectable,
         "identity_lens": identity_lens,
@@ -493,7 +543,11 @@ def build_ops_payload(
         "creds": cred_inventory,
         "hashes": hashes,
         "pth_sessions": pth_sessions,
+        "escalation_target": escalation_target,
         "progress": progress_flags,
+        "effective_progress": eff_progress,
+        "next_action": next_action,
+        "postex_ops": postex_ops,
         "graph": graph,
         "engagement_intel": engagement_intel,
         "findings": _load_json(ws_path / "findings.json") or {"findings": []},
@@ -501,4 +555,7 @@ def build_ops_payload(
         "engagement_framework": ENGAGEMENT_FRAMEWORK,
         "study_map": build_study_map(),
         "pentest_book": build_pentest_book(),
+        "cheatsheet_vars": cheatsheet_vars,
+        "findings_notes": load_findings_notes(ws_path),
+        "workspace_readiness": workspace_readiness(cheatsheet_vars),
     }

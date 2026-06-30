@@ -69,23 +69,30 @@ def _dedupe_gmsa_nodes(vis_nodes: dict[str, dict]) -> None:
 
 
 def _wire_orphan_nodes(vis_nodes: dict[str, dict], vis_edges: list[dict]) -> None:
-    """Connect orphan computers/groups so nothing floats in AD MAP."""
+    """Connect orphan computers/groups to the domain hub (not the pivot) for readable layout."""
     connected: set[str] = set()
     for edge in vis_edges:
         connected.add(str(edge.get("from", "")))
         connected.add(str(edge.get("to", "")))
     connected.discard("")
 
-    anchor: str | None = None
+    domain_anchor: str | None = None
     for nid, node in vis_nodes.items():
-        if nid in connected:
-            anchor = nid
-            if str(node.get("group", "")) in ("user", "gmsa") and (
-                str(node.get("identity_role", "")) in ("pivot", "owned")
-                or str(node.get("label", "")).startswith("★")
-            ):
+        if str(node.get("group", "")) == "domain":
+            domain_anchor = nid
+            break
+
+    anchor = domain_anchor
+    if not anchor:
+        for nid, node in vis_nodes.items():
+            if nid in connected:
                 anchor = nid
-                break
+                if str(node.get("group", "")) in ("user", "gmsa") and (
+                    str(node.get("identity_role", "")) in ("pivot", "owned")
+                    or str(node.get("label", "")).startswith("★")
+                ):
+                    anchor = nid
+                    break
     if not anchor:
         for nid in connected:
             anchor = nid
@@ -95,22 +102,22 @@ def _wire_orphan_nodes(vis_nodes: dict[str, dict], vis_edges: list[dict]) -> Non
 
     seen_eids = {str(e.get("id", "")) for e in vis_edges}
     for nid, node in list(vis_nodes.items()):
-        if nid in connected:
+        if nid in connected or nid == anchor:
             continue
         group = str(node.get("group", ""))
-        if group not in ("computer", "group", "gmsa"):
+        if group not in ("computer", "group", "gmsa", "adcs"):
             continue
-        eid = f"wire:{anchor}->{nid}"
+        eid = f"wire:{nid}->{anchor}"
         if eid in seen_eids:
             continue
         vis_edges.append(
             {
                 "id": eid,
-                "from": anchor,
-                "to": nid,
-                "label": "linked",
+                "from": nid,
+                "to": anchor,
+                "label": "in domain",
                 "arrows": "to",
-                "color": {"color": "#475569"},
+                "color": {"color": "#30363d"},
                 "width": 1,
                 "dashes": True,
             }

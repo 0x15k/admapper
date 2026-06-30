@@ -33,29 +33,12 @@ class AclAnalysisResult:
 
 
 def _pick_credential(session: Session, cred_id: str | None) -> Credential:
-    store = session.credentials
-    if store is None:
-        raise RuntimeError("credential store unavailable")
-    creds = store.list()
-    if not creds:
-        raise ValueError("no credentials — add with creds add or run start_auth")
+    from admapper.creds.common import credential_for_pivot
 
-    if cred_id:
-        cred = next((c for c in creds if c.id == cred_id), None)
-        if cred is None:
-            raise ValueError(f"credential not found: {cred_id}")
-        return cred
-
-    owned = {u.lower() for u in (session.workspace.owned_users if session.workspace else [])}
-    for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
-        for cred in creds:
-            if cred.status == preferred and cred.secret and cred.username.lower() in owned:
-                return cred
-    for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
-        for cred in creds:
-            if cred.status == preferred and cred.secret:
-                return cred
-    raise ValueError("no usable credential for ACL enum")
+    cred = credential_for_pivot(session, cred_id=cred_id)
+    if cred is None:
+        raise ValueError("no usable credential for ACL enum")
+    return cred
 
 
 def _load_member_of(session: Session) -> list[str]:
@@ -231,9 +214,20 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
     cred = _pick_credential(session, cred_id)
     ws_name = session.workspace.name
 
+    from admapper.escalate.analyze import resolve_pivot_user
     from admapper.support.verbosity import print_phase
 
-    print_phase(f"Phase 10 — ACL enumeration @ {dc_ip} as {cred.display_user()}")
+    pivot = resolve_pivot_user(session)
+    principals = [pivot]
+
+    bind_user = cred.display_user()
+    if pivot.lower() not in {cred.username.lower(), cred.username.lower().rstrip("$")}:
+        print_warning(
+            f"no stored password/hash for pivot {pivot} — LDAP bind as {bind_user}; "
+            f"ACL scan still evaluates rights for {pivot}"
+        )
+
+    print_phase(f"Phase 10 — ACL enumeration @ {dc_ip} as {bind_user} (pivot: {pivot})")
 
     ws_path = str(session.workspaces.path_for(ws_name))
     ldap_session, err = open_ldap_session(dc_ip, cred, domain, ws_path=ws_path)
@@ -246,7 +240,6 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
     result = AclAnalysisResult()
     all_findings: list[AclAbuseFinding] = []
 
-    principals = owned_users or [cred.username]
     member_of = _load_member_of(session)
 
     try:
@@ -311,8 +304,19 @@ def run_acl_analysis(session: Session, *, cred_id: str | None = None) -> AclAnal
     result.findings_path = str(findings_path)
 
     if all_findings and principals:
+        from admapper.graph.build import focus_tactical_graph, load_focus_context
+
         graph_store = GraphStore(session.workspaces, ws_name)
         _enrich_graph_with_acls(graph_store, domain, principals[0], all_findings)
+        ws_path = session.workspaces.path_for(ws_name)
+        graph = focus_tactical_graph(
+            graph_store.load(),
+            domain=domain,
+            context=load_focus_context(ws_path),
+            owned_users=owned_users,
+            pivot_user=session.workspace.pivot_user,
+        )
+        graph_store.save(graph)
         result.graph_path = str(graph_store.path)
         print_success("graph updated with ACL edges → graph.json")
 

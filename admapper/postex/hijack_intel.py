@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from admapper.postex.loot_intel import LootIntelResult
 
 _WIN_PATH_RE = re.compile(r"([A-Z]:\\[^\s'\"<>|]+)", re.IGNORECASE)
+_UNC_PATH_RE = re.compile(r"(\\\\[\w.-]+\\[\w$.-]+(?:\\[^\s'\"<>|]*)?)", re.IGNORECASE)
+_UNIX_STYLE_PATH_RE = re.compile(r"(/[\w./-]{4,})", re.IGNORECASE)
 _ZIP_NAME_RE = re.compile(r"([\w.-]+\.zip)", re.IGNORECASE)
 _DLL_NAME_RE = re.compile(r"([\w.-]+\.dll)", re.IGNORECASE)
 _RUN_AS_RE = re.compile(r"(?:[\w.-]+\\)([\w$.-]+)", re.IGNORECASE)
@@ -19,6 +21,8 @@ _DLL_HIJACK_LINE_RE = re.compile(
     r"\.dll|\.zip|scheduled.?task|load(?:ing)?\s+[\w.-]+\.dll|update.?check|monitor|no updates found locally|task\s*\[",
     re.IGNORECASE,
 )
+_SYSTEM_ACCOUNTS = frozenset({"system", "localservice", "networkservice"})
+UNKNOWN_DROP_PATH = "UNKNOWN_DROP_PATH"
 
 
 # Generic parser for service log lines; environment-agnostic
@@ -37,6 +41,14 @@ def _intel_from_service_lines(
                 drop_path = drop_path or _drop_path_from_zip_path(full, z)
             if d:
                 dll_name = dll_name or d
+        applier = re.search(
+            r"Loading update applier:\s*([A-Z]:\\(?:[^|\r\n]+?)\.dll)",
+            line,
+            re.I,
+        )
+        if applier:
+            path = applier.group(1).strip().replace("/", "\\")
+            dll_name = dll_name or (path.rsplit("\\", 1)[-1] if "\\" in path else path)
                 
         for path_match in _WIN_PATH_RE.finditer(line):
             path = path_match.group(1).rstrip(".")
@@ -70,8 +82,50 @@ def _drop_path_from_zip_path(full_path: str, zip_name: str) -> str:
     if zlower in lower:
         idx = lower.rfind(zlower)
         return full_path[:idx].rstrip("\\/")
-    parent = full_path.rsplit("\\", 1)[0]
-    return parent or full_path
+    for sep in ("\\", "/"):
+        if sep in full_path:
+            parent = full_path.rsplit(sep, 1)[0]
+            if parent:
+                return parent
+    return full_path
+
+
+def _drop_path_from_artifact_path(
+    path: str,
+    *,
+    zip_name: str | None,
+    dll_name: str | None,
+) -> str | None:
+    path = path.rstrip(".")
+    if path.lower().endswith(".log"):
+        return None
+    if zip_name and zip_name.lower() in path.lower():
+        return _drop_path_from_zip_path(path, zip_name)
+    if dll_name and dll_name.lower() in path.lower():
+        if "\\" in path:
+            return path.rsplit("\\", 1)[0]
+        if "/" in path:
+            return path.rsplit("/", 1)[0]
+    return None
+
+
+def _extract_drop_path_unc_unix(
+    text: str,
+    *,
+    zip_name: str | None,
+    dll_name: str | None,
+) -> str | None:
+    """Secondary path pass for UNC and forward-slash drop paths."""
+    for regex in (_UNC_PATH_RE, _UNIX_STYLE_PATH_RE):
+        for path_match in regex.finditer(text):
+            found = _drop_path_from_artifact_path(
+                path_match.group(1),
+                zip_name=zip_name,
+                dll_name=dll_name,
+            )
+            if found:
+                return found
+    return None
 
 
 def _normalize_run_as(user: str) -> str:
@@ -81,22 +135,33 @@ def _normalize_run_as(user: str) -> str:
     return user
 
 
+def is_system_run_as(run_as: str) -> bool:
+    """True when the task principal is SYSTEM, LocalService, or NetworkService."""
+    user = _normalize_run_as(run_as)
+    return user.lower() in _SYSTEM_ACCOUNTS
+
+
+@dataclass(frozen=True)
+class ComTaskScore:
+    score: int
+    is_system_account: bool
+
+
 def _score_com_task(
     *,
     zip_name: str | None,
     dll_name: str | None,
     run_as: str,
-) -> int:
+) -> ComTaskScore:
     score = 0
     if zip_name:
         score += 2
     if dll_name:
         score += 1
-    if run_as and not run_as.endswith("$"):
-        lowered = run_as.lower()
-        if lowered not in {"system", "localservice", "networkservice"}:
-            score += 3
-    return score
+    is_system_account = is_system_run_as(run_as)
+    if run_as and not run_as.endswith("$") and not is_system_account:
+        score += 3
+    return ComTaskScore(score=score, is_system_account=is_system_account)
 
 
 def parse_task_xml_file_output(text: str) -> str:
@@ -197,9 +262,9 @@ def intel_from_com_tasks(com_task_output: str) -> HijackIntel | None:
                 drop_path = path.rsplit("\\", 1)[0]
 
         run_as = _normalize_run_as(user)
-        score = _score_com_task(zip_name=zip_name, dll_name=dll_name, run_as=run_as)
+        scored = _score_com_task(zip_name=zip_name, dll_name=dll_name, run_as=run_as)
         candidate = (
-            score,
+            scored.score,
             name,
             zip_name or "payload.zip",
             dll_name or "payload.dll",
@@ -314,8 +379,21 @@ def extract_hijack_intel(
                         break
                 if drop_path:
                     break
+        if not drop_path:
+            for line in corpus:
+                found = _extract_drop_path_unc_unix(
+                    line,
+                    zip_name=zip_name,
+                    dll_name=dll_name,
+                )
+                if found:
+                    drop_path = found
+                    break
     if not drop_path:
-        drop_path = r"C:\ProgramData"
+        if zip_name and dll_name:
+            drop_path = UNKNOWN_DROP_PATH
+        else:
+            drop_path = r"C:\ProgramData"
 
     com_filter = task_hint or (zip_name.split(".")[0] if zip_name else None)
 
@@ -329,6 +407,16 @@ def extract_hijack_intel(
     )
 
 
+def with_discovered_monitor_log_path(
+    intel: HijackIntel | None,
+    path: str | None,
+) -> HijackIntel | None:
+    """Attach the WinRM-probed log path when corpus parsing did not extract it."""
+    if intel is None or not path or not str(path).strip():
+        return intel
+    return replace(intel, monitor_log_path=str(path).strip())
+
+
 def guess_run_as_from_log(text: str) -> str:
     for line in text.splitlines():
         loaded = re.search(
@@ -338,7 +426,7 @@ def guess_run_as_from_log(text: str) -> str:
         )
         if loaded:
             user = loaded.group(1).strip()
-            if user.lower() not in {"system", "localservice", "networkservice"}:
+            if not is_system_run_as(user):
                 return user
     match = _RUN_AS_RE.search(text)
     return match.group(1) if match else ""

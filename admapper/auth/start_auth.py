@@ -34,33 +34,25 @@ class AuthStartResult:
 
 
 def _pick_credential(session: Session, cred_id: str | None) -> Credential:
-    store = session.credentials
-    if store is None:
-        raise RuntimeError("credential store unavailable")
-    creds = store.list()
-    if not creds:
-        raise ValueError("no credentials in workspace — add with creds add or run a cred attack")
+    from admapper.creds.common import credential_for_pivot
 
-    if cred_id:
-        cred = next((c for c in creds if c.id == cred_id), None)
-        if cred is None:
-            raise ValueError(f"credential not found: {cred_id}")
+    cred = credential_for_pivot(session, cred_id=cred_id)
+    if cred is not None:
         return cred
-
-    for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
-        for cred in creds:
-            if cred.status == preferred and cred.secret:
-                return cred
     raise ValueError("no usable credential found")
 
 
-def _mark_owned_user(session: Session, username: str) -> None:
+def _mark_owned_user(session: Session, username: str, *, set_pivot: bool | None = None) -> None:
     if session.workspace is None:
         return
     owned = session.workspace.owned_users
     if username.lower() not in {u.lower() for u in owned}:
         owned.append(username)
-    session.workspace.pivot_user = username
+    if set_pivot is None:
+        current = str(session.workspace.pivot_user or "").strip()
+        set_pivot = not current or current.lower() == username.lower().rstrip("$")
+    if set_pivot:
+        session.workspace.pivot_user = username
     from admapper.intelligence.user_match import refresh_workspace_intel
 
     refresh_workspace_intel(

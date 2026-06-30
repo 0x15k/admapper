@@ -70,18 +70,14 @@ def run_engagement(
         dispatch(session, f"set domain {domain}")
 
     if not username and not password:
-        from admapper.cli.scan import print_scan_summary
+        from admapper.cli.scan import run_unauth_discovery
 
-        dispatch(session, "start_unauth")
-        try:
-            ensure_domain(session)
-        except ValueError as exc:
-            print_info(str(exc))
-        ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
-        ensure_dc_clock(host, enabled=sync_clock, ws_path=ws_path)
-        print_scan_summary(session, sync_hosts=sync_hosts)
-        if session.workspace is not None:
-            session.persist_workspace()
+        run_unauth_discovery(
+            session,
+            host=host,
+            sync_clock=sync_clock,
+            sync_hosts=sync_hosts,
+        )
         return
 
     ws_path = session.workspaces.path_for(session.workspace.name) if session.workspace else None
@@ -167,6 +163,16 @@ def run_engagement(
 
     if session.workspace is not None:
         session.persist_workspace()
+        if username and password:
+            from admapper.dashboard.cli_launch import apply_cli_launch_context
+
+            apply_cli_launch_context(
+                session,
+                host=host,
+                username=username,
+                password=password,
+                domain=session.workspace.domain or domain,
+            )
         if not ran_analyst and not full:
             ws_path = session.workspaces.path_for(session.workspace.name)
             print_info(f"workspace: {ws_path}")

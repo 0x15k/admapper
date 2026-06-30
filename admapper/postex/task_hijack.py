@@ -7,13 +7,16 @@ from typing import Any
 from admapper.models.postex_op import PostexOpportunity
 from admapper.postex.catalog import postex_meta
 from admapper.postex.hijack_intel import (
+    UNKNOWN_DROP_PATH,
     extract_hijack_intel,
     guess_run_as_from_log,
     intel_from_com_tasks,
+    is_system_run_as,
 )
 from admapper.postex.loot_intel import LootIntelResult
 from admapper.postex.nxc_output import strip_nxc_winrm_output
 from admapper.postex.pe_arch import TargetArch, infer_arch_from_monitor_log, normalize_arch
+from admapper.postex.task_run_as import is_interactive_task_user, resolve_task_run_as
 from admapper.postex.templates import apply_postex_templates, build_template_context
 
 _WRITABLE_RE = re.compile(
@@ -21,6 +24,10 @@ _WRITABLE_RE = re.compile(
     re.I,
 )
 _PAYLOAD_REF_RE = re.compile(r"\.zip|\.dll", re.I)
+_SYSTEM_HIJACK_NOTE = "Runs as SYSTEM — value is persistence, not escalation"
+_UNKNOWN_DROP_EVIDENCE = (
+    "loot: zip+dll confirmed but drop path could not be parsed — verify manually"
+)
 
 
 @dataclass
@@ -42,7 +49,7 @@ class TaskHijackFinding:
     payload_zip: str
     payload_dll: str
     writable: bool
-    target_arch: str = "x86"
+    target_arch: str = "x64"
     evidence: list[str] = field(default_factory=list)
     severity: str = "high"
 
@@ -100,6 +107,25 @@ def _unique_loot_tasks(loot: LootIntelResult | None) -> list[ScheduledTaskRecord
     return out
 
 
+def _hijack_finding_severity(
+    *,
+    run_as: str,
+    writable: bool,
+    strong_loot_hints: bool,
+    drop_path: str,
+) -> str:
+    """Severity for a scheduled-task DLL hijack candidate."""
+    if is_system_run_as(run_as):
+        return "medium"
+    if drop_path == UNKNOWN_DROP_PATH:
+        return "high"
+    if writable and run_as != "unknown":
+        return "critical"
+    if strong_loot_hints:
+        return "high"
+    return "info"
+
+
 def analyze_task_hijack(
     *,
     loot: LootIntelResult | None,
@@ -107,12 +133,19 @@ def analyze_task_hijack(
     monitor_log: str = "",
     acl_output: str = "",
     target_arch: str | None = None,
+    discovered_monitor_log_path: str | None = None,
 ) -> TaskHijackAnalysis:
     """Detect scheduled-task DLL hijack from loot, COM tasks, monitor logs, and ACLs."""
     tasks = _parse_com_task_lines(com_task_output)
     intel = extract_hijack_intel(loot, monitor_log=monitor_log, com_task_output=com_task_output)
     if intel is None and com_task_output.strip():
         intel = intel_from_com_tasks(com_task_output)
+    from admapper.postex.hijack_intel import with_discovered_monitor_log_path
+
+    intel = with_discovered_monitor_log_path(intel, discovered_monitor_log_path)
+    monitor_log_path = (
+        intel.monitor_log_path if intel else None
+    ) or (str(discovered_monitor_log_path or "").strip() or None)
     analysis = TaskHijackAnalysis(
         tasks=tasks,
         monitor_log_excerpt=monitor_log.strip()[:2000],
@@ -121,8 +154,9 @@ def analyze_task_hijack(
             "payload_zip": intel.payload_zip if intel else None,
             "payload_dll": intel.payload_dll if intel else None,
             "drop_path": intel.drop_path if intel else None,
-            "monitor_log_path": intel.monitor_log_path if intel else None,
+            "monitor_log_path": monitor_log_path,
             "task_name_hint": intel.task_name_hint if intel else None,
+            "task_run_as_user": None,
         },
     )
     if intel is None:
@@ -146,7 +180,7 @@ def analyze_task_hijack(
 
     writable = bool(_WRITABLE_RE.search(acl_output))
     arch: TargetArch = (
-        normalize_arch(target_arch) or infer_arch_from_monitor_log(monitor_log) or "x86"
+        normalize_arch(target_arch) or infer_arch_from_monitor_log(monitor_log) or "x64"
     )
     zip_name = intel.payload_zip
     dll_name = intel.payload_dll
@@ -161,12 +195,33 @@ def analyze_task_hijack(
             or bool(loot.dll_hijack_refs)
             or (bool(intel.payload_zip) and bool(intel.payload_dll))
         )
-        and drop_path
     )
 
     seen_findings: set[str] = set()
     for task in candidate_tasks:
         run_as = task.run_as or guess_run_as_from_log(monitor_log) or "unknown"
+        if not is_interactive_task_user(run_as):
+            resolved = resolve_task_run_as(
+                {
+                    "tasks": [
+                        {
+                            "name": t.name,
+                            "run_as": t.run_as,
+                            "executable": t.executable,
+                            "arguments": t.arguments,
+                        }
+                        for t in tasks
+                    ],
+                    "com_task_raw": com_task_output,
+                },
+                {
+                    "run_as_user": run_as,
+                    "task_name": task.name,
+                    "payload_zip": zip_name,
+                },
+            )
+            if resolved != "unknown":
+                run_as = resolved
         finding_key = task.name.lower()
         if finding_key in seen_findings:
             continue
@@ -185,16 +240,19 @@ def analyze_task_hijack(
             evidence.append("remote: service log references zip/dll load path")
         if writable:
             evidence.append(f"remote: {drop_path} writable by current principal")
-        if not writable and strong_loot_hints:
-            evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
-
-        severity = "high"
-        if writable and run_as != "unknown":
-            severity = "critical"
+        if drop_path == UNKNOWN_DROP_PATH:
+            evidence.append(_UNKNOWN_DROP_EVIDENCE)
         elif not writable and strong_loot_hints:
-            severity = "high"
-        elif not writable:
-            severity = "info"
+            evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
+        if is_system_run_as(run_as):
+            evidence.append(_SYSTEM_HIJACK_NOTE)
+
+        severity = _hijack_finding_severity(
+            run_as=run_as,
+            writable=writable,
+            strong_loot_hints=strong_loot_hints,
+            drop_path=drop_path,
+        )
 
         if writable or strong_loot_hints:
             analysis.findings.append(
@@ -229,14 +287,24 @@ def analyze_task_hijack(
         evidence = []
         if monitor_log:
             evidence.append("remote: service log references zip/dll load path")
-        if strong_loot_hints:
+        if drop_path == UNKNOWN_DROP_PATH:
+            evidence.append(_UNKNOWN_DROP_EVIDENCE)
+        elif strong_loot_hints:
             evidence.append("loot: zip+dll+drop path detected — verify ACL with postex scan")
-        severity = "critical" if writable and run_as != "unknown" else "high"
+        run_as_resolved = run_as or "unknown"
+        if is_system_run_as(run_as_resolved):
+            evidence.append(_SYSTEM_HIJACK_NOTE)
+        severity = _hijack_finding_severity(
+            run_as=run_as_resolved,
+            writable=writable,
+            strong_loot_hints=strong_loot_hints,
+            drop_path=drop_path,
+        )
         if writable or strong_loot_hints:
             analysis.findings.append(
                 TaskHijackFinding(
                     task_name=task_name,
-                    run_as_user=run_as or "unknown",
+                    run_as_user=run_as_resolved,
                     executable="",
                     arguments="",
                     drop_path=drop_path,
@@ -248,27 +316,34 @@ def analyze_task_hijack(
                     severity=severity,
                 )
             )
+    if analysis.findings:
+        analysis.hijack_intel["task_run_as_user"] = analysis.findings[0].run_as_user
     return analysis
 
 
-def analysis_from_scan_payload(scan_data: dict[str, Any]) -> TaskHijackAnalysis | None:
+def analysis_from_scan_payload(
+    scan_data: dict[str, Any],
+    *,
+    ws_path: Path | None = None,
+) -> TaskHijackAnalysis | None:
     """Rebuild TaskHijackAnalysis from postex_scan.json findings (scenario/remote scan)."""
     raw = scan_data.get("findings") or []
     if not raw:
         return None
     findings: list[TaskHijackFinding] = []
     for item in raw:
+        run_as = resolve_task_run_as(scan_data, item, ws_path=ws_path)
         findings.append(
             TaskHijackFinding(
                 task_name=str(item.get("task_name") or ""),
-                run_as_user=str(item.get("run_as_user") or ""),
+                run_as_user=run_as,
                 executable=str(item.get("executable") or ""),
                 arguments=str(item.get("arguments") or ""),
                 drop_path=str(item.get("drop_path") or ""),
                 payload_zip=str(item.get("payload_zip") or ""),
                 payload_dll=str(item.get("payload_dll") or ""),
                 writable=bool(item.get("writable")),
-                target_arch=str(item.get("target_arch") or "x86"),
+                target_arch=str(item.get("target_arch") or "x64"),
                 evidence=list(item.get("evidence") or []),
                 severity=str(item.get("severity") or "high"),
             )
@@ -277,7 +352,10 @@ def analysis_from_scan_payload(scan_data: dict[str, Any]) -> TaskHijackAnalysis 
         findings=findings,
         monitor_log_excerpt=str(scan_data.get("monitor_log_excerpt") or "")[:2000],
         acl_excerpt=str(scan_data.get("acl_excerpt") or "")[:1000],
-        hijack_intel=dict(scan_data.get("hijack_intel") or {}),
+        hijack_intel={
+            **dict(scan_data.get("hijack_intel") or {}),
+            "task_run_as_user": findings[0].run_as_user if findings else None,
+        },
     )
 
 
@@ -307,13 +385,28 @@ def findings_to_opportunities(
         )
         detail_parts = [
             f"Task '{finding.task_name}' runs as {finding.run_as_user}",
+        ]
+        if (
+            shell_user
+            and finding.run_as_user
+            and shell_user.lower().rstrip("$") != finding.run_as_user.lower().rstrip("$")
+        ):
+            detail_parts.insert(
+                0,
+                f"Escalation: {shell_user} → {finding.run_as_user} via scheduled-task DLL hijack",
+            )
+        detail_parts.extend(
+            [
             f"Binary: {finding.executable} {finding.arguments}".strip(),
             f"Drop {finding.payload_zip} (contains {finding.payload_dll}) → {finding.drop_path}",
-        ]
+            ]
+        )
         if finding.writable:
             detail_parts.append("Drop path writable — deploy payload and wait for task trigger")
         else:
             detail_parts.append("Confirm ACLs on drop path after shell access")
+        if is_system_run_as(finding.run_as_user):
+            detail_parts.append(_SYSTEM_HIJACK_NOTE)
 
         commands = [apply_postex_templates(c, ctx) for c in meta.manual_commands]
 
@@ -379,5 +472,7 @@ def analysis_to_dict(analysis: TaskHijackAnalysis) -> dict[str, Any]:
         ],
         "monitor_log_excerpt": analysis.monitor_log_excerpt,
         "acl_excerpt": analysis.acl_excerpt,
+        "monitor_log_path": (analysis.hijack_intel or {}).get("monitor_log_path"),
+        "task_run_as_user": (analysis.hijack_intel or {}).get("task_run_as_user"),
         "hijack_intel": analysis.hijack_intel,
     }

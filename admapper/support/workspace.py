@@ -37,31 +37,12 @@ class WorkspaceManager:
 
     def path_for(self, name: str) -> Path:
         safe_name = _validate_workspace_name(name)
-        primary = self.root / safe_name
-        if (primary / "state.json").is_file():
-            return primary
-
-        from admapper.support.platform import user_config_dir
-
-        global_root = user_config_dir() / "workspaces"
-        global_path = global_root / safe_name
-        if (global_path / "state.json").is_file():
-            return global_path
-
-        return primary
+        return self.root / safe_name
 
     def list_workspaces(self) -> list[str]:
-        found = set()
+        found: set[str] = set()
         if self.root.is_dir():
             for p in self.root.iterdir():
-                if p.is_dir() and (p / "state.json").is_file():
-                    found.add(p.name)
-
-        from admapper.support.platform import user_config_dir
-
-        global_root = (user_config_dir() / "workspaces").resolve()
-        if global_root.is_dir() and global_root != self.root.resolve():
-            for p in global_root.iterdir():
                 if p.is_dir() and (p / "state.json").is_file():
                     found.add(p.name)
         return sorted(found)
@@ -114,3 +95,27 @@ class WorkspaceManager:
         if self.exists(name):
             return self.load(name)
         return self.create(name, mode=mode)
+
+    def rename(self, old_name: str, new_name: str) -> WorkspaceState:
+        """Move workspace directory and update persisted state name."""
+        import shutil
+
+        old_path = self.path_for(old_name)
+        new_path = self.path_for(new_name)
+        if not (old_path / "state.json").is_file():
+            raise FileNotFoundError(f"workspace not found: {old_name}")
+        if new_path.exists():
+            raise ValueError(f"workspace already exists: {new_name}")
+        state = self.load(old_name)
+        shutil.move(str(old_path), str(new_path))
+        state.name = _validate_workspace_name(new_name)
+        self.save(state)
+        cheatsheet_path = new_path / "cheatsheet_vars.json"
+        if cheatsheet_path.is_file():
+            data = json.loads(cheatsheet_path.read_text(encoding="utf-8"))
+            data["workspace"] = state.name
+            cheatsheet_path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return state

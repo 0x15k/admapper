@@ -64,6 +64,28 @@ def _best_cred_per_user(credentials: list[dict]) -> dict[str, dict]:
     return best
 
 
+def _normalize_username(name: str) -> str:
+    user = str(name or "").strip()
+    if "\\" in user:
+        user = user.split("\\", 1)[1]
+    if "@" in user:
+        user = user.split("@", 1)[0]
+    return user.lower().rstrip("$")
+
+
+def cred_password_and_hash(cred: dict) -> tuple[str, str]:
+    """Return (password, nthash) from a credentials.json row."""
+    secret = str(cred.get("secret") or "")
+    cred_type = str(cred.get("type") or "").lower()
+    if cred_type == "password":
+        return secret, ""
+    if cred_type == "ntlm":
+        return "", secret
+    if len(secret) == 32 and all(c in "0123456789abcdef" for c in secret.lower()):
+        return "", secret
+    return secret, ""
+
+
 def _cred_rows(ws_path: Path) -> list[list[str]]:
     data = _load_json(ws_path / "credentials.json") or {}
     rows: list[list[str]] = []

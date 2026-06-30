@@ -77,6 +77,7 @@ class WinRMClient:
         clock_skew: str | None = None,
         verbose: bool = False,
         nthash: str | None = None,
+        ticket_dir: Path | None = None,
     ) -> None:
         self.host = host.rstrip(".")
         self.domain = domain
@@ -87,7 +88,8 @@ class WinRMClient:
         self.port = port
         self.ticket_method = ticket_method
         self.ccache = ccache
-        self.krb5_conf = krb5_conf or default_ticket_dir() / f"{domain.lower()}-krb5.conf"
+        self._ticket_dir = ticket_dir or default_ticket_dir()
+        self.krb5_conf = krb5_conf or self._ticket_dir / f"{domain.lower()}-krb5.conf"
         self.clock_skew = clock_skew
         self.verbose = verbose
         self.nthash = nthash.lower() if nthash else None
@@ -116,7 +118,7 @@ class WinRMClient:
         if not self.dc_ip:
             raise WinRMError("dc_ip is required to acquire Kerberos tickets")
 
-        ticket_dir = default_ticket_dir()
+        ticket_dir = self._ticket_dir
         ccache = self.ccache or ticket_dir / f"{self.username}-winrm.ccache"
         self.ccache = ccache
 

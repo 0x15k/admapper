@@ -119,6 +119,44 @@ def handle(session: Session, cmd: str, args: list[str]) -> bool | None:
                 print_error(str(exc))
             return True
 
+        if args and args[0].lower() in {"handler", "listen"}:
+            from admapper.postex.handler import run_postex_handler
+
+            lport = 4444
+            i = 1
+            while i < len(args):
+                if args[i] == "--lport" and i + 1 < len(args):
+                    lport = int(args[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            try:
+                run_postex_handler(session, lport=lport)
+            except (ValueError, RuntimeError) as exc:
+                print_error(str(exc))
+            return True
+
+        if args and args[0].lower() == "shell":
+            from admapper.postex.shell_client import connect_shell
+
+            lport = 4444
+            command = None
+            i = 1
+            while i < len(args):
+                if args[i] == "--lport" and i + 1 < len(args):
+                    lport = int(args[i + 1])
+                    i += 2
+                elif args[i] == "-c" and i + 1 < len(args):
+                    command = args[i + 1]
+                    i += 2
+                else:
+                    i += 1
+            try:
+                connect_shell(session, lport=lport, command=command)
+            except (ValueError, RuntimeError) as exc:
+                print_error(str(exc))
+            return True
+
         from admapper.postex.analyze import run_postex_analysis
 
         try:

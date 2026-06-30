@@ -13,7 +13,7 @@ from admapper.auth.ldap_session import open_ldap_session
 from admapper.creds.common import pick_dc_ip
 from admapper.guides.render import print_manual_guide
 from admapper.models.adcs import AdcsFinding
-from admapper.models.credential import Credential, CredentialStatus
+from admapper.models.credential import Credential
 from admapper.support.output import print_info, print_success, print_table, print_warning
 from admapper.support.platform import resolve_certipy
 
@@ -30,24 +30,12 @@ class AdcsAnalysisResult:
 
 
 def _pick_credential(session: Session, cred_id: str | None) -> Credential:
-    store = session.credentials
-    if store is None:
-        raise RuntimeError("credential store unavailable")
-    creds = store.list()
-    if not creds:
-        raise ValueError("no credentials — run start_auth or creds add")
+    from admapper.creds.common import credential_for_pivot
 
-    if cred_id:
-        cred = next((c for c in creds if c.id == cred_id), None)
-        if cred is None:
-            raise ValueError(f"credential not found: {cred_id}")
-        return cred
-
-    for preferred in (CredentialStatus.VALID, CredentialStatus.UNVERIFIED):
-        for cred in creds:
-            if cred.status == preferred and cred.secret:
-                return cred
-    raise ValueError("no usable credential for AD CS enum")
+    cred = credential_for_pivot(session, cred_id=cred_id)
+    if cred is None:
+        raise ValueError("no usable credential for AD CS enum")
+    return cred
 
 
 def _build_group_enroll_hints(

